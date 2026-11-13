@@ -3,428 +3,316 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>RoadWatch public road map</title>
-<meta name="description" content="Open and repaired road damage reported by citizens and drive surveys. No personal data is published.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>RoadWatch Maps</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
-  :root {
-    --asphalt: #17191d;
-    --asphalt-2: #24272d;
-    --yellow: #f2b705;
-    --ink: #1c1e22;
-    --muted: #6b7079;
-    --line: #e3e5e8;
-    --bg: #f3f4f6;
-    --card: #ffffff;
-    --open: #d93a2b;
-    --fixed: #2a6fdb;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body {
-    font-family: "Barlow", system-ui, sans-serif; color: var(--ink); background: var(--bg);
-    display: flex; flex-direction: column; min-height: 100vh;
-  }
-  header {
-    background: var(--asphalt); color: #fff; padding: 12px 16px 0;
-    border-bottom: 4px dashed var(--yellow);
-  }
-  .bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding-bottom: 12px; }
-  .logo {
-    width: 34px; height: 34px; border-radius: 8px; background: var(--yellow); color: var(--asphalt);
-    display: grid; place-items: center; font: 700 18px "Barlow Condensed", sans-serif; flex: none;
-  }
-  h1 { font: 700 22px/1.1 "Barlow Condensed", sans-serif; letter-spacing: .3px; margin: 0; flex: 1 1 auto; }
-  h1 small { display: block; font: 400 13px "Barlow", sans-serif; color: #b9bdc4; letter-spacing: 0; margin-top: 2px; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px;
-    font: 600 14px "Barlow", sans-serif; text-decoration: none; white-space: nowrap;
-  }
-  .btn.primary { background: var(--yellow); color: var(--asphalt); }
-  .btn.ghost { color: #fff; border: 1px solid #4a4e56; }
-  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-
-  .stats {
-    max-width: 1200px; margin: 12px auto 0; padding: 0 16px; width: 100%;
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
-  }
-  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .stat b { display: block; font: 700 26px/1 "Barlow Condensed", sans-serif; }
-  .stat span { font-size: 13px; color: var(--muted); }
-  .stat.open b { color: var(--open); }
-  .stat.fixed b { color: var(--fixed); }
-
-  main { flex: 1; display: flex; flex-direction: column; max-width: 1200px; width: 100%; margin: 12px auto; padding: 0 16px; gap: 12px; }
-  #map { flex: 1; min-height: 420px; border-radius: 12px; border: 1px solid var(--line); background: #e9eaec; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); }
-  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 5px; }
-  .privacy { color: var(--muted); margin: 0; }
-  .privacy strong { color: var(--ink); }
-  #status { color: var(--muted); }
-
-  .pin {
-    min-width: 28px; height: 28px; padding: 0 6px; border-radius: 14px; color: #fff; border: 2px solid #fff;
-    font: 700 13px/24px "Barlow Condensed", sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.35);
-  }
-  .pin.open { background: var(--open); }
-  .pin.repaired { background: var(--fixed); }
-  .leaflet-div-icon.rw { background: none; border: none; }
-  .leaflet-popup-content { font: 14px/1.4 "Barlow", sans-serif; margin: 10px 12px; }
-  .pop-title { font-weight: 700; font-size: 15px; }
-  .pop-meta { color: var(--muted); font-size: 13px; }
-
-  .live { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
-  .live i { width: 9px; height: 9px; border-radius: 50%; background: #9aa1aa; display: inline-block; }
-  .live.on i { background: #2e9a57; box-shadow: 0 0 0 3px rgba(46,154,87,.25); }
-  .pulse { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--open); animation: ping 1.6s ease-out 3; }
-  @keyframes ping { from { transform: scale(.6); opacity: 1; } to { transform: scale(2.8); opacity: 0; } }
-  #toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 1200; display: grid; gap: 8px; width: min(440px, calc(100vw - 28px)); }
-  .toast { background: #17191d; color: #fff; border-left: 4px solid #f2b705; border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 26px rgba(0,0,0,.35); font-size: 14px; }
-  .toast.fix { border-left-color: #2e9a57; }
-  .planner h2 { font: 700 20px "Barlow Condensed", sans-serif; margin: 0 0 8px; }
-  .planner .inputs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
-  .planner input { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
-  .planner button { font: 600 14px "Barlow", sans-serif; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
-  .planner button.go { background: #17191d; color: #fff; border-color: #17191d; }
-  .planner .tools { display: flex; gap: 8px; margin: 8px 0 0; flex-wrap: wrap; }
-  #route-msg { color: var(--muted); margin: 8px 0 0; }
-  #route-msg.err { color: #d92d20; }
-  #route-list { display: grid; gap: 8px; margin-top: 10px; }
-  .route { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; background: #fff; }
-  .route.sel { border-color: #17191d; box-shadow: inset 0 -3px 0 #f2b705; }
-  .route b { font: 700 17px "Barlow Condensed", sans-serif; }
-  .chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; background: #eceee9; color: #3a3f45; }
-  .chip.rec { background: #2e9a57; color: #fff; }
-  .route .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  @media (max-width: 760px) { .planner .inputs { grid-template-columns: 1fr; } }
-
-  footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 16px; }
-
-  @media (max-width: 760px) {
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stat.km { grid-column: span 2; }
-    h1 { font-size: 20px; }
-    .actions { width: 100%; }
-    .actions .btn { flex: 1; justify-content: center; }
-    #map { min-height: 60vh; }
-  }
-
-  .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .stat b.small { font-size: 17px; line-height: 1.15; padding-top: 4px; overflow-wrap: anywhere; }
-  .stat.red b { color: #d92d20; }
-  .stat.warn b { color: #b86e00; }
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
-  .mapcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .seg { display: inline-flex; border: 1.5px solid var(--asphalt); border-radius: 10px; overflow: hidden; }
-  .seg button { font: 600 14px "Barlow", sans-serif; padding: 9px 16px; min-height: 44px; border: 0; background: #fff; color: var(--ink); cursor: pointer; }
-  .seg button + button { border-left: 1.5px solid var(--asphalt); }
-  .seg button[aria-pressed="true"] { background: var(--asphalt); color: var(--yellow); }
-  .seg button:focus-visible, .planner button:focus-visible, .rep:focus-visible, .route:focus-visible, .planner input:focus-visible { outline: 3px solid #1f5fbf; outline-offset: 2px; }
-  .sq { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; opacity: .85; }
-  .zlabel { min-width: 26px; height: 26px; border-radius: 13px; border: 2px solid #fff; color: #fff; font: 700 14px/22px "Barlow Condensed", sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
-  .zlabel.yellow { color: #1c1e22; }
-  .reports h2 { font: 700 20px "Barlow Condensed", sans-serif; margin: 0 0 8px; }
-  #rep-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; }
-  .rep { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; width: 100%; font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; min-height: 48px; cursor: pointer; transition: background .6s; }
-  .rep.fresh { background: #fff4c2; border-color: var(--yellow); }
-  .rep b { font-weight: 700; }
-  .rep .sub { grid-column: 1 / 2; color: var(--muted); font-size: 13px; }
-  .st { align-self: start; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
-  .st.submitted { background: #e2edfd; color: #1b57b8; }
-  .st.in_review { background: #e9e8fb; color: #4a45c4; }
-  .st.in_progress { background: #fdecd2; color: #a35a00; }
-  .st.resolved { background: #dcf3e4; color: #1d7a42; }
-  .st.rejected { background: #fbe0dd; color: #b3261e; }
-  .empty { color: var(--muted); margin: 6px 0; }
-  .planner input, .planner button { min-height: 44px; }
-  .planner button.go { background: var(--yellow); color: var(--asphalt); border-color: var(--yellow); font-weight: 700; }
-  .planner .inputs { grid-template-columns: 1fr; }
-  .route .sub.warn { color: #b3261e; font-weight: 600; }
-  .route .advice { margin-top: 4px; }
-  .rdot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 11px/20px "Barlow", sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
-  .endpin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; color: #fff; font: 700 14px/24px "Barlow", sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
-  #banner { display: none; background: var(--asphalt); color: #fff; border-left: 4px solid var(--yellow); border-radius: 10px; padding: 10px 14px; }
-  #banner.on { display: block; }
-  @media (max-width: 960px) {
-    .layout { grid-template-columns: minmax(0, 1fr); }
-    #rep-list { max-height: none; }
-  }
-  @media (max-width: 760px) {
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stat.area { grid-column: span 2; }
-  }
-  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+:root{--ink:#1f2328;--muted:#5f6670;--line:#e3e5e8;--card:#fff;--blue:#1a73e8;--red:#d92d20;--amber:#f0a30a;--green:#1e9e57}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-serif;color:var(--ink)}
+#map{position:absolute;inset:0}
+.panel{position:absolute;top:12px;left:12px;width:392px;max-height:calc(100% - 24px);background:var(--card);border-radius:14px;box-shadow:0 2px 14px rgba(0,0,0,.28);display:flex;flex-direction:column;z-index:5;overflow:hidden}
+.search{display:flex;align-items:center;gap:6px;padding:8px 10px}
+.search input{flex:1;border:0;outline:0;font:inherit;font-size:16px;padding:8px 4px;min-width:0;background:transparent}
+.ib{border:0;background:none;width:38px;height:38px;border-radius:50%;cursor:pointer;display:grid;place-items:center;color:var(--blue);flex:none}
+.ib:hover{background:#f1f3f4}.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sugg{border-top:1px solid var(--line);max-height:260px;overflow:auto}
+.sugg button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 14px;cursor:pointer;font:inherit}
+.sugg button:hover{background:#f6f7f8}.sugg small{color:var(--muted);display:block}
+.dir{padding:10px 12px;border-top:1px solid var(--line);display:none;gap:8px}
+.dir.on{display:grid}
+.fld{display:flex;align-items:center;gap:8px}
+.fld .dot{width:12px;height:12px;border-radius:50%;border:3px solid var(--blue);flex:none}
+.fld .dot.b{border-color:var(--red);background:var(--red)}
+.fld input{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;min-width:0}
+.body{overflow:auto;flex:1}
+.banner{margin:10px 12px 0;padding:10px 12px;border-radius:10px;background:#e8f5ec;color:#145a32;font-weight:600}
+.banner.warn{background:#fff3e0;color:#8a4b00}.banner.bad{background:#fdecea;color:#8c1d14}
+.route{margin:8px 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
+.route.sel{border-color:var(--blue);background:#f5f9ff}
+.route .t{display:flex;justify-content:space-between;align-items:baseline;font-size:17px;font-weight:600}
+.route .t span{color:var(--muted);font-weight:400;font-size:14px}
+.route .d{margin-top:4px;font-size:14px;color:var(--muted)}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;margin-right:4px;background:#eef0f2;color:#3c4043}
+.chip.rec{background:var(--green);color:#fff}.chip.bad{background:#fdecea;color:#8c1d14}.chip.ok{background:#e8f5ec;color:#145a32}
+.card{padding:14px 16px;border-top:1px solid var(--line)}
+.card h3{margin:0 0 2px;font-size:19px}
+.card .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;font:600 14px inherit;cursor:pointer;color:var(--blue)}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:8px;font-size:14px}.kv b{color:var(--muted);font-weight:500}
+.layers{position:absolute;top:12px;left:428px;display:flex;gap:8px;z-index:4;flex-wrap:wrap}
+.pill{background:#fff;border:0;border-radius:999px;padding:8px 14px;box-shadow:0 1px 6px rgba(0,0,0,.3);font:600 14px inherit;cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:7px}
+.pill i{width:10px;height:10px;border-radius:50%;background:#bbb}.pill.on i{background:var(--green)}
+.pill.on{background:#e8f0fe;color:#174ea6}
+.legend{position:absolute;left:12px;bottom:26px;background:#fff;border-radius:10px;padding:8px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:12.5px;z-index:3;display:flex;gap:12px;align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:16px;height:6px;border-radius:3px}
+.live{position:absolute;right:12px;top:12px;background:#fff;border-radius:999px;padding:6px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:13px;font-weight:600;z-index:4;display:flex;gap:6px;align-items:center}
+.live i{width:9px;height:9px;border-radius:50%;background:#9aa1aa}.live.on i{background:var(--green);box-shadow:0 0 0 3px rgba(30,158,87,.25)}
+#toasts{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;z-index:9;display:grid;gap:8px;width:min(440px,calc(100vw - 24px))}
+.toast{background:#202124;color:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:14px}
+.pin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)}
+.maplibregl-ctrl-bottom-right{bottom:12px}
+@media (max-width:760px){
+  .panel{top:auto;bottom:0;left:0;right:0;width:100%;max-height:58%;border-radius:18px 18px 0 0}
+  .layers{left:12px;top:12px;right:130px}
+  .legend{display:none}
+}
 </style>
 </head>
 <body>
-<header>
-  <div class="bar">
-    <div class="logo" aria-hidden="true">RW</div>
-    <h1>RoadWatch public road map<small>Road damage reported by citizens and drive surveys</small></h1>
-    <div class="actions">
-      <a class="btn primary" href="tel:+918064270577">Call helpline</a>
-      <a class="btn ghost" id="app-link" href="#download">Download the app</a>
-    </div>
-  </div>
-</header>
+<div id="map"></div>
 
-<section class="stats" aria-label="Summary" aria-live="polite">
-  <div class="stat open"><b id="s-open">-</b><span>Open defects</span></div>
-  <div class="stat"><b id="s-comp">-</b><span>Complaints received</span></div>
-  <div class="stat warn"><b id="s-compopen">-</b><span>Complaints still open</span></div>
-  <div class="stat red"><b id="s-red">-</b><span>Red zones</span></div>
-  <div class="stat area"><b class="small" id="s-area">-</b><span>Most affected area</span></div>
-</section>
+<div class="panel" id="panel">
+  <div class="search">
+    <input id="q" placeholder="Search a place or road" autocomplete="off" aria-label="Search places">
+    <button class="ib" id="go-dir" title="Directions" aria-label="Directions"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg></button>
+  </div>
+  <div class="dir" id="dir">
+    <div class="fld"><span class="dot"></span><input id="from" placeholder="Choose starting point" autocomplete="off"><button class="ib" id="here" title="Use my location" aria-label="Use my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg></button></div>
+    <div class="fld"><span class="dot b"></span><input id="to" placeholder="Choose destination" autocomplete="off"><button class="ib" id="swap" title="Swap" aria-label="Swap start and destination"><svg viewBox="0 0 24 24"><path d="M7 4v16M7 4L3 8M7 4l4 4M17 20V4M17 20l-4-4M17 20l4-4"/></svg></button></div>
+    <div class="fld" style="justify-content:flex-end"><button class="btn" id="close-dir">Close</button><button class="btn p" id="plan">Get directions</button></div>
+  </div>
+  <div class="sugg" id="sugg"></div>
+  <div class="body" id="body"></div>
+</div>
 
-<main>
-  <div class="layout">
-    <div class="mapcol">
-      <div class="card row">
-        <div class="seg" role="group" aria-label="What to show on the map">
-          <button type="button" data-mode="areas" aria-pressed="false">Areas</button>
-          <button type="button" data-mode="pins" aria-pressed="false">Pins</button>
-          <button type="button" data-mode="both" aria-pressed="true">Both</button>
-        </div>
-        <div class="legend" id="legend-zones">
-          <span><i class="sq" style="background:#2e9a57"></i>Green: 1 to 2 defects</span>
-          <span><i class="sq" style="background:#f2b705"></i>Yellow: 3 to 5</span>
-          <span><i class="sq" style="background:#d92d20"></i>Red: 6 or more, or 3 or more serious</span>
-        </div>
-      </div>
-      <div id="banner" role="status"></div>
-      <div id="map" role="region" aria-label="Map of road damage"></div>
-      <div class="card row">
-        <div class="legend">
-          <span><i class="dot" style="background:var(--open)"></i>Open</span>
-          <span><i class="dot" style="background:var(--fixed)"></i>Repaired</span>
-          <span id="status">Loading</span>
-          <span class="live" id="live"><i></i><span>Connecting</span></span>
-        </div>
-      </div>
-    </div>
-    <div class="side">
-      <div class="card planner" id="planner">
-        <h2>Plan a smoother route</h2>
-        <div class="inputs">
-          <input id="r-from" aria-label="Start place" placeholder="From (place or latitude, longitude)" autocomplete="off">
-          <input id="r-to" aria-label="Destination" placeholder="To (place or latitude, longitude)" autocomplete="off">
-        </div>
-        <div class="tools">
-          <button id="r-here" type="button">Use my location</button>
-          <button class="go" id="r-go" type="button">Compare routes</button>
-        </div>
-        <p id="route-msg" aria-live="polite">Routes are compared by driving time and by the road damage reported along them, updated live as people report new damage.</p>
-        <div id="route-list"></div>
-      </div>
-      <div class="card reports">
-        <h2>Recent reports</h2>
-        <div id="rep-list" aria-live="polite"><p class="empty">Loading reports...</p></div>
-      </div>
-    </div>
-  </div>
-  <div class="card" id="download">
-    <p class="privacy"><strong>Privacy.</strong> No names, phone numbers or photos are published. This map shows only the
-      location, type and status of each defect, and reports show only the area.</p>
-    <p class="privacy" style="margin-top:8px">To report a pothole, call the helpline on
-      <a href="tel:+918064270577">+91 80 6427 0577</a> or use the RoadWatch app on your phone.</p>
-  </div>
-</main>
+<div class="layers" id="layers">
+  <button class="pill on" data-l="zones"><i></i>Damage zones</button>
+  <button class="pill on" data-l="defects"><i></i>Potholes</button>
+</div>
+<div class="live" id="live"><i></i><span>Connecting</span></div>
+<div class="legend"><span><i style="background:#1a73e8"></i>Clear road</span><span><i style="background:#f0a30a"></i>Damaged</span><span><i style="background:#d92d20"></i>Severe</span></div>
 <div id="toasts"></div>
-<footer>Map data from OpenStreetMap contributors. Tiles by Esri.</footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 (function () {
-  var NAMES = {
-    pothole: "Pothole", longitudinal_crack: "Longitudinal crack", transverse_crack: "Transverse crack",
-    alligator_crack: "Alligator crack", debris: "Debris", manhole: "Manhole", speed_breaker: "Speed breaker",
-    barricade: "Barricade"
-  };
-  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var NAMES = { pothole: "Pothole", alligator_crack: "Alligator cracks", longitudinal_crack: "Long crack", transverse_crack: "Cross crack",
+    manhole: "Manhole", speed_breaker: "Speed breaker", debris: "Debris", barricade: "Barricade" };
+  var COL = { red: "#d92d20", yellow: "#f0a30a", green: "#1e9e57" };
+  function esc(t) { return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function toast(t) { var e = document.createElement("div"); e.className = "toast"; e.textContent = t; $("toasts").appendChild(e); setTimeout(function () { e.remove(); }, 6500); }
 
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  var map = new maplibregl.Map({ container: "map", style: "https://tiles.openfreemap.org/styles/liberty", center: [77.5946, 12.9716], zoom: 12, attributionControl: { compact: true } });
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+  var geo = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true });
+  map.addControl(geo, "bottom-right");
+
+  var defects = [], ready = false, endpoints = { from: null, to: null }, lastRes = null, selIdx = 0, markers = [];
+
+  function circlePoly(lat, lon, r) {
+    var pts = [], k = 28, dLat = r / 110540, dLon = r / (111320 * Math.cos(lat * Math.PI / 180));
+    for (var i = 0; i <= k; i++) { var a = i / k * 2 * Math.PI; pts.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]); }
+    return [pts];
+  }
+  function defectFC() {
+    return { type: "FeatureCollection", features: defects.filter(function (d) { return d.lat != null; }).map(function (d) {
+      return { type: "Feature", geometry: { type: "Point", coordinates: [d.lon, d.lat] },
+        properties: { uid: d.uid, number: d.number, cls: d["class"], sev: d.severity || "", status: d.status || "active", reports: d.reports || 1,
+          c: d.status === "repaired" ? "#1e9e57" : (/crit|sev/i.test(d.severity || "") ? "#d92d20" : "#f0a30a") } };
+    }) };
+  }
+  function setDefects() { if (ready) map.getSource("defects").setData(defectFC()); }
+
+  map.on("load", function () {
+    map.addSource("zones", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addSource("defects", { type: "geojson", data: defectFC(), cluster: true, clusterRadius: 38, clusterMaxZoom: 14 });
+    map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addSource("alts", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "zones-fill", type: "fill", source: "zones", paint: { "fill-color": ["get", "c"], "fill-opacity": 0.22 } });
+    map.addLayer({ id: "zones-line", type: "line", source: "zones", paint: { "line-color": ["get", "c"], "line-width": 1.4, "line-opacity": 0.7 } });
+    map.addLayer({ id: "alts", type: "line", source: "alts", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#8a9097", "line-width": 6, "line-opacity": 0.75 } });
+    map.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 11 } });
+    map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "c"], "line-width": 7 } });
+    map.addLayer({ id: "clusters", type: "circle", source: "defects", filter: ["has", "point_count"],
+      paint: { "circle-color": "#d92d20", "circle-opacity": 0.88, "circle-stroke-color": "#fff", "circle-stroke-width": 2, "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 24] } });
+    map.addLayer({ id: "cluster-n", type: "symbol", source: "defects", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] }, paint: { "text-color": "#fff" } });
+    map.addLayer({ id: "pts", type: "circle", source: "defects", filter: ["!", ["has", "point_count"]],
+      paint: { "circle-color": ["get", "c"], "circle-radius": 7, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    ready = true;
+    loadZones(); loadDefects();
+    map.on("click", "clusters", function (e) {
+      var f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
+      map.getSource("defects").getClusterExpansionZoom(f.properties.cluster_id).then(function (z) { map.easeTo({ center: f.geometry.coordinates, zoom: z + 0.5 }); });
     });
-  }
-  function day(iso) {
-    if (!iso) return "";
-    var d = new Date(/Z|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z");
-    if (isNaN(d)) return "";
-    var s = d.getDate() + " " + MONTHS[d.getMonth()];
-    if (d.getFullYear() !== new Date().getFullYear()) s += " " + d.getFullYear();
-    return s;
-  }
-  function popup(p) {
-    var name = NAMES[p["class"]] || "Road damage";
-    var reports = p.reports + (p.reports === 1 ? " report" : " reports");
-    var state = p.status === "repaired"
-      ? "repaired, last seen " + day(p.last_seen)
-      : "open since " + day(p.first_seen);
-    return '<div class="pop-title">' + esc(name + " " + p.number + ", " + reports + ", " + state) + "</div>" +
-      '<div class="pop-meta">' + esc(p.uid) + (p.severity ? ", severity " + esc(p.severity) : "") + "</div>" +
-      '<div class="pop-meta"><a href="https://maps.google.com/?q=' + p.lat + "," + p.lon +
-      '" target="_blank" rel="noopener">Open in Google Maps</a></div>';
-  }
+    map.on("click", "pts", function (e) { showDefect(e.features[0].properties.uid, true); });
+    ["clusters", "pts"].forEach(function (l) {
+      map.on("mouseenter", l, function () { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", l, function () { map.getCanvas().style.cursor = ""; });
+    });
+  });
 
-  var map = L.map("map", { zoomControl: true }).setView([12.9716, 77.5946], 12);
-  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
-    maxZoom: 16, attribution: "Tiles &copy; Esri"
-  }).addTo(map);
-
-  var byUid = {};
-  function openHash() {
-    var uid = decodeURIComponent((location.hash || "").slice(1)).toUpperCase();
-    var m = byUid[uid];
-    if (!m) return false;
-    map.setView(m.getLatLng(), 16);
-    m.openPopup();
-    return true;
-  }
-
-  function setText(id, v) { document.getElementById(id).textContent = v; }
-
-  function getJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
-  var pinsGroup = L.layerGroup().addTo(map), zonesGroup = L.layerGroup().addTo(map), mode = "both";
-  var ZC = { red: "#d92d20", yellow: "#f2b705", green: "#2e9a57" };
-
-  function loadSummary() {
-    getJSON("/api/public/summary").then(function (s) {
-      setText("s-open", s.open_defects); setText("s-comp", s.complaints_total);
-      setText("s-compopen", s.complaints_open); setText("s-red", s.red_zones);
-      setText("s-area", s.most_affected_area || "None yet");
-    }).catch(function () {});
-  }
   function loadZones() {
-    getJSON("/api/public/zones?cell_m=300").then(function (z) {
-      zonesGroup.clearLayers();
-      (z.cells || []).forEach(function (c) {
-        var dLat = c.size_m / 2 / 111320, dLon = c.size_m / 2 / (111320 * Math.cos(c.lat * Math.PI / 180));
-        var col = ZC[c.level] || ZC.green;
-        var tip = esc(c.label || (c.count + " defects"));
-        L.rectangle([[c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]],
-          { color: col, weight: 1.5, fillColor: col, fillOpacity: 0.32 })
-          .bindTooltip(tip, { sticky: true }).bindPopup("<b>" + tip + "</b>").addTo(zonesGroup);
-        L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "rw", html: '<div class="zlabel ' + esc(c.level) + '" style="background:' + col + '">' + esc(c.count) + "</div>",
-          iconSize: [26, 26], iconAnchor: [13, 13] }), title: c.label, keyboard: false }).bindPopup("<b>" + tip + "</b>").addTo(zonesGroup);
-      });
+    fetch("/api/public/zones").then(function (r) { return r.json(); }).then(function (z) {
+      map.getSource("zones").setData({ type: "FeatureCollection", features: (z.cells || []).map(function (c) {
+        return { type: "Feature", geometry: { type: "Polygon", coordinates: circlePoly(c.lat, c.lon, c.size_m * 0.62) }, properties: { c: COL[c.level] || COL.green, label: c.label } };
+      }) });
     }).catch(function () {});
   }
-  function setMode(m) {
-    mode = m;
-    var b = document.querySelectorAll(".seg button");
-    for (var i = 0; i < b.length; i++) b[i].setAttribute("aria-pressed", b[i].getAttribute("data-mode") === m ? "true" : "false");
-    if (m === "pins") map.removeLayer(zonesGroup); else if (!map.hasLayer(zonesGroup)) map.addLayer(zonesGroup);
-    if (m === "areas") map.removeLayer(pinsGroup); else if (!map.hasLayer(pinsGroup)) map.addLayer(pinsGroup);
-    document.getElementById("legend-zones").style.display = m === "pins" ? "none" : "";
+  function loadDefects() {
+    fetch("/api/public/defects").then(function (r) { return r.json(); }).then(function (l) {
+      defects = l; setDefects();
+      var h = (location.hash || "").replace("#", "");
+      if (h) showDefect(h, true);
+    }).catch(function () { toast("Could not load road damage data."); });
   }
-  (function () {
-    var b = document.querySelectorAll(".seg button");
-    for (var i = 0; i < b.length; i++) b[i].onclick = function () { setMode(this.getAttribute("data-mode")); };
-  })();
-  loadSummary(); loadZones();
 
-  // ---- recent reports from everyone
-  var STATUS = { submitted: "Submitted", in_review: "In review", in_progress: "In progress", resolved: "Resolved", rejected: "Rejected" };
-  var CATS = { pothole: "Pothole", crack: "Cracks", waterlogging: "Waterlogging", broken_road: "Broken road", other: "Other" };
-  var seenReports = null, freshSet = {};
-  function ago(iso) {
-    var d = new Date(/Z|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z"), s = (Date.now() - d.getTime()) / 1000;
-    if (isNaN(s)) return "";
-    if (s < 60) return "just now";
-    if (s < 3600) return Math.floor(s / 60) + " min ago";
-    if (s < 86400) return Math.floor(s / 3600) + " h ago";
-    if (s < 7 * 86400) return Math.floor(s / 86400) + " d ago";
-    return day(iso);
+  // ---- layer toggles
+  document.querySelectorAll("#layers .pill").forEach(function (b) {
+    b.onclick = function () {
+      var on = !b.classList.contains("on"); b.classList.toggle("on", on);
+      var ids = b.dataset.l === "zones" ? ["zones-fill", "zones-line"] : ["clusters", "cluster-n", "pts"];
+      ids.forEach(function (id) { map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
+    };
+  });
+
+  // ---- place search (Nominatim, India) with debounce
+  var timer = null, activeInput = null;
+  function search(input) {
+    activeInput = input; clearTimeout(timer);
+    var q = input.value.trim(); if (q.length < 3) { $("sugg").innerHTML = ""; return; }
+    timer = setTimeout(function () {
+      var c = map.getCenter();
+      fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=in&viewbox=" + (c.lng - 1) + "," + (c.lat + 1) + "," + (c.lng + 1) + "," + (c.lat - 1) + "&q=" + encodeURIComponent(q))
+        .then(function (r) { return r.json(); }).then(function (hits) {
+          if (input !== activeInput) return;
+          $("sugg").innerHTML = hits.map(function (h, i) {
+            var p = (h.display_name || "").split(", ");
+            return "<button data-i='" + i + "'><b>" + esc(p[0]) + "</b><small>" + esc(p.slice(1, 4).join(", ")) + "</small></button>";
+          }).join("") || "<button disabled>No places found</button>";
+          Array.prototype.forEach.call($("sugg").querySelectorAll("button[data-i]"), function (b) {
+            b.onclick = function () { pick(input, hits[+b.dataset.i]); };
+          });
+        }).catch(function () {});
+    }, 420);
   }
-  function renderReports(list) {
-    var box = document.getElementById("rep-list"); box.innerHTML = "";
-    if (!list.length) { box.innerHTML = '<p class="empty">No reports yet. Be the first to report a road problem.</p>'; return; }
-    list.forEach(function (r) {
-      var el = document.createElement("button"); el.type = "button";
-      var hasLoc = typeof r.lat === "number" && typeof r.lon === "number";
-      el.className = "rep" + (freshSet[r.number] ? " fresh" : "");
-      var cat = CATS[r.category] || NAMES[r.category] || "Road damage", st = STATUS[r.status] || r.status;
-      el.setAttribute("aria-label", cat + " " + r.number + ", " + (r.area || "area not shared") + ", " + st);
-      el.innerHTML = "<span><b>" + esc(cat) + "</b> " + esc(r.number) + '</span><span class="st ' + esc(r.status) + '">' + esc(st) + "</span>" +
-        '<span class="sub">' + esc((r.area || "Location not shared") + (r.created_at ? ", " + ago(r.created_at) : "")) + "</span>";
-      el.onclick = function () {
-        if (!hasLoc) { toast("This report has no map location.", false); return; }
-        map.setView([r.lat, r.lon], 16); pulse(r.lat, r.lon);
-        document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "nearest" });
-      };
-      box.appendChild(el);
+  function pick(input, h) {
+    $("sugg").innerHTML = "";
+    var pt = { lat: parseFloat(h.lat), lon: parseFloat(h.lon), name: (h.display_name || "").split(", ").slice(0, 2).join(", ") };
+    input.value = pt.name;
+    if (input.id === "q") { placeCard(pt, h.display_name); map.flyTo({ center: [pt.lon, pt.lat], zoom: 15 }); }
+    else { endpoints[input.id === "from" ? "from" : "to"] = pt; }
+  }
+  ["q", "from", "to"].forEach(function (id) { $(id).addEventListener("input", function () { search($(id)); if (id !== "q") endpoints[id] = null; }); });
+
+  var pm = null;
+  function placeCard(pt, full) {
+    if (pm) pm.remove();
+    pm = new maplibregl.Marker({ color: "#d92d20" }).setLngLat([pt.lon, pt.lat]).addTo(map);
+    var near = defects.filter(function (d) { return d.lat != null && dist(d.lat, d.lon, pt.lat, pt.lon) < 300 && d.status !== "repaired"; }).length;
+    $("body").innerHTML = "<div class='card'><h3>" + esc(pt.name) + "</h3><div style='color:#5f6670'>" + esc(full || "") + "</div>" +
+      "<div class='row'><span class='chip " + (near ? "bad" : "ok") + "'>" + (near ? near + " reported road defects within 300 m" : "No reported road damage nearby") + "</span></div>" +
+      "<div class='row'><button class='btn p' id='dto'>Directions</button></div></div>";
+    $("dto").onclick = function () { openDir(); $("to").value = pt.name; endpoints.to = pt; if (!endpoints.from) $("from").focus(); else plan(); };
+  }
+
+  function dist(a, b, c, d) { var dx = (d - b) * Math.cos((a + c) / 2 * Math.PI / 180) * 111320, dy = (c - a) * 110540; return Math.sqrt(dx * dx + dy * dy); }
+
+  // ---- defect card
+  function showDefect(uid, fly) {
+    var d = defects.filter(function (x) { return String(x.uid).toUpperCase() === String(uid).toUpperCase(); })[0];
+    if (!d) return;
+    if (fly) map.flyTo({ center: [d.lon, d.lat], zoom: Math.max(map.getZoom(), 16) });
+    history.replaceState(null, "", "#" + d.uid);
+    $("body").innerHTML = "<div class='card'><h3>" + esc(NAMES[d["class"]] || "Road damage") + " " + esc(d.number) + "</h3>" +
+      "<div class='row' style='margin-top:6px'><span class='chip " + (d.status === "repaired" ? "ok" : "bad") + "'>" + (d.status === "repaired" ? "Repaired" : "Open") + "</span><span class='chip'>" + esc(d.severity || "Unrated") + "</span></div>" +
+      "<div class='kv'><b>Reports</b><span>" + esc(d.reports || 1) + "</span><b>First seen</b><span>" + esc((d.first_seen || "").slice(0, 10)) + "</span><b>Last seen</b><span>" + esc((d.last_seen || "").slice(0, 10)) + "</span><b id='rl'></b><span id='rv'></span></div>" +
+      "<div class='row'><button class='btn p' id='dd'>Directions here</button></div></div>";
+    $("dd").onclick = function () { openDir(); var p = { lat: d.lat, lon: d.lon, name: (NAMES[d["class"]] || "Damage") + " " + d.number }; $("to").value = p.name; endpoints.to = p; };
+  }
+
+  // ---- directions
+  function openDir() { $("dir").classList.add("on"); }
+  $("go-dir").onclick = function () { openDir(); $("from").focus(); };
+  $("close-dir").onclick = function () { $("dir").classList.remove("on"); clearRoute(); $("body").innerHTML = ""; };
+  $("swap").onclick = function () {
+    var a = $("from").value; $("from").value = $("to").value; $("to").value = a;
+    var t = endpoints.from; endpoints.from = endpoints.to; endpoints.to = t;
+  };
+  $("here").onclick = function () {
+    if (!navigator.geolocation) { toast("Location is not available in this browser."); return; }
+    navigator.geolocation.getCurrentPosition(function (p) {
+      endpoints.from = { lat: p.coords.latitude, lon: p.coords.longitude, name: "Your location" }; $("from").value = "Your location";
+    }, function () { toast("Location permission was denied. Type a start place instead."); }, { enableHighAccuracy: true, timeout: 12000 });
+  };
+  function clearRoute() {
+    markers.forEach(function (m) { m.remove(); }); markers = [];
+    map.getSource("route").setData({ type: "FeatureCollection", features: [] });
+    map.getSource("alts").setData({ type: "FeatureCollection", features: [] });
+    lastRes = null;
+  }
+  function ptText(which) {
+    var p = endpoints[which]; if (p) return p.lat.toFixed(6) + "," + p.lon.toFixed(6);
+    return $(which).value.trim();
+  }
+  function plan(quiet) {
+    var o = ptText("from"), d = ptText("to");
+    clearTimeout(timer); $("sugg").innerHTML = "";
+    if (!o || !d) { toast("Enter a start and a destination."); return; }
+    if (!quiet) $("body").innerHTML = "<div class='banner warn'>Comparing routes and road damage...</div>";
+    fetch("/api/routeplan?origin=" + encodeURIComponent(o) + "&dest=" + encodeURIComponent(d))
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Could not plan this trip"); return j; }); })
+      .then(function (j) {
+        var was = lastRes ? lastRes.recommended : null;
+        lastRes = j; selIdx = j.recommended; renderRoutes(); drawRoute(true);
+        if (quiet && was !== null && was !== j.recommended) toast("A new report changed the best route.");
+      }).catch(function (e) { $("body").innerHTML = "<div class='banner bad'>" + esc(e.message) + "</div>"; });
+  }
+  $("plan").onclick = function () { plan(false); };
+
+  function fmtMin(m) { return m >= 60 ? Math.floor(m / 60) + " h " + Math.round(m % 60) + " min" : Math.round(m) + " min"; }
+  function renderRoutes() {
+    var res = lastRes, rec = res.routes[res.recommended], fast = res.routes[res.fastest], html = "";
+    if (res.routes.length > 1 && rec !== fast) {
+      var saved = fast.defect_count - rec.defect_count, extra = Math.max(0, Math.round((rec.duration_min - fast.duration_min) * 10) / 10);
+      html += "<div class='banner'>Better route found: Route " + (rec.index + 1) + " avoids " + saved + " reported road defects" +
+        (fast.severe_count > rec.severe_count ? " (" + (fast.severe_count - rec.severe_count) + " serious)" : "") + (extra ? " for " + extra + " min more." : ".") + "</div>";
+    } else if (rec.defect_count === 0) {
+      html += "<div class='banner'>This route has no reported road damage.</div>";
+    } else {
+      html += "<div class='banner warn'>Best available route still passes " + rec.defect_count + " reported defects (" + rec.severe_count + " serious). Drive carefully.</div>";
+    }
+    res.routes.forEach(function (r) {
+      var chips = r.labels.map(function (l) { return "<span class='chip" + (l === "recommended" ? " rec" : "") + "'>" + esc(l) + "</span>"; }).join("");
+      html += "<div class='route" + (r.index === selIdx ? " sel" : "") + "' data-i='" + r.index + "'><div class='t'>" + fmtMin(r.duration_min) + "<span>" + r.distance_km + " km</span></div>" +
+        "<div class='d'>" + chips + "<span class='chip " + (r.defect_count ? "bad" : "ok") + "'>" + (r.defect_count ? r.defect_count + " potholes and defects" : "No damage reported") + "</span></div></div>";
+    });
+    $("body").innerHTML = html;
+    Array.prototype.forEach.call($("body").querySelectorAll(".route"), function (el) {
+      el.onclick = function () { selIdx = +el.dataset.i; renderRoutes(); drawRoute(false); };
     });
   }
-  function loadReports() {
-    getJSON("/api/public/complaints?limit=40").then(function (list) {
-      var added = [];
-      list.forEach(function (r) {
-        if (seenReports && !seenReports[r.number]) { freshSet[r.number] = 1; added.push(r.number); }
-      });
-      seenReports = seenReports || {};
-      list.forEach(function (r) { seenReports[r.number] = 1; });
-      renderReports(list);
-      added.forEach(function (n) { setTimeout(function () { delete freshSet[n]; var e = document.querySelectorAll(".rep.fresh"); for (var i = 0; i < e.length; i++) e[i].classList.remove("fresh"); }, 6500); });
-    }).catch(function () { document.getElementById("rep-list").innerHTML = '<p class="empty">Could not load reports. Try again later.</p>'; });
-  }
-  loadReports();
-  setInterval(loadReports, 60000);
-
-  var pts = [];
-  function pinIcon(p, cls) {
-    return L.divIcon({ className: "rw", html: '<div class="pin ' + cls + '">' + esc(p.number) + "</div>",
-      iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -12] });
-  }
-  function addMarker(p) {
-    var key = String(p.uid).toUpperCase();
-    if (byUid[key]) { pinsGroup.removeLayer(byUid[key]); }
-    var cls = p.status === "repaired" ? "repaired" : "open";
-    var m = L.marker([p.lat, p.lon], { icon: pinIcon(p, cls), title: (NAMES[p["class"]] || "Road damage") + " " + p.number,
-      zIndexOffset: cls === "open" ? 100 : 0 }).bindPopup(popup(p)).addTo(pinsGroup);
-    m.on("popupopen", function () { history.replaceState(null, "", "#" + p.uid); });
-    byUid[key] = m;
-    return m;
-  }
-  function counts() {
-    var open = 0, all = 0, k;
-    for (k in byUid) { all++; if (byUid[k].options.icon.options.html.indexOf("repaired") < 0) open++; }
-    setText("status", all ? (all + " on the map, " + open + " open") : "No reports yet");
-  }
-  function toast(text, fix) {
-    var t = document.createElement("div");
-    t.className = "toast" + (fix ? " fix" : ""); t.textContent = text;
-    document.getElementById("toasts").appendChild(t);
-    setTimeout(function () { t.remove(); }, 7000);
-  }
-  function pulse(lat, lon) {
-    var m = L.marker([lat, lon], { icon: L.divIcon({ className: "rw", html: '<div class="pulse"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-      interactive: false }).addTo(map);
-    setTimeout(function () { map.removeLayer(m); }, 6000);
+  function drawRoute(fit) {
+    var res = lastRes; if (!res) return;
+    markers.forEach(function (m) { m.remove(); }); markers = [];
+    var alts = res.routes.filter(function (r) { return r.index !== selIdx; }).map(function (r) {
+      return { type: "Feature", geometry: { type: "LineString", coordinates: r.geometry.map(function (p) { return [p[1], p[0]]; }) }, properties: {} };
+    });
+    map.getSource("alts").setData({ type: "FeatureCollection", features: alts });
+    var r = res.routes[selIdx], g = r.geometry, feats = [];
+    for (var i = 0; i < g.length - 1; i++) {
+      var mid = [(g[i][0] + g[i + 1][0]) / 2, (g[i][1] + g[i + 1][1]) / 2], worst = 0;
+      for (var k = 0; k < r.defects.length; k++) { var h = r.defects[k]; if (dist(mid[0], mid[1], h.lat, h.lon) < 28) worst = Math.max(worst, h.risk >= 70 ? 2 : 1); }
+      feats.push({ type: "Feature", geometry: { type: "LineString", coordinates: [[g[i][1], g[i][0]], [g[i + 1][1], g[i + 1][0]]] }, properties: { c: worst === 2 ? "#d92d20" : worst === 1 ? "#f0a30a" : "#1a73e8" } });
+    }
+    map.getSource("route").setData({ type: "FeatureCollection", features: feats });
+    r.defects.forEach(function (h) {
+      var el = document.createElement("div"); el.className = "pin"; el.style.background = h.risk >= 70 ? "#d92d20" : "#f0a30a";
+      markers.push(new maplibregl.Marker({ element: el }).setLngLat([h.lon, h.lat]).setPopup(new maplibregl.Popup({ offset: 18 }).setHTML("<b>" + esc(NAMES[h["class"]] || "Road damage") + " " + esc(h.number) + "</b><br>Risk " + Math.round(h.risk))).addTo(map));
+    });
+    markers.push(new maplibregl.Marker({ color: "#1a73e8" }).setLngLat([res.origin.lon, res.origin.lat]).addTo(map));
+    markers.push(new maplibregl.Marker({ color: "#d92d20" }).setLngLat([res.destination.lon, res.destination.lat]).addTo(map));
+    if (fit) {
+      var b = new maplibregl.LngLatBounds();
+      g.forEach(function (p) { b.extend([p[1], p[0]]); });
+      map.fitBounds(b, { padding: { top: 60, bottom: 60, left: window.innerWidth > 760 ? 440 : 40, right: 60 }, duration: 700 });
+    }
   }
 
-  fetch("/api/public/defects").then(function (r) { return r.json(); }).then(function (list) {
-    list.forEach(function (p) { addMarker(p); pts.push([p.lat, p.lon]); });
-    counts();
-    if (!openHash() && pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
-  }).catch(function () { setText("status", "Could not load the map data. Try again later."); });
-
-  // ---- live feed: reports from other people appear here as they happen
-  var liveEl = document.getElementById("live");
-  function setLive(on, txt) { liveEl.className = "live" + (on ? " on" : ""); liveEl.lastChild.textContent = txt; }
-  var rt = null;
-  function refreshStats() {
-    clearTimeout(rt);
-    rt = setTimeout(function () { loadSummary(); loadZones(); loadReports(); }, 700);
-  }
+  // ---- live feed
   var retry = 1000;
+  function setLive(on, t) { $("live").className = "live" + (on ? " on" : ""); $("live").lastChild.textContent = t; }
   function connect() {
     var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/events");
     ws.onopen = function () { retry = 1000; setLive(true, "Live"); };
@@ -432,104 +320,21 @@
       var m; try { m = JSON.parse(e.data); } catch (_) { return; }
       var d = m.data || {};
       if (m.type === "map.defect") {
-        addMarker(d); counts(); refreshStats();
-        pulse(d.lat, d.lon);
-        toast((d["new"] ? "New " : "Updated: ") + (NAMES[d["class"]] || "road damage").toLowerCase() + " reported on the map", false);
-        if (window.__routeRefresh) window.__routeRefresh();
+        var i = -1; defects.forEach(function (x, n) { if (String(x.uid) === String(d.uid)) i = n; });
+        if (i >= 0) defects[i] = Object.assign(defects[i], d); else defects.push(d);
+        setDefects(); loadZones();
+        toast((d["new"] ? "New " : "Updated: ") + (NAMES[d["class"]] || "road damage").toLowerCase() + " reported on the map.");
+        if (lastRes) plan(true);
       } else if (m.type === "map.repair") {
-        var q = byUid[String(d.uid).toUpperCase()];
-        if (q) { var ll = q.getLatLng();
-          addMarker({ uid: d.uid, number: d.number, lat: ll.lat, lon: ll.lng, "class": "pothole", status: "repaired", reports: 1 }); }
-        counts(); refreshStats(); toast("A road defect was marked repaired", true);
-        if (window.__routeRefresh) window.__routeRefresh();
-      } else if (m.type === "map.report") {
-        pulse(d.lat, d.lon); toast("A new report was just filed nearby on the map", false); refreshStats();
-      }
+        defects.forEach(function (x) { if (String(x.uid) === String(d.uid)) x.status = "repaired"; });
+        setDefects(); loadZones(); toast("A road defect was marked repaired.");
+        if (lastRes) plan(true);
+      } else if (m.type === "map.report") { toast("A new report was just filed on the map."); }
     };
     ws.onclose = function () { setLive(false, "Reconnecting"); setTimeout(connect, retry = Math.min(retry * 2, 15000)); };
   }
   connect();
-
-  // ---- route planner
-  var routeLayer = L.layerGroup().addTo(map), lastQuery = null, lastRes = null, selIdx = 0;
-  function rmsg(t, err) { var e = document.getElementById("route-msg"); e.textContent = t; e.className = err ? "err" : ""; }
-  function banner(t) {
-    var b = document.getElementById("banner"); b.textContent = t; b.className = t ? "on" : "";
-    if (t) { clearTimeout(banner.t); banner.t = setTimeout(function () { banner(""); }, 12000); }
-  }
-  function endIcon(txt, col) { return L.divIcon({ className: "rw", html: '<div class="endpin" style="background:' + col + '">' + txt + "</div>", iconSize: [30, 30], iconAnchor: [15, 15] }); }
-  function draw(res, idx, fit) {
-    selIdx = idx; routeLayer.clearLayers();
-    res.routes.forEach(function (r) {
-      if (r.index === idx) return;
-      L.polyline(r.geometry, { color: "#8a9097", weight: 6, opacity: 0.6 }).addTo(routeLayer).on("click", function () { draw(res, r.index, false); });
-    });
-    var r = res.routes[idx];
-    var line = L.polyline(r.geometry, { color: r.labels.indexOf("recommended") >= 0 ? "#2e9a57" : "#1f5fbf", weight: 7, opacity: 0.95 }).addTo(routeLayer);
-    r.defects.forEach(function (h, i) {
-      L.marker([h.lat, h.lon], { icon: L.divIcon({ className: "rw", html: '<div class="rdot" style="background:' + (h.risk >= 70 ? "#d92d20" : "#e08a00") + '">' + esc(h.number) + "</div>",
-        iconSize: [24, 24], iconAnchor: [12, 12] }), title: (NAMES[h["class"]] || "Road damage") + " " + h.number })
-        .bindPopup(esc((NAMES[h["class"]] || "Road damage") + " " + h.number + ", " + (h.severity || "") + ", risk " + Math.round(h.risk))).addTo(routeLayer);
-    });
-    L.marker([res.origin.lat, res.origin.lon], { icon: endIcon("A", "#2a6fdb"), title: "Start" }).addTo(routeLayer);
-    L.marker([res.destination.lat, res.destination.lon], { icon: endIcon("B", "#17191d"), title: "Destination" }).addTo(routeLayer);
-    if (fit !== false) map.fitBounds(line.getBounds(), { padding: [40, 40] });
-    var kids = document.querySelectorAll(".route");
-    for (var i = 0; i < kids.length; i++) { kids[i].className = "route" + (i === idx ? " sel" : ""); kids[i].setAttribute("aria-pressed", i === idx ? "true" : "false"); }
-  }
-  function show(res, idx, fit) {
-    lastRes = res; var box = document.getElementById("route-list"); box.innerHTML = "";
-    res.routes.forEach(function (r) {
-      var el = document.createElement("div"); el.className = "route"; el.tabIndex = 0; el.setAttribute("role", "button");
-      var chips = r.labels.map(function (l) { return '<span class="chip' + (l === "recommended" ? " rec" : "") + '">' + esc(l) + "</span>"; }).join("");
-      var dc = r.defect_count || 0;
-      el.setAttribute("aria-label", "Route " + (r.index + 1) + ", " + r.duration_min + " minutes, " + r.distance_km + " km, " + dc + " reported potholes");
-      el.innerHTML = "<b>" + esc(Math.round(r.duration_min)) + " min</b> <span class=\"sub\" style=\"display:inline\">" + esc(r.distance_km) + " km</span>" + chips +
-        '<div class="sub' + (r.severe_count ? " warn" : "") + '">' +
-        (dc ? dc + " reported " + (dc === 1 ? "pothole" : "potholes") + ", " + r.severe_count + " serious" : "No reported potholes on this route") + "</div>";
-      el.onclick = function () { draw(res, r.index, true); };
-      el.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); draw(res, r.index, true); } };
-      box.appendChild(el);
-    });
-    rmsg(res.advice || "", false); draw(res, idx, fit);
-  }
-  function friendly(m) {
-    var l = String(m || "").toLowerCase();
-    if (/not found|geocode|could not find|no place|unknown place/.test(l)) return "We could not find one of those places. Try a nearby landmark or type latitude, longitude.";
-    if (/busy|timeout|timed out|unavailable|50\d|rate/.test(l)) return "The routing service is busy right now. Please try again in a moment.";
-    return m || "Could not plan this trip. Try again.";
-  }
-  function plan(quiet) {
-    var o = document.getElementById("r-from").value.trim(), d = document.getElementById("r-to").value.trim();
-    if (!o || !d) { rmsg("Enter where you start and where you are going.", true); return; }
-    lastQuery = [o, d]; if (!quiet) { rmsg("Comparing routes...", false); banner(""); }
-    fetch("/api/routeplan?origin=" + encodeURIComponent(o) + "&dest=" + encodeURIComponent(d))
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Could not plan this trip"); return j; }, function () { throw new Error("busy"); }); })
-      .then(function (j) {
-        var was = lastRes ? lastRes.recommended : null;
-        if (!j.routes || !j.routes.length) throw new Error("No drivable route found between those places.");
-        if (quiet) {
-          var changed = was !== null && was !== j.recommended;
-          show(j, changed ? j.recommended : Math.min(selIdx, j.routes.length - 1), false);
-          if (changed) { toast("A new report changed the best route", false); banner("A new report changed the best route"); }
-        } else show(j, j.recommended, true);
-      })
-      .catch(function (e) { if (!quiet) rmsg(friendly(e.message), true); });
-  }
-  document.getElementById("r-go").onclick = function () { plan(false); };
-  document.getElementById("r-to").addEventListener("keydown", function (e) { if (e.key === "Enter") plan(false); });
-  document.getElementById("r-from").addEventListener("keydown", function (e) { if (e.key === "Enter") document.getElementById("r-to").focus(); });
-  document.getElementById("r-here").onclick = function () {
-    if (!navigator.geolocation) { rmsg("Location is not available in this browser. Type your start place instead.", true); return; }
-    rmsg("Finding your location...", false);
-    navigator.geolocation.getCurrentPosition(function (p) {
-      document.getElementById("r-from").value = p.coords.latitude.toFixed(5) + ", " + p.coords.longitude.toFixed(5);
-      rmsg("Start set to your location. Enter a destination.", false);
-    }, function () { rmsg("Location permission was denied. Type your start place instead.", true); }, { timeout: 15000 });
-  };
-  window.__routeRefresh = function () { if (lastQuery) plan(true); };
-
-  window.addEventListener("hashchange", openHash);
+  window.addEventListener("hashchange", function () { var h = location.hash.replace("#", ""); if (h) showDefect(h, true); });
 })();
 </script>
 </body>
