@@ -1,0 +1,58 @@
+{
+  "weights": "pothole_best.pt (fine-tuned) + rdd2022_yolov8m.pt",
+  "split": "held-out test",
+  "imgsz": 640,
+  "evaluated_at": "2026-11-13T11:31:11",
+  "sources": {
+    "cracks": "RDD2022 labelled test split (5,757 images), crack model rdd2022_yolov8m",
+    "pothole": "external pothole set never seen in training (396 images), RoadWatch fine-tuned YOLO11m; on 565 RDD2022 test potholes it scores 39% mAP50 vs 18% for PotholeNet",
+    "baseline_pothole_map50": 0.0217
+  },
+  "overall": {
+    "precision": 0.6687,
+    "recall": 0.6113,
+    "f1": 0.6384,
+    "map50": 0.6611,
+    "map50_95": 0.3729
+  },
+  "per_class": [
+    {
+      "class": "longitudinal_crack",
+      "precision": 0.6299,
+      "recall": 0.5665,
+      "f1": 0.5965,
+      "map50": 0.6019,
+      "map50_95": 0.3405
+    },
+    {
+      "class": "transverse_crack",
+      "precision": 0.612,
+      "recall": 0.6001,
+      "f1": 0.606,
+      "map50": 0.6139,
+      "map50_95": 0.3098
+    },
+    {
+      "class": "alligator_crack",
+      "precision": 0.6946,
+      "recall": 0.609,
+      "f1": 0.649,
+      "map50": 0.6851,
+      "map50_95": 0.3823
+    },
+    {
+      "class": "pothole",
+      "precision": 0.7384,
+      "recall": 0.6695,
+      "f1": 0.7023,
+      "map50": 0.7435,
+      "map50_95": 0.4591
+    }
+  ],
+  "speed_ms": {
+    "preprocess": 4.4,
+    "inference": 17.1,
+    "loss": 0.0,
+    "postprocess": 3.45
+  }
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RoadWatch">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A4B63"/>
+      <stop offset="1" stop-color="#1C2433"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5B6B82"/>
+      <stop offset="1" stop-color="#2B3546"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFB340"/>
+      <stop offset="1" stop-color="#FF9500"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 0c19.6 0 25.6 0 28.8 3.2S64 12.4 64 32s0 25.6-3.2 28.8S51.6 64 32 64 6.4 64 3.2 60.8 0 51.6 0 32 0 6.4 3.2 3.2 12.4 0 32 0z" fill="url(#bg)"/>
+  <path d="M27 22h10l12 42H15z" fill="url(#road)"/>
+  <path d="M32 26v5M32 36v7M32 49v10" stroke="#F2F2F7" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>
+  <ellipse cx="38.5" cy="47" rx="5.5" ry="2.2" fill="#0B0F17" opacity=".75"/>
+  <path d="M38.5 9c-5 0-8.5 3.7-8.5 8.3 0 5.6 6.4 11.8 8 13.3.3.3.7.3 1 0 1.6-1.5 8-7.7 8-13.3C47 12.7 43.5 9 38.5 9z" fill="url(#pin)"/>
+  <circle cx="38.5" cy="17.3" r="3.1" fill="#fff"/>
+</svg>

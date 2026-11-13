@@ -1,0 +1,76 @@
+{
+  "weights": "rdd2022_yolov8m.pt",
+  "data": "data/merged/potholes_ext.yaml",
+  "split": "test",
+  "imgsz": 640,
+  "evaluated_at": "2026-11-13T11:33:04",
+  "overall": {
+    "precision": 0.0933,
+    "recall": 0.1098,
+    "f1": 0.1009,
+    "map50": 0.0241,
+    "map50_95": 0.0088
+  },
+  "per_class": [
+    {
+      "class": "pothole",
+      "precision": 0.0933,
+      "recall": 0.1098,
+      "f1": 0.1009,
+      "map50": 0.0241,
+      "map50_95": 0.0088
+    }
+  ],
+  "confusion_matrix": {
+    "labels": [
+      "longitudinal_crack",
+      "transverse_crack",
+      "alligator_crack",
+      "pothole",
+      "background"
+    ],
+    "matrix": [
+      [
+        0,
+        0,
+        0,
+        5,
+        2832
+      ],
+      [
+        0,
+        0,
+        0,
+        15,
+        2692
+      ],
+      [
+        0,
+        0,
+        0,
+        99,
+        5848
+      ],
+      [
+        0,
+        0,
+        0,
+        128,
+        1511
+      ],
+      [
+        0,
+        0,
+        0,
+        1147,
+        0
+      ]
+    ]
+  },
+  "speed_ms": {
+    "preprocess": 1.9,
+    "inference": 15.53,
+    "loss": 0.0,
+    "postprocess": 5.83
+  }
+}
