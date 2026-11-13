@@ -445,3 +445,16 @@ table.t.rp-sub td { padding: 4px 8px 4px 0; border-bottom: 0; font-size: 14px; }
 
 /* synced live view: the canvas shows the analysed frame, the raw video keeps playing invisibly as the source */
 .live-video.synced { opacity: 0; }
+
+/* ===== pothole size and depth measurement ===== */
+.ms-panel { display: grid; gap: 12px; }
+.ms-imgwrap { position: relative; line-height: 0; }
+.ms-overlay { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+.ms-refbox { position: absolute; border: 2px dashed var(--marking); background: color-mix(in srgb, var(--marking) 18%, transparent); pointer-events: none; }
+.ms-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+.ms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+.ms-stat .l { color: var(--ink-2); font-size: 13px; }
+.ms-stat .v { font-family: var(--display); font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ms-notes { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; }
+.ms-ref summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ms-card { margin-top: 14px; }

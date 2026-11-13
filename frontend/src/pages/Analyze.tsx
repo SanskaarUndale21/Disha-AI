@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react'
 import { api, label, type Inspection } from '../api'
 import { DefectDrawer, LocationPicker, Pill, Risk } from '../components'
+import { MeasurePanel } from '../measure'
 
-export function InspectionResult({ insp }: { insp: Inspection }) {
+export function InspectionResult({ insp, file }: { insp: Inspection; file?: File | null }) {
   const [sel, setSel] = useState<number | null>(null)
+  const [measure, setMeasure] = useState(false)
+  const hasPothole = (insp.detections ?? []).some((d) => d.class_name === 'pothole')
   const s = insp.summary ?? {}
   const dets = insp.detections ?? []
   return (
@@ -67,6 +70,16 @@ export function InspectionResult({ insp }: { insp: Inspection }) {
           </table>
         </div>
       </div>
+      {insp.media_type === 'image' && file && hasPothole && (
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <div className="row">
+            <h3 style={{ margin: 0 }}>Pothole size and depth</h3>
+            <span className="spacer" />
+            {!measure && <button className="btn primary" onClick={() => setMeasure(true)}>Measure size and depth</button>}
+          </div>
+          {measure && <div style={{ marginTop: 10 }}><MeasurePanel file={file} /></div>}
+        </div>
+      )}
       {sel != null && <DefectDrawer id={sel} onClose={() => setSel(null)} />}
     </div>
   )
@@ -205,7 +218,7 @@ export default function Analyze() {
           </div>
         </div>
       </div>
-      {res && <InspectionResult insp={res} />}
+      {res && <InspectionResult insp={res} file={file} />}
     </>
   )
 }

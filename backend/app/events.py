@@ -35,6 +35,9 @@ def publish(type_: str, data: dict | None = None, audience: str = "officer"):
         del _recent[:-50]
     if _loop is None:
         return
+    pub = _public_view(type_, data)
+    if pub and audience != "all":
+        publish(pub[0], pub[1], audience="all")
     msg = json.dumps(ev, default=_default)
     try:
         running = asyncio.get_running_loop()
@@ -47,6 +50,25 @@ def publish(type_: str, data: dict | None = None, audience: str = "officer"):
             asyncio.run_coroutine_threadsafe(_fanout(msg, audience), _loop)
     except RuntimeError:
         pass
+
+
+def _public_view(type_: str, data: dict):
+    """Anonymous version of an event for the public live map: location, type and status only."""
+    d = data or {}
+    if type_ in ("defect.created", "defect.updated"):
+        lat, lon = d.get("lat"), d.get("lon")
+        if lat is None or lon is None:
+            return None
+        return "map.defect", {"uid": d.get("uid"), "number": d.get("defect_id") or d.get("id"),
+                              "class": d.get("class_name"), "severity": d.get("severity"),
+                              "status": d.get("status") or "active", "lat": lat, "lon": lon,
+                              "reports": d.get("report_count") or 1, "new": type_ == "defect.created"}
+    if type_ == "repair.verified" and d.get("lat") is not None:
+        return "map.repair", {"uid": d.get("uid"), "number": d.get("defect_id"), "lat": d["lat"], "lon": d["lon"]}
+    if type_ == "complaint.created" and d.get("lat") is not None:
+        return "map.report", {"category": d.get("category"), "lat": round(float(d["lat"]), 4),
+                              "lon": round(float(d["lon"]), 4)}
+    return None
 
 
 def _wants(info, audience):

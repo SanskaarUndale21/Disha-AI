@@ -79,6 +79,31 @@
   .pop-title { font-weight: 700; font-size: 15px; }
   .pop-meta { color: var(--muted); font-size: 13px; }
 
+  .live { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+  .live i { width: 9px; height: 9px; border-radius: 50%; background: #9aa1aa; display: inline-block; }
+  .live.on i { background: #2e9a57; box-shadow: 0 0 0 3px rgba(46,154,87,.25); }
+  .pulse { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--open); animation: ping 1.6s ease-out 3; }
+  @keyframes ping { from { transform: scale(.6); opacity: 1; } to { transform: scale(2.8); opacity: 0; } }
+  #toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 1200; display: grid; gap: 8px; width: min(440px, calc(100vw - 28px)); }
+  .toast { background: #17191d; color: #fff; border-left: 4px solid #f2b705; border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 26px rgba(0,0,0,.35); font-size: 14px; }
+  .toast.fix { border-left-color: #2e9a57; }
+  .planner h2 { font: 700 20px "Barlow Condensed", sans-serif; margin: 0 0 8px; }
+  .planner .inputs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+  .planner input { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+  .planner button { font: 600 14px "Barlow", sans-serif; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  .planner button.go { background: #17191d; color: #fff; border-color: #17191d; }
+  .planner .tools { display: flex; gap: 8px; margin: 8px 0 0; flex-wrap: wrap; }
+  #route-msg { color: var(--muted); margin: 8px 0 0; }
+  #route-msg.err { color: #d92d20; }
+  #route-list { display: grid; gap: 8px; margin-top: 10px; }
+  .route { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; background: #fff; }
+  .route.sel { border-color: #17191d; box-shadow: inset 0 -3px 0 #f2b705; }
+  .route b { font: 700 17px "Barlow Condensed", sans-serif; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 6px; margin-left: 6px; background: #eceee9; color: #3a3f45; }
+  .chip.rec { background: #2e9a57; color: #fff; }
+  .route .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  @media (max-width: 760px) { .planner .inputs { grid-template-columns: 1fr; } }
+
   footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 16px; }
 
   @media (max-width: 760px) {
@@ -118,7 +143,19 @@
       <span><i class="dot" style="background:var(--open)"></i>Open</span>
       <span><i class="dot" style="background:var(--fixed)"></i>Repaired</span>
       <span id="status">Loading</span>
+      <span class="live" id="live"><i></i><span>Connecting</span></span>
     </div>
+  </div>
+  <div class="card planner" id="planner">
+    <h2>Plan a smoother route</h2>
+    <div class="inputs">
+      <input id="r-from" placeholder="From (place or latitude, longitude)" autocomplete="off">
+      <input id="r-to" placeholder="To (place or latitude, longitude)" autocomplete="off">
+      <button class="go" id="r-go">Compare routes</button>
+    </div>
+    <div class="tools"><button id="r-here" type="button">Use my location as start</button></div>
+    <p id="route-msg">Routes are compared by driving time and by the road damage reported along them, updated live as people report new damage.</p>
+    <div id="route-list"></div>
   </div>
   <div class="card" id="download">
     <p class="privacy"><strong>Privacy.</strong> No names, phone numbers or photos are published. This map shows only the
@@ -127,6 +164,7 @@
       <a href="tel:+918064270577">+91 80 6427 0577</a> or use the RoadWatch app on your phone.</p>
   </div>
 </main>
+<div id="toasts"></div>
 <footer>Map data from OpenStreetMap contributors. Tiles by Esri.</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -189,24 +227,135 @@
     setText("s-km", s.drive_km_last_30d);
   }).catch(function () {});
 
+  var pts = [];
+  function pinIcon(p, cls) {
+    return L.divIcon({ className: "rw", html: '<div class="pin ' + cls + '">' + esc(p.number) + "</div>",
+      iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -12] });
+  }
+  function addMarker(p) {
+    var key = String(p.uid).toUpperCase();
+    if (byUid[key]) { map.removeLayer(byUid[key]); }
+    var cls = p.status === "repaired" ? "repaired" : "open";
+    var m = L.marker([p.lat, p.lon], { icon: pinIcon(p, cls), title: (NAMES[p["class"]] || "Road damage") + " " + p.number,
+      zIndexOffset: cls === "open" ? 100 : 0 }).bindPopup(popup(p)).addTo(map);
+    m.on("popupopen", function () { history.replaceState(null, "", "#" + p.uid); });
+    byUid[key] = m;
+    return m;
+  }
+  function counts() {
+    var open = 0, all = 0, k;
+    for (k in byUid) { all++; if (byUid[k].options.icon.options.html.indexOf("repaired") < 0) open++; }
+    setText("status", all ? (all + " on the map, " + open + " open") : "No reports yet");
+  }
+  function toast(text, fix) {
+    var t = document.createElement("div");
+    t.className = "toast" + (fix ? " fix" : ""); t.textContent = text;
+    document.getElementById("toasts").appendChild(t);
+    setTimeout(function () { t.remove(); }, 7000);
+  }
+  function pulse(lat, lon) {
+    var m = L.marker([lat, lon], { icon: L.divIcon({ className: "rw", html: '<div class="pulse"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
+      interactive: false }).addTo(map);
+    setTimeout(function () { map.removeLayer(m); }, 6000);
+  }
+
   fetch("/api/public/defects").then(function (r) { return r.json(); }).then(function (list) {
-    var pts = [];
-    list.forEach(function (p) {
-      var cls = p.status === "repaired" ? "repaired" : "open";
-      var icon = L.divIcon({
-        className: "rw", html: '<div class="pin ' + cls + '">' + esc(p.number) + "</div>",
-        iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -12]
-      });
-      var m = L.marker([p.lat, p.lon], { icon: icon, title: (NAMES[p["class"]] || "Road damage") + " " + p.number,
-        zIndexOffset: cls === "open" ? 100 : 0 }).bindPopup(popup(p)).addTo(map);
-      m.on("popupopen", function () { history.replaceState(null, "", "#" + p.uid); });
-      byUid[String(p.uid).toUpperCase()] = m;
-      pts.push([p.lat, p.lon]);
-    });
-    var open = list.filter(function (p) { return p.status !== "repaired"; }).length;
-    setText("status", list.length ? (list.length + " on the map, " + open + " open") : "No reports yet");
+    list.forEach(function (p) { addMarker(p); pts.push([p.lat, p.lon]); });
+    counts();
     if (!openHash() && pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
   }).catch(function () { setText("status", "Could not load the map data. Try again later."); });
+
+  // ---- live feed: reports from other people appear here as they happen
+  var liveEl = document.getElementById("live");
+  function setLive(on, txt) { liveEl.className = "live" + (on ? " on" : ""); liveEl.lastChild.textContent = txt; }
+  function refreshStats() {
+    fetch("/api/public/stats").then(function (r) { return r.json(); }).then(function (s) {
+      setText("s-open", s.open); setText("s-repaired", s.repaired); setText("s-reports", s.total_reports);
+      setText("s-cit", s.citizens_reports_last_30d); setText("s-km", s.drive_km_last_30d);
+    }).catch(function () {});
+  }
+  var retry = 1000;
+  function connect() {
+    var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/events");
+    ws.onopen = function () { retry = 1000; setLive(true, "Live"); };
+    ws.onmessage = function (e) {
+      var m; try { m = JSON.parse(e.data); } catch (_) { return; }
+      var d = m.data || {};
+      if (m.type === "map.defect") {
+        addMarker(d); counts(); refreshStats();
+        pulse(d.lat, d.lon);
+        toast((d["new"] ? "New " : "Updated: ") + (NAMES[d["class"]] || "road damage").toLowerCase() + " reported on the map", false);
+        if (window.__routeRefresh) window.__routeRefresh();
+      } else if (m.type === "map.repair") {
+        var q = byUid[String(d.uid).toUpperCase()];
+        if (q) { var ll = q.getLatLng();
+          addMarker({ uid: d.uid, number: d.number, lat: ll.lat, lon: ll.lng, "class": "pothole", status: "repaired", reports: 1 }); }
+        counts(); refreshStats(); toast("A road defect was marked repaired", true);
+        if (window.__routeRefresh) window.__routeRefresh();
+      } else if (m.type === "map.report") {
+        pulse(d.lat, d.lon); toast("A new report was just filed nearby on the map", false); refreshStats();
+      }
+    };
+    ws.onclose = function () { setLive(false, "Reconnecting"); setTimeout(connect, retry = Math.min(retry * 2, 15000)); };
+  }
+  connect();
+
+  // ---- route planner
+  var routeLayer = L.layerGroup().addTo(map), lastQuery = null, lastRes = null;
+  function rmsg(t, err) { var e = document.getElementById("route-msg"); e.textContent = t; e.className = err ? "err" : ""; }
+  function draw(res, idx) {
+    routeLayer.clearLayers();
+    res.routes.forEach(function (r) {
+      if (r.index === idx) return;
+      L.polyline(r.geometry, { color: "#8a9097", weight: 5, opacity: 0.55 }).addTo(routeLayer).on("click", function () { draw(res, r.index); });
+    });
+    var r = res.routes[idx];
+    var line = L.polyline(r.geometry, { color: r.labels.indexOf("recommended") >= 0 ? "#2e9a57" : "#1f5fbf", weight: 7, opacity: 0.95 }).addTo(routeLayer);
+    r.defects.forEach(function (h) {
+      L.circleMarker([h.lat, h.lon], { radius: 8, color: "#fff", weight: 2, fillColor: h.risk >= 70 ? "#d92d20" : "#e08a00", fillOpacity: 1 })
+        .bindPopup(esc((NAMES[h["class"]] || "Road damage") + " " + h.number + ", risk " + Math.round(h.risk))).addTo(routeLayer);
+    });
+    L.marker([res.origin.lat, res.origin.lon]).addTo(routeLayer);
+    L.marker([res.destination.lat, res.destination.lon]).addTo(routeLayer);
+    map.fitBounds(line.getBounds(), { padding: [40, 40] });
+    var kids = document.querySelectorAll(".route");
+    for (var i = 0; i < kids.length; i++) kids[i].className = "route" + (i === idx ? " sel" : "");
+  }
+  function show(res) {
+    lastRes = res; var box = document.getElementById("route-list"); box.innerHTML = "";
+    res.routes.forEach(function (r) {
+      var el = document.createElement("div"); el.className = "route";
+      var chips = r.labels.map(function (l) { return '<span class="chip' + (l === "recommended" ? " rec" : "") + '">' + esc(l) + "</span>"; }).join("");
+      el.innerHTML = "<b>Route " + (r.index + 1) + "</b>" + chips +
+        '<div class="sub">' + r.duration_min + " min, " + r.distance_km + " km. " +
+        (r.defect_count ? r.defect_count + " reported road defects (" + r.severe_count + " serious)" : "No reported road damage") + "</div>";
+      el.onclick = function () { draw(res, r.index); };
+      box.appendChild(el);
+    });
+    rmsg(res.advice, false); draw(res, res.recommended);
+  }
+  function plan(quiet) {
+    var o = document.getElementById("r-from").value.trim(), d = document.getElementById("r-to").value.trim();
+    if (!o || !d) { rmsg("Enter where you start and where you are going.", true); return; }
+    lastQuery = [o, d]; if (!quiet) rmsg("Comparing routes...", false);
+    fetch("/api/routeplan?origin=" + encodeURIComponent(o) + "&dest=" + encodeURIComponent(d))
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Could not plan this trip"); return j; }); })
+      .then(function (j) {
+        var was = lastRes ? lastRes.recommended : null;
+        show(j);
+        if (quiet && was !== null && was !== j.recommended) toast("A new report changed the best route", false);
+      })
+      .catch(function (e) { rmsg(e.message, true); });
+  }
+  document.getElementById("r-go").onclick = function () { plan(false); };
+  document.getElementById("r-to").addEventListener("keydown", function (e) { if (e.key === "Enter") plan(false); });
+  document.getElementById("r-here").onclick = function () {
+    if (!navigator.geolocation) { rmsg("Location is not available in this browser.", true); return; }
+    navigator.geolocation.getCurrentPosition(function (p) {
+      document.getElementById("r-from").value = p.coords.latitude.toFixed(5) + ", " + p.coords.longitude.toFixed(5);
+    }, function () { rmsg("Location permission was denied. Type your start place instead.", true); });
+  };
+  window.__routeRefresh = function () { if (lastQuery) plan(true); };
 
   window.addEventListener("hashchange", openHash);
 })();

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { MeasurePanel } from './measure'
 import { api, fmtDate, fmtDay, inr, label, ops, reportUrl, type CostRow, type Defect } from './api'
 
 const RISK_HEX: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
@@ -160,7 +161,9 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
   const [mail, setMail] = useState<{ to: string; subject: string; body: string } | null>(null)
   const [mailErr, setMailErr] = useState('')
   const [sending, setSending] = useState(false)
+  const [showMeasure, setShowMeasure] = useState(false)
   useEffect(() => {
+    setShowMeasure(false)
     setCost(null)
     setMail(null)
     setMailErr('')
@@ -220,6 +223,16 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
               <span className="spacer" />
               <button className="btn sm primary" disabled={sending} onClick={sendMail}>{sending ? 'Preparing...' : 'Send to roads department'}</button>
             </div>
+            {d.class_name === 'pothole' && (
+              <div className="card ms-card">
+                <div className="row">
+                  <b>Size and depth</b>
+                  <span className="spacer" />
+                  {!showMeasure && <button className="btn sm" onClick={() => setShowMeasure(true)}>Measure size and depth</button>}
+                </div>
+                {showMeasure && <div style={{ marginTop: 10 }}><MeasurePanel defectId={d.id} /></div>}
+              </div>
+            )}
             {mailErr && <div className="err">Could not send. {mailErr}</div>}
             {mail && (
               <div className="dd-mail">

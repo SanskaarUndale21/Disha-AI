@@ -296,7 +296,7 @@ def _record_clean_pass(s, session_id, device_id, lat, lon):
             df.status, df.trend, df.severity_score = "repaired", "repaired", 0.0
             df.risk_score, df.risk_level = 0.0, "Low"
             s.add(DefectHistory(defect_id=df.id, observed_at=now(), present=False, trend="repaired", risk_score=0.0))
-            events.publish("repair.verified", {"uid": df.uid, "defect_id": df.id, "passes": len(sessions),
+            events.publish("repair.verified", {"uid": df.uid, "defect_id": df.id, "lat": df.lat, "lon": df.lon, "passes": len(sessions),
                                                 "message": f"{df.uid} looks repaired: {len(sessions)} separate drives saw clean road here."})
 
 

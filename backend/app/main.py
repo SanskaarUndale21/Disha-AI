@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from . import auth, config, detector, events, live, pipeline, reports, scoring, similarity
 from . import severity as severity_mod
+from . import routing
 from . import screening
 from .db import (Complaint, ComplaintMedia, Defect, DefectHistory, Detection, Inspection, SessionLocal, get_session,
                  init_db, now)
@@ -709,6 +710,7 @@ live.register_ws(app)
 auth.register_routes(app)
 events.register(app)
 screening.register(app)
+routing.register(app)
 citizen.register(app)
 measure.register(app)
 voice.register(app)
