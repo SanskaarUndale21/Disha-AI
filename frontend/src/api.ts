@@ -382,7 +382,11 @@ export const safety = {
 
 /** Sibling panels run on the same host, other ports. */
 export const panelUrl = (port: number) => `${location.protocol}//${location.hostname}:${port}`
-export const mapUrl = () => `${location.protocol}//${location.hostname}:8000/map`
+const API_BASE: string = ((import.meta as any).env?.VITE_API_BASE ?? '').replace(/\/+$/, '')
+export const apiBase = () => API_BASE
+/** WebSocket origin: the configured API for a hosted deployment, else the page host (dev proxy). */
+export const wsBase = (proto: string) => (API_BASE ? API_BASE.replace(/^http/, 'ws') : `${proto}://${location.host}`)
+export const mapUrl = () => (API_BASE ? `${API_BASE}/map` : `${location.protocol}//${location.hostname}:8000/map`)
 
 /** Confidence tier: backend value when present, else the 0.4 cut used by the model. */
 export const tierOf = (d: { tier?: string | null; confidence?: number }) =>

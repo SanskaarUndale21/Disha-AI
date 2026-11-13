@@ -11,7 +11,7 @@
 
   var DEFAULT_HELPLINE = "+918064270577";
   var API = (function () {
-    var o = lsGet("rw-api", "");
+    var o = lsGet("rw-api", "") || window.RW_API_BASE || "";
     if (o) return o.replace(/\/+$/, "");
     return location.protocol + "//" + location.hostname + ":8000";
   })();

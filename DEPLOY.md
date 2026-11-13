@@ -30,3 +30,9 @@ Starts the API (8000), admin panel (5173), citizen portal (5174) and feed panel 
 - Road ownership records are sample data until replaced with the authority's register.
 - The emergency "notify" step is a placeholder; no real call or SMS is sent.
 - Put the API behind HTTPS (a reverse proxy or a tunnel) before exposing it to the internet.
+
+## Hosted frontends (Vercel)
+- Citizen website: https://disha-ai-citizen.vercel.app (folder `citizen_web`, API address in `citizen_web/config.js`)
+- Admin panel: https://disha-ai-admin.vercel.app (folder `frontend`, built with `VITE_API_BASE`, rewrite rules in `frontend/public/vercel.json`)
+- Redeploy: `cd citizen_web && vercel deploy --prod --yes`; admin: `cd frontend && VITE_API_BASE=<api> npx vite build && vercel deploy dist --prod --yes`
+- The backend is not on Vercel. When the Cloudflare tunnel address changes, update `config.js`, `frontend/public/vercel.json`, rebuild and redeploy both.

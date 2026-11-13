@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowCounterClockwise, Camera, CheckCircle, Crosshair, FileVideo, FilmStrip, FloppyDisk, ImageSquare, Lightning, MapPin, Pause, Play, Siren, SpeakerHigh, SpeakerSlash, Warning } from '@phosphor-icons/react'
-import { authHeaders, label } from '../api'
+import { authHeaders, label, wsBase } from '../api'
 
 type Track = {
   id: number | null
@@ -355,7 +355,7 @@ export default function Live() {
   const connect = () =>
     new Promise<WebSocket>((ok, bad) => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      const s = new WebSocket(`${proto}://${location.host}/ws/live`)
+      const s = new WebSocket(`${wsBase(proto)}/ws/live`)
       s.binaryType = 'arraybuffer'
       s.onopen = () => {
         s.send(JSON.stringify({ type: 'config', cracks }))

@@ -8,6 +8,13 @@ import { AuthProvider } from './auth'
 import { RealtimeProvider } from './events'
 import { AlarmProvider } from './alarm'
 
+const _base: string = ((import.meta as any).env?.VITE_API_BASE ?? '').replace(/\/+$/, '')
+if (_base) {
+  const _fetch = window.fetch.bind(window)
+  window.fetch = ((input: any, init?: any) =>
+    _fetch(typeof input === 'string' && input.startsWith('/api') ? _base + input : input, init)) as typeof fetch
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

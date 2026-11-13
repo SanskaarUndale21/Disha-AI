@@ -1,3 +1,4 @@
+import { wsBase } from './api'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './auth'
@@ -70,7 +71,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const open = () => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       const tok = session?.access_token
-      ws = new WebSocket(`${proto}://${location.host}/ws/events${tok ? `?token=${tok}` : ''}`)
+      ws = new WebSocket(`${wsBase(proto)}/ws/events${tok ? `?token=${tok}` : ''}`)
       ws.onopen = () => {
         setConnected(true)
         retry = 1000
