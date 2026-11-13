@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { FilePdf } from '@phosphor-icons/react'
-import { analysisPdfUrl, api, label, type Inspection } from '../api'
+import { analysisPdfUrl, api, label, tierOf, type Inspection } from '../api'
 import { RoadRecord } from '../roadrecord'
-import { DefectDrawer, LocationPicker, Pill, Risk } from '../components'
+import { DefectDrawer, LocationPicker, Pill, Risk, TierPill } from '../components'
 import { MeasurePanel } from '../measure'
 
 export function InspectionResult({ insp, file, quality }: { insp: Inspection; file?: File | null; quality?: string }) {
   const [sel, setSel] = useState<number | null>(null)
   const [measure, setMeasure] = useState(false)
   const s = insp.summary ?? {}
-  const dets = insp.detections ?? []
+  const [hiOnly, setHiOnly] = useState(false)
+  const allDets = insp.detections ?? []
+  const dets = hiOnly ? allDets.filter((d) => tierOf(d) === 'high') : allDets
   const isVideo = insp.media_type === 'video'
-  const hasPothole = dets.some((d) => d.class_name === 'pothole')
-  const potholes = new Set(dets.filter((d) => d.class_name === 'pothole').map((d) => d.defect_uid ?? `t${d.track_id ?? d.id}`)).size
-  const uniqueDefects = s.unique_tracks ?? dets.length
+  const hasPothole = allDets.some((d) => d.class_name === 'pothole')
+  const potholes = new Set(allDets.filter((d) => d.class_name === 'pothole').map((d) => d.defect_uid ?? `t${d.track_id ?? d.id}`)).size
+  const uniqueDefects = s.unique_tracks ?? allDets.length
   const rawTracks = s.raw_track_ids ?? uniqueDefects
   const q = String(s.quality ?? quality ?? '').toLowerCase()
   const secs = insp.processing_ms != null ? insp.processing_ms / 1000 : null
@@ -52,7 +54,7 @@ export function InspectionResult({ insp, file, quality }: { insp: Inspection; fi
           </div>
         </div>
         <div className="grid g3">
-          <div className="card kpi"><div className="l">Detected</div><div className="v">{s.total ?? dets.length}</div></div>
+          <div className="card kpi"><div className="l">Detected</div><div className="v">{s.total ?? allDets.length}</div></div>
           <div className="card kpi"><div className="l">New defects</div><div className="v">{s.new_defects ?? 0}</div></div>
           <div className="card kpi"><div className="l">Already known</div><div className="v">{s.duplicates ?? 0}</div></div>
         </div>
@@ -62,12 +64,12 @@ export function InspectionResult({ insp, file, quality }: { insp: Inspection; fi
             {Object.entries(s.by_class ?? {}).map(([k, v]) => (
               <span key={k} className="pill">{label(k)}: <b className="num">{v as number}</b></span>
             ))}
-            {dets.length === 0 && <span className="muted">No road damage detected.</span>}
+            {allDets.length === 0 && <span className="muted">No road damage detected.</span>}
           </div>
         </div>
       </div>
       <div className="card scroll-x" style={{ gridColumn: '1 / -1' }}>
-        <h3>Detected defects</h3>
+        <div className="row" style={{ justifyContent: 'space-between' }}><h3>Detected defects</h3><label className="toggle"><input type="checkbox" checked={hiOnly} onChange={(e) => setHiOnly(e.target.checked)} /> High confidence only ({allDets.filter((d) => tierOf(d) === 'high').length} of {allDets.length})</label></div>
         {dets.length === 0 ? (
           <div className="empty">Nothing was flagged. Try a clearer photo or a drive with more daylight.</div>
         ) : (
@@ -84,7 +86,7 @@ export function InspectionResult({ insp, file, quality }: { insp: Inspection; fi
                   <td>{label(d.class_name)}</td>
                   <td>
                     <span className="mono">{d.confidence.toFixed(2)}</span>{' '}
-                    <span className={`pill ${d.confidence >= 0.4 ? 'Minor' : 'Moderate'}`}>{d.confidence >= 0.4 ? 'High confidence' : 'Possible'}</span>
+                    <TierPill tier={tierOf(d)} />
                   </td>
                   <td><Pill v={d.severity} /></td>
                   <td><Risk score={d.risk_score} level={d.risk_level} /></td>

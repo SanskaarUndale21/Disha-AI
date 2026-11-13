@@ -329,3 +329,16 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
     </div>
   )
 }
+
+export function Skeleton({ rows = 5, h = 46 }: { rows?: number; h?: number }) {
+  return (
+    <div className="skel-list" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => <span key={i} className="skel" style={{ height: h }} />)}
+    </div>
+  )
+}
+
+export function TierPill({ tier, conf }: { tier: 'high' | 'possible'; conf?: number | null }) {
+  const pct = conf != null ? ` ${Math.round(conf * 100)}%` : ''
+  return <span className={`pill tier ${tier}`}>{tier === 'high' ? 'High confidence' : 'Possible'}{pct}</span>
+}

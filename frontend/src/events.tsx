@@ -43,7 +43,7 @@ function describe(e: RtEvent): Omit<Toast, 'id'> | null {
         ? { title: 'Device blocked for fake reports', body: d.reason ?? '', tone: 'high', to: '/complaints' }
         : { title: 'Photo refused: no road damage', body: `device ${d.device ?? 'unknown'}`, tone: 'med', to: '/complaints' }
     case 'emergency.fall':
-      return { title: 'Emergency: fall near pothole', body: d.message ?? `Fall near pothole PH ${d.pothole_id ?? ''}`, tone: 'high', to: '/alerts', sticky: true }
+      return null // the global alarm banner covers this
     case 'repair.verified':
       return { title: `${d.uid} looks repaired`, body: `${d.passes} separate drives saw clean road here`, tone: 'ok', to: '/defects' }
     case 'live.saved':

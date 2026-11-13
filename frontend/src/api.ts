@@ -30,6 +30,7 @@ export type Detection = {
   verify_note: string | null
   annotated_url?: string
   media_type?: string
+  tier?: 'high' | 'possible' | null
 }
 
 export type Inspection = {
@@ -79,6 +80,8 @@ export type Defect = {
   first_seen: string
   last_seen: string
   verified: boolean
+  tier?: 'high' | 'possible' | null
+  confidence?: number | null
   detections?: Detection[]
   history?: {
     inspection_id: number | null
@@ -357,3 +360,30 @@ export const roads = {
   forDefect: (id: number) => req<RoadRecordData>(`/api/roads/defect/${id}`),
 }
 export const analysisPdfUrl = (inspectionId: number) => `/api/reports/analysis/${inspectionId}.pdf`
+
+/* ---------- safety: fall emergencies ---------- */
+export type Emergency = {
+  id: number
+  message: string
+  level?: string
+  status: string
+  snapshot_url: string | null
+  lat: number | null
+  lon: number | null
+  pothole_id: number | null
+  created_at: string
+  acknowledged_at?: string | null
+}
+
+export const safety = {
+  emergencies: () => req<Emergency[]>(`/api/safety/emergencies`),
+  ack: (id: number) => req<any>(`/api/safety/emergencies/${id}/ack`, { method: 'POST' }),
+}
+
+/** Sibling panels run on the same host, other ports. */
+export const panelUrl = (port: number) => `${location.protocol}//${location.hostname}:${port}`
+export const mapUrl = () => `${location.protocol}//${location.hostname}:8000/map`
+
+/** Confidence tier: backend value when present, else the 0.4 cut used by the model. */
+export const tierOf = (d: { tier?: string | null; confidence?: number }) =>
+  d.tier === 'high' || d.tier === 'possible' ? d.tier : (d.confidence ?? 0) >= 0.4 ? 'high' : 'possible'

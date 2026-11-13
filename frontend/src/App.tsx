@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import { List, Moon, SignIn, SignOut, Sun, X } from '@phosphor-icons/react'
-import { api, ops, voice } from './api'
+import { ArrowSquareOut, BellRinging, ChatCircleText, DotsThreeOutline, List, MapPinArea, MapTrifold, Moon, SignIn, SignOut, Sun, UsersThree, VideoCamera, X } from '@phosphor-icons/react'
+import { api, ops, panelUrl, voice } from './api'
+import { AlarmControl } from './alarm'
 import { useAuth } from './auth'
 import { useLiveRefresh, useRealtime } from './events'
 import { NAV_GROUPS, Tile } from './icons'
@@ -47,6 +48,14 @@ function AdminGate({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+const TABS: { to: string; icon: any; short: string; badge?: string }[] = [
+  { to: '/', icon: MapTrifold, short: 'Home' },
+  { to: '/map', icon: MapPinArea, short: 'Map' },
+  { to: '/alerts', icon: BellRinging, short: 'Alerts', badge: 'alerts' },
+  { to: '/live', icon: VideoCamera, short: 'Patrol' },
+  { to: '/complaints', icon: ChatCircleText, short: 'Reports', badge: 'complaints' },
+]
+
 function useTheme() {
   const [theme, setTheme] = useState<string>(() => {
     try {
@@ -87,6 +96,7 @@ export default function App() {
   useLiveRefresh(['complaint.', 'detection.', 'inspection.', 'alert.'], loadBadges)
   const initials = (profile?.full_name || profile?.email || '?').split(/[\s@.]/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
   const flush = loc.pathname === '/' || loc.pathname === '/map'
+  const isMap = loc.pathname === '/map'
   const [menu, setMenu] = useState(false)
   useEffect(() => setMenu(false), [loc.pathname])
   useEffect(() => {
@@ -104,6 +114,10 @@ export default function App() {
         <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Open menu" aria-expanded={menu}><List size={18} weight="bold" /></button>
         <img src="/logo.svg" alt="" />
         <b>{title}</b>
+        <span className="spacer" />
+        <a className="btn sm go tb-link" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer"><ArrowSquareOut size={14} weight="bold" /> Feed panel</a>
+        <AlarmControl />
+        <button className="icon-btn tb-theme" onClick={toggle} aria-label="Toggle appearance">{dark ? <Sun size={16} weight="bold" /> : <Moon size={16} weight="bold" />}</button>
       </header>
       {menu && <div className="side-scrim" onClick={() => setMenu(false)} />}
       <aside className={`side ${menu ? 'open' : ''}`}>
@@ -129,6 +143,10 @@ export default function App() {
             </nav>
           </div>
         ))}
+        <div className="ext-links">
+          <a className="feed-link" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer"><ArrowSquareOut size={18} weight="bold" /> <span><b>Open Feed panel</b><small>Field feed, port 5175</small></span></a>
+          <a className="cit-link" href={panelUrl(5174)} target="_blank" rel="noopener noreferrer"><UsersThree size={16} weight="bold" /> Citizen portal</a>
+        </div>
         <div className="foot">
           <div className="status-line">
             <span className={`dot ${connected ? 'ok' : ''}`} />
@@ -153,7 +171,20 @@ export default function App() {
             ))}
         </div>
       </aside>
-      <main id="main" className={`main ${flush ? 'flush' : ''}`}>
+      <nav className="tabbar" aria-label="Main">
+        {TABS.map((n) => (
+          <NavLink key={n.to} to={n.to} end={n.to === '/'} className="tab">
+            <n.icon size={24} weight="duotone" />
+            <span>{n.short}</span>
+            {n.badge && badges[n.badge] ? <i className="tb-badge">{badges[n.badge]}</i> : null}
+          </NavLink>
+        ))}
+        <button className={`tab ${menu ? 'on' : ''}`} onClick={() => setMenu(true)} aria-label="More">
+          <DotsThreeOutline size={24} weight="duotone" />
+          <span>More</span>
+        </button>
+      </nav>
+      <main id="main" className={`main ${flush ? 'flush' : ''} ${isMap ? 'map-page' : ''}`}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<AdminGate><AdminRoutes /></AdminGate>} />
@@ -164,7 +195,9 @@ export default function App() {
 }
 
 function AdminRoutes() {
+  const loc = useLocation()
   return (
+    <div key={loc.pathname} className="page-anim">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/map" element={<LiveMap />} />
@@ -181,5 +214,6 @@ function AdminRoutes() {
           <Route path="/model" element={<Model />} />
           <Route path="/users" element={<Officer><Users /></Officer>} />
         </Routes>
+    </div>
   )
 }

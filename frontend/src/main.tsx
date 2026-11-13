@@ -6,13 +6,16 @@ import './index.css'
 import App from './App'
 import { AuthProvider } from './auth'
 import { RealtimeProvider } from './events'
+import { AlarmProvider } from './alarm'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <RealtimeProvider>
-          <App />
+          <AlarmProvider>
+            <App />
+          </AlarmProvider>
         </RealtimeProvider>
       </AuthProvider>
     </BrowserRouter>

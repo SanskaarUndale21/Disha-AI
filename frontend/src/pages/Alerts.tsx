@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowClockwise, BellRinging, Check, CheckCircle, Info, Warning, WarningOctagon } from '@phosphor-icons/react'
-import { fmtDate, ops, timeAgo, type Alert, type AlertSummary } from '../api'
-import { DefectDrawer } from '../components'
+import { fmtDate, ops, safety, timeAgo, type Alert, type AlertSummary, type Emergency } from '../api'
+import { DefectDrawer, Skeleton } from '../components'
 import { useLiveRefresh } from '../events'
 import { Tile } from '../icons'
 
@@ -38,6 +38,9 @@ export default function Alerts() {
   const [busy, setBusy] = useState<number | 'scan' | null>(null)
   const [scanNote, setScanNote] = useState('')
   const [sel, setSel] = useState<number | null>(null)
+  const [ems, setEms] = useState<Emergency[]>([])
+  const [emsLoaded, setEmsLoaded] = useState(false)
+  const [emErr, setEmErr] = useState('')
 
   const load = () => {
     ops
@@ -49,9 +52,10 @@ export default function Alerts() {
       .catch((e) => setErr(e?.message || 'Could not load alerts'))
       .finally(() => setLoaded(true))
     ops.alertSummary().then(setSum).catch(() => {})
+    safety.emergencies().then((r) => { setEms(Array.isArray(r) ? r : []); setEmErr('') }).catch((e) => setEmErr(e?.message || 'Could not load emergencies')).finally(() => setEmsLoaded(true))
   }
   useEffect(load, [status])
-  useLiveRefresh(['alert.'], load)
+  useLiveRefresh(['alert.', 'emergency.'], load)
 
   const act = async (id: number, s: 'acknowledged' | 'resolved') => {
     setBusy(id)
@@ -116,6 +120,40 @@ export default function Alerts() {
         ))}
       </div>
 
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="row" style={{ marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Emergencies</h3>
+          <span className="spacer" />
+          <span className="note">{ems.filter((x) => x.status !== 'acknowledged').length} unacknowledged</span>
+        </div>
+        {emErr && <div className="err" style={{ marginBottom: 12 }}>{emErr}</div>}
+        {!emsLoaded && <Skeleton rows={2} h={64} />}
+        <div className="al-list">
+          {ems.map((m) => (
+            <div key={m.id} className={`al-row em ${m.status === 'acknowledged' ? 'acknowledged' : 'open'}`} style={{ ['--lv' as any]: '#d92d20' }}>
+              {m.snapshot_url && <a href={m.snapshot_url} target="_blank" rel="noopener noreferrer"><img className="thumb em-snap" src={m.snapshot_url} alt="Fall snapshot" /></a>}
+              <div className="al-main">
+                <div className="row" style={{ gap: 10 }}>
+                  <span className="al-level">Fall</span>
+                  <b className="al-type">{m.message}</b>
+                  <span className={`pill ${m.status === 'acknowledged' ? '' : 'High'}`}>{m.status}</span>
+                </div>
+                <div className="note" title={fmtDate(m.created_at)}>
+                  {timeAgo(m.created_at)}
+                  {m.lat != null && m.lon != null && <>{' '}<a href={`https://www.google.com/maps?q=${m.lat},${m.lon}`} target="_blank" rel="noopener noreferrer">{m.lat.toFixed(5)}, {m.lon.toFixed(5)}</a></>}
+                </div>
+              </div>
+              <div className="al-act">
+                {m.status !== 'acknowledged' && (
+                  <button className="btn sm" disabled={busy === m.id} onClick={async () => { setBusy(m.id); setActErr(''); try { await safety.ack(m.id); load() } catch (e: any) { setActErr(e?.message || 'Action failed') } finally { setBusy(null) } }}><Check size={14} weight="bold" /> Acknowledge</button>
+                )}
+              </div>
+            </div>
+          ))}
+          {emsLoaded && ems.length === 0 && !emErr && <div className="empty">No emergencies recorded.</div>}
+        </div>
+      </div>
+
       <div className="card">
         <div className="row" style={{ marginBottom: 12 }}>
           <div className="seg">
@@ -154,7 +192,7 @@ export default function Alerts() {
             </div>
           ))}
           {rows.length === 0 && (
-            <div className="empty">{!loaded ? 'Loading...' : err ? 'Nothing to show.' : status === 'open' ? 'No open alerts. All clear.' : 'No alerts here.'}</div>
+            <div className="empty">{!loaded ? <Skeleton rows={3} /> : err ? 'Nothing to show.' : status === 'open' ? 'No open alerts. All clear.' : 'No alerts here.'}</div>
           )}
         </div>
       </div>

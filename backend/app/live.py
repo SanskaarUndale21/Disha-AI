@@ -13,6 +13,7 @@ smoothed over ~15 results), "people" (pose model every 2nd frame) and, once per 
 """
 import asyncio
 import json
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -143,6 +144,88 @@ def register_ws(app):
         if r.returncode != 0 or not dst.exists():
             raise HTTPException(400, "This video could not be converted. Try an MP4 or MOV file.")
         return {"url": f"/media/uploads/{dst.name}"}
+
+    @app.websocket("/ws/livestream")
+    async def live_stream_ws(ws: WebSocket):
+        """Server-side stream source: the server opens an IP camera / RTSP / HTTP (MJPEG, HLS) URL itself and sends back
+        each analysed frame as {"image": <base64 jpeg>, ...same fields as /ws/live}. Client sends
+        {"type":"start","url":"rtsp://...","classes":[...],"people":true,"hazards":true,"cracks":true} then {"type":"stop"}."""
+        import base64
+        await ws.accept()
+        stop = threading.Event()
+        q: asyncio.Queue = asyncio.Queue(maxsize=2)
+        loop = asyncio.get_running_loop()
+
+        def reader(url, cfg):
+            cap = cv2.VideoCapture(url)
+            if not cap.isOpened():
+                loop.call_soon_threadsafe(q.put_nowait, {"type": "error", "error": "Could not open the stream. Check the address and that this computer can reach the camera."})
+                return
+            sess = LiveSession(bool(cfg.get("cracks", True)))
+            if cfg.get("classes"):
+                sess.tk.allow = set(cfg["classes"])
+            sess.want_people = bool(cfg.get("people", True))
+            sess.want_hazards = bool(cfg.get("hazards", True))
+            if cfg.get("lat") is not None and cfg.get("lon") is not None:
+                sess.gps = (float(cfg["lat"]), float(cfg["lon"]))
+            last = 0.0
+            try:
+                while not stop.is_set():
+                    ok, frame = cap.read()
+                    if not ok:
+                        loop.call_soon_threadsafe(q.put_nowait, {"type": "error", "error": "The stream ended or was interrupted."})
+                        break
+                    if time.time() - last < 0.12:  # about 8 analysed frames per second keeps the laptop cool
+                        continue
+                    last = time.time()
+                    h, w = frame.shape[:2]
+                    if max(h, w) > 960:
+                        sc = 960 / max(h, w)
+                        frame = cv2.resize(frame, (int(w * sc), int(h * sc)), interpolation=cv2.INTER_AREA)
+                    res = sess.process(frame)
+                    ok2, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    if ok2:
+                        res["image"] = base64.b64encode(buf.tobytes()).decode()
+                        res["w"], res["h"] = frame.shape[1], frame.shape[0]
+                    loop.call_soon_threadsafe(lambda r=res: q.full() or q.put_nowait(r))
+            finally:
+                cap.release()
+
+        async def pump():
+            while True:
+                await ws.send_json(await q.get())
+
+        pump_task = None
+        thread = None
+        try:
+            pump_task = asyncio.create_task(pump())
+            while True:
+                msg = await ws.receive()
+                if msg.get("type") == "websocket.disconnect":
+                    break
+                if not msg.get("text"):
+                    continue
+                m = json.loads(msg["text"])
+                if m.get("type") == "start":
+                    url = str(m.get("url", "")).strip()
+                    if not url.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
+                        await ws.send_json({"type": "error", "error": "Use an rtsp://, http:// or https:// stream address."})
+                        continue
+                    stop.set()
+                    if thread:
+                        await asyncio.to_thread(thread.join, 3)
+                    stop.clear()
+                    thread = threading.Thread(target=reader, args=(url, m), daemon=True)
+                    thread.start()
+                    await ws.send_json({"type": "started"})
+                elif m.get("type") == "stop":
+                    stop.set()
+        except Exception:
+            pass
+        finally:
+            stop.set()
+            if pump_task:
+                pump_task.cancel()
 
     @app.websocket("/ws/live")
     async def live_ws(ws: WebSocket):

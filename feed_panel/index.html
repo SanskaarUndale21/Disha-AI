@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RoadWatch Feed Panel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scene"><div class="sky"></div><div class="road"><i></i><i></i><i></i><i></i><i></i></div></div>
+<div id="alarm" role="alertdialog" aria-live="assertive">
+  <h2>PERSON DOWN</h2>
+  <img id="alsnap" alt="snapshot" class="hidden">
+  <div class="msg"><b id="almsg"></b><div id="alloc"></div></div>
+  <button class="btn3d" id="aldis">Dismiss</button>
+</div>
+<header class="top">
+  <div class="brand"><span class="mark"></span><b>RoadWatch</b><small>Feed panel</small></div>
+  <nav class="tabs">
+    <button class="key on" data-tab="cam">Live camera</button>
+    <button class="key" data-tab="vid">Video file</button>
+    <button class="key" data-tab="pho">Photo(s)</button>
+  </nav>
+  <span class="chip" id="status"><i></i><span>Connecting</span></span>
+  <button class="key" id="alarmEnable">Enable alarm sound</button>
+  <button class="key" id="alarmTest">Test alarm</button>
+</header>
+<main>
+<div class="hero"><h1>Feed data into RoadWatch</h1><p>Stream a camera, upload a video, or drop photos. Choose what to detect, then send.</p></div>
+<div class="layout">
+  <div>
+    <section class="pane on tilt" id="tab-cam"><div class="card">
+      <div class="row">
+        <button class="btn3d primary" id="camStart">Start camera</button>
+        <label class="grow">Or use a video file as source<input type="file" id="camFile" accept="video/*"></label>
+        <button class="btn3d" id="camStop">Stop</button>
+        <button class="btn3d primary" id="camFinish">Finish and save</button>
+      </div>
+      <div class="row">
+        <label class="grow">Or stream URL (IP camera, RTSP, phone camera app, MJPEG/HTTP/HLS)<input id="camUrl" placeholder="http://192.168.1.5:8080/video or rtsp://user:pass@camera-ip/stream1"></label>
+        <button class="btn3d primary" id="camUrlGo">Connect stream</button>
+      </div>
+      <div class="stage"><video id="lv" muted playsinline></video><canvas id="lc"></canvas><div class="hud" id="lhud">idle</div></div>
+      <p class="note" id="cmsg"></p>
+      <div id="cres"></div>
+    </div></section>
+    <section class="pane tilt" id="tab-vid"><div class="card">
+      <label>Video file<input type="file" id="vfile" accept="video/*"></label>
+      <div class="lbl">Quality<div class="seg" id="qseg"><button data-q="2k" class="on">2K (fast)</button><button data-q="4k">4K (detailed)</button></div></div>
+      <button class="btn3d primary" id="vgo">Analyze video</button>
+      <div class="prog hidden" id="vprog"><div id="vbar"></div></div>
+      <p class="note" id="vmsg"></p><div id="vout"></div>
+    </div></section>
+    <section class="pane tilt" id="tab-pho"><div class="card">
+      <label>Photo(s)<input type="file" id="pfile" accept="image/*" multiple></label>
+      <button class="btn3d primary" id="pgo">Analyze photos</button>
+      <p class="note" id="pmsg"></p><div id="pout" class="thumbs"></div>
+    </div></section>
+  </div>
+  <aside class="card tilt">
+    <div class="lbl">Classes to detect
+      <div class="dl"><button class="mini" id="selAll">Select all</button><button class="mini" id="selNone">None</button></div>
+      <div class="cls" id="clsList"></div>
+    </div>
+    <div class="tog">
+      <label><input type="checkbox" id="optPeople" checked> Detect people and falls</label>
+      <label><input type="checkbox" id="optHaz" checked> Road hazards (animals, stop signs, traffic lights)</label>
+      <label><input type="checkbox" id="optCracks" checked> Include cracks</label>
+    </div>
+    <div class="row"><label class="grow">Lat<input id="lat" inputmode="decimal"></label><label class="grow">Lon<input id="lon" inputmode="decimal"></label></div>
+    <button class="btn3d" id="gps">Use my location</button>
+    <label>Inspector name<input id="insp" value="operator"></label>
+    <div class="lbl">Recent uploads<div class="list" id="recent"></div></div>
+  </aside>
+</div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
