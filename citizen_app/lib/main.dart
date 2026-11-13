@@ -39,7 +39,13 @@ Future<void> main() async {
     api.fetchAuthConfig(); // refresh cache in the background
   }
   await initSupabase();
-  api.syncConfig();
+  api.ensureServer().then((ok) {
+    if (ok) {
+      api.syncConfig();
+      realtime.restart();
+      refreshTick.value++;
+    }
+  });
   realtime = Realtime(prefs, onEvent: _onEvent)..start();
   if (Api.supabaseReady) {
     Supabase.instance.client.auth.onAuthStateChange.listen((s) {

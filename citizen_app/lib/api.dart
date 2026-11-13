@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 import 'package:uuid/uuid.dart';
 
+import 'discovery.dart';
+
 const defaultHelpline = '+918064270577';
 
 /// Local settings: backend URL, citizen profile, device id.
@@ -21,6 +23,8 @@ class Prefs extends ChangeNotifier {
   }
 
   static const _envServer = String.fromEnvironment('SERVER');
+
+  static String get defaultServerUrl => _defaultServer;
 
   static String get _defaultServer {
     if (_envServer.isNotEmpty) return _envServer;
@@ -189,6 +193,16 @@ class Api {
     }
   }
 
+  /// Makes sure [prefs.server] points at a live backend. If it doesn't, searches the local network
+  /// and saves what it finds. Returns true when a backend is reachable.
+  Future<bool> ensureServer() async {
+    if (await ServerDiscovery.ping(prefs.server)) return true;
+    final found = await ServerDiscovery.find([prefs.server, Prefs.defaultServerUrl]);
+    if (found == null) return false;
+    await prefs.save(server: found);
+    return true;
+  }
+
   Future<void> syncConfig() async {
     try {
       final c = await _get('/api/citizen/config');
@@ -222,8 +236,7 @@ class Api {
     String? address,
     void Function(double)? onProgress,
   }) async {
-    final req = http.MultipartRequest('POST', Uri.parse('${prefs.server}/api/complaints'))..headers.addAll(_headers);
-    req.fields.addAll({
+    final fields = {
       'category': category,
       'description': description,
       'device_id': prefs.deviceId,
@@ -232,22 +245,45 @@ class Api {
       if (lat != null) 'lat': '$lat',
       if (lon != null) 'lon': '$lon',
       if (address != null && address.isNotEmpty) 'address': address,
-    });
+    };
+    final parts = <(List<int>, String)>[];
     for (var i = 0; i < files.length; i++) {
-      final f = files[i];
-      req.files.add(http.MultipartFile.fromBytes('files', await f.readAsBytes(), filename: _fileName(f, i)));
-      onProgress?.call((i + 1) / (files.length + 1) * 0.5);
+      parts.add((await files[i].readAsBytes(), _fileName(files[i], i)));
+      onProgress?.call((i + 1) / (files.length + 1) * 0.4);
     }
-    try {
+
+    Future<Complaint> send() async {
+      final req = http.MultipartRequest('POST', Uri.parse('${prefs.server}/api/complaints'))
+        ..headers.addAll(_headers)
+        ..fields.addAll(fields);
+      for (final (bytes, name) in parts) {
+        req.files.add(http.MultipartFile.fromBytes('files', bytes, filename: name));
+      }
+      onProgress?.call(0.5);
       final streamed = await req.send().timeout(const Duration(minutes: 5));
       final body = await streamed.stream.bytesToString();
       if (streamed.statusCode >= 400) throw ApiException(_err(body, streamed.statusCode));
       onProgress?.call(1);
       return Complaint.fromJson(jsonDecode(body));
+    }
+
+    try {
+      return await send();
     } on ApiException {
       rethrow;
     } catch (_) {
-      throw ApiException("Upload failed. Check your connection and try again.");
+      // Server moved (new Wi-Fi / IP). Find it on the network and try once more.
+      final before = prefs.server;
+      if (await ensureServer() && prefs.server != before) {
+        try {
+          return await send();
+        } on ApiException {
+          rethrow;
+        } catch (_) {}
+      }
+      throw ApiException(
+          "Can't reach the RoadWatch server at ${prefs.server}. Put your phone on the same Wi-Fi as the computer "
+          'running it, or set the address in Profile > Server.');
     }
   }
 
