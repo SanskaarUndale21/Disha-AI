@@ -55,8 +55,8 @@ export default function Progress() {
                       <YAxis yAxisId="r" orientation="right" fontSize={11} />
                       <Tooltip />
                       <Legend />
-                      <Bar yAxisId="l" dataKey="count" name="defects" fill="#f5b100" />
-                      <Line yAxisId="r" dataKey="area" name="damaged area %" stroke="#d93a2b" />
+                      <Bar yAxisId="l" dataKey="count" name="defects" fill="#f2cc8f" />
+                      <Line yAxisId="r" dataKey="area" name="damaged area %" stroke="#e07a5f" />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>

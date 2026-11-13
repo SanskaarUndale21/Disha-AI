@@ -24,8 +24,15 @@
   addEventListener("deviceorientation", function (e) { if (e.gamma != null) tilt = Math.max(-1, Math.min(1, e.gamma / 30)); }, { passive: true });
 
   function lerp(a, b, t) { return a + (b - a) * t; }
+  var LIGHT = { sky0: "#F4F1DE", sky1: "#F6E9CB", sky2: "#F2CC8F", sun0: "rgba(255,247,226,.95)", sun1: "rgba(242,204,143,.55)", sun2: "rgba(242,204,143,0)", h1: "#BCD5C5", h2: "#9DC4AE", g0: "#A9CDB6", g1: "#81B29A", vA: "rgba(129,178,154,.55)", vB: "rgba(111,163,138,.55)", kA: "#F4F1DE", kB: "#F2CC8F", aA: "#5F6384", aB: "#585C7C", dash: "#F2CC8F", haze0: "rgba(246,233,203,.95)", haze1: "rgba(246,233,203,0)" };
+  var DARK = { sky0: "#1F2133", sky1: "#2A2D47", sky2: "#5B4E55", sun0: "rgba(242,204,143,.55)", sun1: "rgba(242,204,143,.22)", sun2: "rgba(242,204,143,0)", h1: "#2B3A4A", h2: "#27423F", g0: "#25403B", g1: "#1A2D2D", vA: "rgba(60,100,86,.55)", vB: "rgba(48,84,72,.55)", kA: "#8A8CA3", kB: "#F2CC8F", aA: "#2A2C40", aB: "#242638", dash: "#F2CC8F", haze0: "rgba(60,56,70,.9)", haze1: "rgba(60,56,70,0)" };
+  var P = LIGHT;
 
+  var lastTheme = "";
   function frame(t) {
+    if (!document.body.classList.contains("on-home")) { lastTheme = ""; return; }
+    var th = document.documentElement.getAttribute("data-theme");
+    if (reduce && th === lastTheme) return; lastTheme = th;
     var dt = Math.min(0.05, (t - last) / 1000 || 0.016); last = t;
     speed = lerp(speed, target, 0.06);
     z += speed * dt * 3.2;
@@ -35,22 +42,23 @@
   }
 
   function draw(t) {
+    P = document.documentElement.getAttribute("data-theme") === "dark" ? DARK : LIGHT;
     var hz = Math.round(H * 0.46); // horizon line
     // sky: ivory fading to a warm peach glow at the horizon
     var g = ctx.createLinearGradient(0, 0, 0, hz);
-    g.addColorStop(0, "#F4F1DE"); g.addColorStop(0.7, "#F6E9CB"); g.addColorStop(1, "#F2CC8F");
+    g.addColorStop(0, P.sky0); g.addColorStop(0.7, P.sky1); g.addColorStop(1, P.sky2);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, hz + 1);
     // sun
     var sx = W * (0.5 - bend * 0.12), sr = H * 0.1;
     var sg = ctx.createRadialGradient(sx, hz - sr * 0.4, sr * 0.2, sx, hz - sr * 0.4, sr * 2.2);
-    sg.addColorStop(0, "rgba(255,247,226,.95)"); sg.addColorStop(0.4, "rgba(242,204,143,.55)"); sg.addColorStop(1, "rgba(242,204,143,0)");
+    sg.addColorStop(0, P.sun0); sg.addColorStop(0.4, P.sun1); sg.addColorStop(1, P.sun2);
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, hz + 1);
     // far hills drift sideways as the road bends (parallax)
-    hills(hz, "#BCD5C5", 0.10, 0.075, 1.3, -bend * 40);
-    hills(hz, "#9DC4AE", 0.065, 0.1, 2.1, -bend * 70);
+    hills(hz, P.h1, 0.10, 0.075, 1.3, -bend * 40);
+    hills(hz, P.h2, 0.065, 0.1, 2.1, -bend * 70);
     // ground
     var gg = ctx.createLinearGradient(0, hz, 0, H);
-    gg.addColorStop(0, "#A9CDB6"); gg.addColorStop(1, "#81B29A");
+    gg.addColorStop(0, P.g0); gg.addColorStop(1, P.g1);
     ctx.fillStyle = gg; ctx.fillRect(0, hz, W, H - hz);
 
     // road: draw strips from the horizon down; each strip has its own depth, so curves bend toward the viewer
@@ -64,24 +72,24 @@
       var c = cx + curve;
       var band = Math.floor((depth * 0.9 + z * 6) ) % 2 === 0;
       // verge stripes in two greens give the sense of speed
-      ctx.fillStyle = band ? "rgba(129,178,154,.55)" : "rgba(111,163,138,.55)";
+      ctx.fillStyle = band ? P.vA : P.vB;
       ctx.fillRect(0, y, W, 1);
       // kerb
-      ctx.fillStyle = band ? "#F4F1DE" : "#F2CC8F";
+      ctx.fillStyle = band ? P.kA : P.kB;
       ctx.fillRect(c - half * 1.08, y, half * 2.16, 1);
       // asphalt
-      ctx.fillStyle = band ? "#5F6384" : "#585C7C";
+      ctx.fillStyle = band ? P.aA : P.aB;
       ctx.fillRect(c - half, y, half * 2, 1);
       // centre dashes (peach) race toward the viewer
       if (Math.floor(depth * 0.55 + z * 3.2) % 2 === 0) {
-        ctx.fillStyle = "#F2CC8F";
+        ctx.fillStyle = P.dash;
         var dw = Math.max(1, half * 0.035);
         ctx.fillRect(c - dw, y, dw * 2, 1);
       }
     }
     // soft haze at the horizon to melt road into sky
     var hg = ctx.createLinearGradient(0, hz - 6, 0, hz + H * 0.12);
-    hg.addColorStop(0, "rgba(246,233,203,.95)"); hg.addColorStop(1, "rgba(246,233,203,0)");
+    hg.addColorStop(0, P.haze0); hg.addColorStop(1, P.haze1);
     ctx.fillStyle = hg; ctx.fillRect(0, hz - 6, W, H * 0.12 + 6);
   }
 
@@ -95,7 +103,7 @@
     ctx.lineTo(W, hz + 1); ctx.closePath(); ctx.fill();
   }
 
-  if (reduce) { draw(0); return; }
+  if (reduce) { draw(0); new MutationObserver(function () { draw(0); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] }); new MutationObserver(function () { draw(0); }).observe(document.body, { attributes: true, attributeFilter: ["class"] }); return; }
   var running = true, interval = 1000 / 30;
   document.addEventListener("visibilitychange", function () { running = !document.hidden; if (running) requestAnimationFrame(loop); });
   function loop(t) {

@@ -434,6 +434,8 @@
     document.body.className = "on-" + (name === "c" ? "detail" : name);
     var t = TABS[name];
     Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (a) { if (a.dataset.tab === t) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+    var nlKey = { home: "home", report: "report", drive: "drive", map: "map", reports: "reports", c: "reports", alerts: "alerts", profile: "profile" }[name];
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nl]"), function (a) { if (a.dataset.nl === nlKey) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
     var main = $("main");
     if (name === "map") { main.hidden = true; $("mapview").hidden = false; viewMap(p); refreshBadge(); return; }
     main.hidden = false; $("mapview").hidden = true;
@@ -480,40 +482,105 @@
   }
   function paintNearby() { var n = $("nearby"); if (n && current === "home") { n.innerHTML = nearbyHtml(); bindRetry("retry-def", retryDefects); } }
   function retryDefects() { defectsErr = null; defectsCache = null; paintNearby(); loadDefects().then(paintNearby); }
+  /* public numbers for the hero strip and the latest-reports feed (no personal data) */
+  var pub = { stats: null, summary: null, feed: null, err: false };
+  function loadPublic() {
+    var a = api("/api/public/stats").then(function (s) { pub.stats = s; }, function () { pub.err = true; });
+    var b = api("/api/public/summary").then(function (s) { pub.summary = s; }, function () { pub.err = true; });
+    var c = api("/api/public/complaints?limit=8").then(function (l) { pub.feed = Array.isArray(l) ? l : []; }, function () { pub.err = true; if (pub.feed == null) pub.feed = []; });
+    return Promise.all([a, b, c]);
+  }
+  function num(n) { return n == null ? "--" : Number(n).toLocaleString("en-IN"); }
+  function statStrip() {
+    var s = pub.stats, m = pub.summary;
+    var spots = m ? m.open_defects : s ? s.open : null, fixed = s ? s.repaired : m ? m.complaints_resolved : null, recent = s ? s.citizens_reports_last_30d : null;
+    function cell(v, l, hint) { return '<div class="stat-c"><b class="bignum">' + (v == null ? "--" : num(v)) + '</b><span class="mono">' + l + "</span><small>" + hint + "</small></div>"; }
+    return cell(spots, "KNOWN DAMAGE SPOTS", "On the city map right now") + cell(fixed, "FIXED SPOTS", "Marked repaired by crews") + cell(recent, "REPORTS, LAST 30 DAYS", "Sent in by citizens like you");
+  }
+  function miniMap() {
+    var d = defectsCache;
+    if (d == null) return '<div class="mm-skel">' + skel(300) + "</div>";
+    if (!d.length) return '<div class="mm-empty">No damage mapped yet</div>';
+    var minLa = 90, maxLa = -90, minLo = 180, maxLo = -180;
+    var la = d.map(function (x) { return x.lat; }).sort(function (a, b) { return a - b; }), lo = d.map(function (x) { return x.lon; }).sort(function (a, b) { return a - b; });
+    var mLa = la[la.length >> 1], mLo = lo[lo.length >> 1];
+    var near = d.filter(function (x) { return Math.abs(x.lat - mLa) < 0.3 && Math.abs(x.lon - mLo) < 0.3; });
+    if (near.length > 12) d = near;
+    d.forEach(function (x) { minLa = Math.min(minLa, x.lat); maxLa = Math.max(maxLa, x.lat); minLo = Math.min(minLo, x.lon); maxLo = Math.max(maxLo, x.lon); });
+    var W = 640, H = 380, pad = 36, kx = Math.cos(((minLa + maxLa) / 2) * Math.PI / 180);
+    var sx = (W - pad * 2) / Math.max(0.002, (maxLo - minLo) * kx), sy = (H - pad * 2) / Math.max(0.002, maxLa - minLa), sc = Math.min(sx, sy);
+    var ox = (W - (maxLo - minLo) * kx * sc) / 2, oy = (H - (maxLa - minLa) * sc) / 2;
+    var out = "", i;
+    for (i = 1; i < 8; i++) out += '<path d="M' + (i * 80) + ' 0V' + H + '" class="mm-g"/>';
+    for (i = 1; i < 5; i++) out += '<path d="M0 ' + (i * 76) + 'H' + W + '" class="mm-g"/>';
+    out += '<path class="mm-r" d="M-10 300C120 250 190 280 300 190S480 120 650 70"/><path class="mm-r" d="M90 -10C130 110 220 150 250 250S330 330 360 400"/><path class="mm-r" d="M-10 120C150 140 330 90 500 230S600 330 650 320"/>';
+    d.forEach(function (x) {
+      var r = x.risk_level || x.severity, c = (r === "High" || r === "Critical" || r === "Severe") ? "hi" : (r === "Medium" || r === "Moderate") ? "md" : "lo";
+      out += '<circle class="mm-d ' + c + '" r="' + (c === "hi" ? 3.4 : 2.8) + '" cx="' + ((x.lon - minLo) * kx * sc + ox).toFixed(1) + '" cy="' + ((maxLa - x.lat) * sc + oy).toFixed(1) + '"/>';
+    });
+    return '<svg class="mm-svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Preview of mapped damage spots" preserveAspectRatio="xMidYMid slice">' + out + "</svg>";
+  }
+  function feedHtml() {
+    var f = pub.feed;
+    if (f == null) return skel(56) + skel(56, "margin-top:8px") + skel(56, "margin-top:8px");
+    if (!f.length) return '<div class="feed-empty"><b>Nothing reported yet</b><span>Be the first to flag a bad stretch of road.</span></div>';
+    return '<ul class="feed">' + f.slice(0, 6).map(function (c) {
+      var cat = catOf(c.category);
+      return '<li class="feed-r"><span class="mono tk">' + esc(c.number) + '</span><span class="fc"><b>' + esc(cat.label) + '</b><small>' + esc(c.area || "Location shared on the map") + '</small></span>' + pill(c.status) + '<span class="mono when">' + esc(timeAgo(c.created_at)) + "</span></li>";
+    }).join("") + "</ul>";
+  }
+  function alertsHtml() {
+    var items = notifs.slice(0, 3);
+    if (!items.length) return '<div class="al-empty"><span class="mono">ALL QUIET</span><p>No safety alerts right now. We will show warnings and repair news here the moment they happen.</p></div>';
+    return '<ul class="al-mini">' + items.map(function (a) {
+      var k = KIND[a.kind] || KIND.system;
+      return '<li class="' + (a.kind === "safety" ? "emerg" : "") + '"><span class="mono">' + esc(k.label.toUpperCase()) + "</span><b>" + esc(a.title) + "</b><small>" + esc(a.text) + " &middot; " + esc(timeAgo(a.at)) + "</small></li>";
+    }).join("") + "</ul>";
+  }
+  function paintPublic() {
+    if (current !== "home") return;
+    var a = $("h-stats"), b = $("h-feed"), c = $("h-map");
+    if (a) a.innerHTML = statStrip();
+    if (b) b.innerHTML = feedHtml();
+    if (c) c.innerHTML = miniMap();
+    var n = $("h-nearby"); if (n) n.textContent = defectsCache ? defectsCache.length + " spots" : "";
+  }
   function viewHome(p, soft) {
-    var items = complaints || [];
-    var open = items.filter(function (x) { return x.status !== "resolved" && x.status !== "rejected"; }).length, fixed = items.filter(function (x) { return x.status === "resolved"; }).length;
-    var q = getQueue();
-    var recent;
-    if (complaints == null && !complaintsErr) recent = skel(88) + skel(88, "margin-top:10px");
-    else if (complaintsErr && !items.length) recent = errBlock(complaintsErr, "retry-rec");
-    else if (!items.length) recent = '<div class="card rtile"><img class="thumb" style="width:72px;height:72px" alt="" src="assets/photos/pothole_sq.jpg"><div class="body"><div class="headline">No reports yet</div><div class="sub">Your complaints and their repair status will show up here.</div></div></div>';
-    else recent = '<div class="list">' + items.slice(0, 3).map(tileHtml).join("") + "</div>";
+    var q = getQueue(), mine = complaints || [];
     view.innerHTML =
-      '<div class="hello">' + esc(greeting()) + '</div><div class="page-head"><h1 class="large-title grow">Disha AI</h1></div>' +
-      '<div style="height:20px"></div>' +
-      '<a class="hero pressable" href="#/report"><img src="assets/photos/street.jpg" alt=""><span class="glass">' + icon("camera") + '</span><div class="hero-in"><h2>Spotted a bad road?</h2><p>Snap a photo or video. AI checks it and routes it to the repair crew.</p><span class="cta">' + icon("plus") + "Report an issue</span></div></a>" +
-      (q.length ? '<div class="banner info" style="margin-top:14px">' + icon("wifi-off") + "<div><b>" + q.length + " report" + (q.length > 1 ? "s" : "") + " waiting to send</b>Saved on this device. We send it as soon as you are online.<div class=\"btnrow\"><button type=\"button\" class=\"btn\" id=\"q-send\">Send now</button></div></div></div>" : "") +
-      (installEvt && !isStandalone() ? '<button type="button" class="card sm pressable rowlink" id="install" style="margin-top:14px;display:flex">' + badgeIcon("install", "blue", 40) + '<div class="grow"><div class="headline" style="font-size:15.5px">Install Disha AI</div><div class="sub">Add it to your home screen for quick reports.</div></div>' + icon("chev-r") + "</button>" : "") +
-      '<a class="card callcard pressable" style="margin-top:14px" href="tel:' + esc(helpline.replace(/\s/g, "")) + '" aria-label="Call the Disha AI agent on ' + esc(prettyPhone(helpline)) + '"><span class="ring">' + badgeIcon("wave", "indigo", 48) + '<i class="dot"></i></span><div class="grow"><div class="headline">Call Disha AI agent</div><div class="sub" style="font-size:13px">' + esc(prettyPhone(helpline)) + '  ·  Hindi &amp; English</div></div><span class="callbtn">' + icon("phone") + "</span></a>" +
-      '<a class="card tripcard pressable" href="#/map?dir=1" id="trip">' + badgeIcon("route", "blue", 48) + '<div class="grow"><div class="headline">Plan a safe trip</div><div class="sub" style="font-size:13px">Routes that steer clear of potholes and damaged roads.</div></div>' + icon("chev-r") + "</a>" +
-      sectionHead("More ways to help") +
-      '<div class="tools"><a class="card tool pressable" href="#/drive">' + badgeIcon("film", "orange", 36) + '<div class="headline">Dashcam</div><div class="sub">Scan a video or photo</div></a>' +
-      '<a class="card tool pressable" href="#/map">' + badgeIcon("map", "green", 36) + '<div class="headline">City map</div><div class="sub">Every known pothole</div></a>' +
-      '<a class="card tool pressable" href="#/alerts">' + badgeIcon("bell", "indigo", 36) + '<div class="headline">Alerts</div><div class="sub">Safety and repair news</div></a></div>' +
-      sectionHead("Near you") + '<div id="nearby">' + nearbyHtml() + "</div>" +
-      sectionHead("Quick report") +
-      '<div class="quick">' + CATS.map(function (c) { return '<a class="phototile pressable" href="#/report?cat=' + c.key + '" aria-label="Report ' + esc(c.label) + '"><img alt="" src="assets/photos/' + c.photo + '_sq.jpg"><span class="iconbadge c-' + c.color + '" style="--s:30px">' + icon(c.icon) + '</span><span class="lbl">' + esc(c.label) + "</span></a>"; }).join("") + "</div>" +
-      (items.length ? '<div class="stats"><div class="card stat s-blue"><b>' + items.length + "</b><span>Reported</span></div><div class=\"card stat s-orange\"><b>" + open + "</b><span>Open</span></div><div class=\"card stat s-green\"><b>" + fixed + "</b><span>Fixed</span></div></div>" : "") +
-      sectionHead("Recent reports", items.length > 3 ? '<a class="btn ghost" href="#/reports">See all</a>' : "") + recent;
-    bindRetry("retry-rec", function () { complaints = null; complaintsErr = null; renderRoute(true); fetchComplaints().then(function () { renderRoute(true); }, function () { renderRoute(true); }); });
-    bindRetry("retry-def", retryDefects);
+      '<section class="hh"><div class="hh-in wrap">' +
+      '<span class="tagline mono"><i class="ldot"></i>LIVE <u></u> AI CHECKED <u></u> FREE TO USE</span>' +
+      '<h1 class="display">Fix the road,<br><em>not the excuses.</em></h1>' +
+      '<p class="lede">Photograph a pothole, crack or flooded stretch. Disha AI checks it, pins it on the city map and sends it to the crew that repairs it.</p>' +
+      '<div class="cta-row"><a class="pbtn peach glow" href="#/report">Report an issue ' + icon("arrow") + '</a><a class="pbtn outline" href="#/map?dir=1">Plan a safe trip</a><button type="button" class="pbtn outline" data-talk="1">Talk to Disha</button></div>' +
+      '<div class="statstrip" id="h-stats" aria-live="polite">' + statStrip() + "</div>" +
+      "</div></section>" +
+      '<div class="below">' +
+      (q.length ? '<div class="wrap"><div class="banner info" style="margin-top:22px">' + icon("wifi-off") + "<div><b>" + q.length + " report" + (q.length > 1 ? "s" : "") + " waiting to send</b>Saved on this device. We send it as soon as you are online.<div class=\"btnrow\"><button type=\"button\" class=\"btn\" id=\"q-send\">Send now</button></div></div></div></div>" : "") +
+      '<section class="sec wrap"><div class="sec-h"><span class="mono kick">01 / HOW IT WORKS</span><h2 class="h2">From a photo to a <em>fixed</em> road in three steps.</h2></div>' +
+      '<ol class="steps"><li><span class="stepn">01</span><h3>Snap it</h3><p>Take a photo or a short video of the damage. Location is picked up for you, or type the street.</p></li>' +
+      '<li><span class="stepn">02</span><h3>AI checks it</h3><p>Our model confirms the damage, rates how risky it is and rejects blurry or unrelated pictures.</p></li>' +
+      '<li><span class="stepn">03</span><h3>Crew fixes it</h3><p>It lands on the repair queue. You follow every status change under My reports, with alerts.</p></li></ol></section>' +
+      '<section class="sec wrap mapsec"><div class="mapcard"><div class="mc-txt"><span class="mono kick">02 / LIVE MAP</span><h2 class="h2">Every known damage spot, <em>on one map.</em></h2><p class="lede sm">Red is high risk, peach is moderate, sage is minor. Plan a route that steers clear of the worst stretches.</p>' +
+      '<div class="cta-row"><a class="pbtn sage" href="#/map">Open live map ' + icon("arrow") + '</a><a class="pbtn outline" href="#/map?dir=1">Plan a safe trip</a></div></div>' +
+      '<a class="mc-vis pressable" href="#/map" aria-label="Open the live city map"><div id="h-map" class="mm">' + miniMap() + '</div><span class="mono chip live"><i class="ldot"></i>LIVE</span><span class="mono chip cnt" id="h-nearby">' + (defectsCache ? defectsCache.length + " spots" : "") + '</span><span class="mm-key mono"><i class="hi"></i>HIGH<i class="md"></i>MODERATE<i class="lo"></i>MINOR</span></a></div></section>' +
+      '<section class="sec wrap"><div class="sec-h row"><div><span class="mono kick">03 / LATEST REPORTS</span><h2 class="h2">What neighbours are <em>flagging</em> now.</h2></div><a class="pbtn outline sm" href="#/reports">' + (mine.length ? "My reports (" + mine.length + ")" : "My reports") + '</a></div>' +
+      '<div id="h-feed">' + feedHtml() + '</div>' +
+      '<div class="quick-h mono">QUICK REPORT</div><div class="quick">' + CATS.map(function (c) { return '<a class="phototile pressable" href="#/report?cat=' + c.key + '" aria-label="Report ' + esc(c.label) + '"><img alt="" loading="lazy" src="assets/photos/' + c.photo + '_sq.jpg"><span class="lbl">' + esc(c.label) + "</span></a>"; }).join("") + "</div></section>" +
+      '<section class="sec wrap"><div class="sec-h"><span class="mono kick">04 / SAFETY ALERTS</span><h2 class="h2">Warnings that <em>reach you</em> first.</h2></div>' +
+      '<div class="safe"><div class="safe-a" id="h-alerts">' + alertsHtml() + '<a class="pbtn outline sm" href="#/alerts">All alerts</a></div>' +
+      '<div class="safe-b"><a class="callcard pressable" href="tel:' + esc(helpline.replace(/\s/g, "")) + '" aria-label="Call the Disha AI agent on ' + esc(prettyPhone(helpline)) + '"><span class="ring">' + icon("wave") + '<i class="dot"></i></span><div class="grow"><span class="mono">VOICE HELPLINE</span><div class="headline">Call Disha AI agent</div><div class="sub">' + esc(prettyPhone(helpline)) + ' &middot; Hindi and English</div></div><span class="callbtn">' + icon("phone") + '</span></a>' +
+      '<a class="tripcard pressable" href="#/drive"><span class="mono">VIDEO ANALYSIS</span><div class="headline">Scan a dashcam clip</div><div class="sub">Upload a drive video and every pothole is boxed and mapped.</div></a>' +
+      (installEvt && !isStandalone() ? '<button type="button" class="tripcard pressable" id="install"><span class="mono">INSTALL</span><div class="headline">Add Disha AI to your phone</div><div class="sub">One tap from the home screen.</div></button>' : "") +
+      '</div></div></section>' +
+      '<footer class="foot wrap"><span class="mono">DISHA AI &middot; ROADS, REPORTED AND FIXED</span><span class="mono">CITIZEN PORTAL</span></footer></div>';
     bindRetry("q-send", function () { flushQueue(true); });
     bindRetry("install", doInstall);
     if (!soft) {
       if (complaints == null) fetchComplaints().then(function () { renderRoute(true); }, function () { renderRoute(true); });
       else pollComplaints();
-      if (defectsCache == null) loadDefects().then(paintNearby);
+      if (defectsCache == null) loadDefects().then(paintPublic);
+      loadPublic().then(paintPublic);
     }
   }
 
@@ -893,7 +960,7 @@
     var map = classMap || DEFAULT_CLASSES; if (!D.classes) D.classes = Object.keys(map);
     var isVid = D.file ? isVideoFile(D.file) : true;
     var ready = D.file && !D.busy && D.classes.length && (D.where !== "gpx" || D.gpx) && (D.where !== "here" || (D.lat && D.lon));
-    view.innerHTML = '<div class="page-head"><a class="btn ghost" href="#/home" aria-label="Back to Home" style="margin-left:-8px">' + icon("chev-l") + 'Home</a><span class="grow"></span></div><h1 class="large-title" style="margin-top:4px;font-size:30px">Drive / Import</h1>' +
+    view.innerHTML = '<div class="page-head"><a class="btn ghost" href="#/home" aria-label="Back to Home" style="margin-left:-8px">' + icon("chev-l") + 'Home</a><span class="grow"></span></div><h1 class="large-title" style="margin-top:4px;font-size:30px">Video analysis</h1>' +
       '<p class="sub" style="margin:8px 0 0">Upload a dashcam clip or a photo. Every pothole is boxed and tracked once, then added to the city map.</p>' +
       sectionHead("1. The video or photo") + '<div class="card dropzone">' + badgeIcon("film", D.file ? "green" : "blue", 42) + '<div class="grow"><div class="headline">' + esc(D.file ? D.file.name : "No file chosen") + '</div><div class="sub">' + (D.file ? esc(fmtSize(D.file.size)) : "MP4, MOV or JPG. Up to a few minutes works best.") + '</div></div><button type="button" class="btn" id="d-pick"' + (D.busy ? " disabled" : "") + ">" + (D.file ? "Change" : "Choose") + '</button><input id="d-file" type="file" accept="video/*,image/*" hidden></div>' +
       '<div id="d-ferr"></div>' +
@@ -999,6 +1066,14 @@
     navigator.serviceWorker.register("sw.js").then(function (r) { swReg = r; }, function () {});
     navigator.serviceWorker.ready.then(function (r) { swReg = r; });
   }
+  function applyTheme(t, save) {
+    document.documentElement.setAttribute("data-theme", t);
+    var m = document.getElementById("meta-theme"); if (m) m.setAttribute("content", t === "dark" ? "#1F2133" : "#F4F1DE");
+    var b = $("theme-btn"); if (b) { b.setAttribute("aria-label", t === "dark" ? "Switch to light mode" : "Switch to dark mode"); b.setAttribute("aria-pressed", t === "dark" ? "true" : "false"); }
+    if (save) lsSet("rw-theme", t);
+  }
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light", false);
+  $("theme-btn").onclick = function () { applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark", true); };
   renderRoute();
   syncConfig();
   connectWs();
@@ -1007,3 +1082,9 @@
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") { pollComplaints(); if (!wsOk) connectWs(); } });
   setTimeout(pollComplaints, 2500);
 })();
+
+/* Talk to Disha: opens the in-browser voice call from any button with data-talk or #talk-btn */
+document.addEventListener("click", function (e) {
+  var t = e.target.closest && e.target.closest("[data-talk], #talk-btn");
+  if (t && window.DishaCall) { e.preventDefault(); window.RW_API_BASE = window.RW_API_BASE || (typeof API !== "undefined" ? API : undefined); window.DishaCall.open(); }
+});

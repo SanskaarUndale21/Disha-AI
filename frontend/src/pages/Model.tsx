@@ -18,10 +18,10 @@ function Ring({ value, color, size = 64 }: { value: number; color: string; size?
 }
 
 const RISK_PARTS = [
-  { k: 'Severity of the damage', w: 45, c: '#ff3b30', d: 'Measured from the image: size, depth and roughness.' },
-  { k: 'Type of damage', w: 20, c: '#ff9500', d: 'Potholes count most, then alligator, transverse and longitudinal cracks.' },
-  { k: 'Road and traffic', w: 20, c: '#007aff', d: 'Highways and busy roads rank higher. Unknown roads count as average.' },
-  { k: 'Position in the lane', w: 15, c: '#5856d6', d: 'Damage in the wheel path is riskier than at the road edge.' },
+  { k: 'Severity of the damage', w: 45, c: '#e07a5f', d: 'Measured from the image: size, depth and roughness.' },
+  { k: 'Type of damage', w: 20, c: '#f2cc8f', d: 'Potholes count most, then alligator, transverse and longitudinal cracks.' },
+  { k: 'Road and traffic', w: 20, c: '#b3b6d6', d: 'Highways and busy roads rank higher. Unknown roads count as average.' },
+  { k: 'Position in the lane', w: 15, c: '#8e91b0', d: 'Damage in the wheel path is riskier than at the road edge.' },
 ]
 
 export default function Model() {
@@ -45,7 +45,7 @@ export default function Model() {
       <div className="grid g-wide">
         <div className="card">
           <div className="row" style={{ marginBottom: 14 }}>
-            <Tile icon={Target} color="#34c759" size={30} />
+            <Tile icon={Target} color="#81b29a" size={30} />
             <h3 style={{ margin: 0 }}>Detection accuracy</h3>
           </div>
           {!m?.available ? (
@@ -55,7 +55,7 @@ export default function Model() {
               {m.per_class.map((c: any) => (
                 <div key={c.class} className="acc">
                   <div className="acc-ring">
-                    <Ring value={c.map50} color={CLASS_HEX[c.class] ?? '#8e8e93'} />
+                    <Ring value={c.map50} color={CLASS_HEX[c.class] ?? '#a9abc0'} />
                     <b>{pct(c.map50)}</b>
                   </div>
                   <div>
@@ -106,7 +106,7 @@ export default function Model() {
       <div className="grid g3" style={{ marginTop: 16 }}>
         <div className="card">
           <div className="row" style={{ marginBottom: 14 }}>
-            <Tile icon={Gauge} color="#ff3b30" size={30} />
+            <Tile icon={Gauge} color="#e07a5f" size={30} />
             <h3 style={{ margin: 0 }}>Risk score</h3>
           </div>
           <div className="stack-bar">
@@ -119,7 +119,7 @@ export default function Model() {
             </div>
           ))}
           <div className="weight">
-            <i style={{ background: '#8e8e93' }} />
+            <i style={{ background: '#a9abc0' }} />
             <div><b>Extra points</b><div className="note">Up to 12 for repeat citizen reports, 8 when it is getting worse.</div></div>
           </div>
           <div className="bands">
@@ -131,24 +131,24 @@ export default function Model() {
 
         <div className="card">
           <div className="row" style={{ marginBottom: 14 }}>
-            <Tile icon={Ruler} color="#ff9500" size={30} />
+            <Tile icon={Ruler} color="#f2cc8f" size={30} />
             <h3 style={{ margin: 0 }}>Severity</h3>
           </div>
           <p className="note" style={{ marginTop: 0 }}>The damaged area inside each box is traced with OpenCV, then measured three ways.</p>
-          <div className="weight"><i style={{ background: '#ff3b30' }} /><div><b>Size</b><div className="note">Traced area, corrected for distance so far-away potholes are not undercounted.</div></div></div>
-          <div className="weight"><i style={{ background: '#5856d6' }} /><div><b>Depth</b><div className="note">How much darker or wetter the hole is than the road around it.</div></div></div>
-          <div className="weight"><i style={{ background: '#30b0c7' }} /><div><b>Roughness</b><div className="note">Broken, jagged edges inside the damaged area.</div></div></div>
+          <div className="weight"><i style={{ background: '#e07a5f' }} /><div><b>Size</b><div className="note">Traced area, corrected for distance so far-away potholes are not undercounted.</div></div></div>
+          <div className="weight"><i style={{ background: '#8e91b0' }} /><div><b>Depth</b><div className="note">How much darker or wetter the hole is than the road around it.</div></div></div>
+          <div className="weight"><i style={{ background: '#b3b6d6' }} /><div><b>Roughness</b><div className="note">Broken, jagged edges inside the damaged area.</div></div></div>
           <p className="note">Calibrated on 2,400 real potholes: 40% rate low, 40% medium, 20% high.</p>
         </div>
 
         <div className="card">
           <div className="row" style={{ marginBottom: 14 }}>
-            <Tile icon={Copy} color="#5856d6" size={30} />
+            <Tile icon={Copy} color="#8e91b0" size={30} />
             <h3 style={{ margin: 0 }}>Duplicate reports</h3>
           </div>
           <p className="note" style={{ marginTop: 0 }}>A new sighting joins an existing defect instead of creating a second record when both are true:</p>
-          <div className="weight"><i style={{ background: '#007aff' }} /><div><b>Within 15 metres</b><div className="note">30 metres when the location was pinned by hand.</div></div></div>
-          <div className="weight"><i style={{ background: '#34c759' }} /><div><b>Looks like the same damage</b><div className="note">Image similarity from a DINOv2 vision model. Without GPS the match must be much closer.</div></div></div>
+          <div className="weight"><i style={{ background: '#b3b6d6' }} /><div><b>Within 15 metres</b><div className="note">30 metres when the location was pinned by hand.</div></div></div>
+          <div className="weight"><i style={{ background: '#81b29a' }} /><div><b>Looks like the same damage</b><div className="note">Image similarity from a DINOv2 vision model. Without GPS the match must be much closer.</div></div></div>
           <p className="note">The same photo uploaded twice is caught separately by an image fingerprint.</p>
         </div>
       </div>

@@ -805,6 +805,7 @@ def patch_complaint(cid: int, body: ComplaintPatch, s: Session = Depends(get_ses
     c = s.get(Complaint, cid)
     if not c:
         raise HTTPException(404)
+    prev_status = c.status
     if body.status is not None:
         if body.status not in COMPLAINT_STATUSES:
             raise HTTPException(400, f"status must be one of {COMPLAINT_STATUSES}")
@@ -814,6 +815,9 @@ def patch_complaint(cid: int, body: ComplaintPatch, s: Session = Depends(get_ses
     c.updated_at = now()
     s.commit()
     out = ser_complaint(c)
+    if body.status is not None and body.status != prev_status:
+        from . import sms as _s
+        _s.notify_status(c.citizen_phone, c.ticket, c.status)
     events.publish("complaint.updated", out,
                    audience=f"user:{c.citizen_user_id}" if c.citizen_user_id else "officer")
     return out
@@ -837,6 +841,10 @@ citizen.register(app)
 measure.register(app)
 voice.register(app)
 ops.register(app)
+from . import call as _call  # noqa: E402
+_call.register(app)
+from . import sms as _sms  # noqa: E402
+_sms.register(app)
 
 # serve built frontend if present
 _dist = config.ROOT / "frontend" / "dist"

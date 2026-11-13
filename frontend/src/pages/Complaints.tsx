@@ -7,7 +7,7 @@ import { ScreeningPanel } from '../screening'
 
 const STATUSES = ['submitted', 'in_review', 'in_progress', 'resolved', 'rejected']
 const STATUS_COL: Record<string, string> = {
-  submitted: '#0a84ff', in_review: '#bf5af2', in_progress: '#ff9f0a', resolved: '#30d158', rejected: '#8b8f99',
+  submitted: '#b3b6d6', in_review: '#8e91b0', in_progress: '#f2cc8f', resolved: '#81b29a', rejected: '#a9abc0',
 }
 const NEXT: Record<string, string[]> = {
   submitted: ['in_review', 'rejected'],
@@ -18,7 +18,7 @@ const NEXT: Record<string, string[]> = {
 }
 
 export function StatusPill({ s }: { s: string }) {
-  return <span className="pill" style={{ background: STATUS_COL[s] + '26', color: STATUS_COL[s], borderColor: 'transparent' }}>{s.replace('_', ' ')}</span>
+  return <span className="pill" style={{ background: `color-mix(in srgb, ${STATUS_COL[s]} 22%, transparent)`, color: `color-mix(in srgb, ${STATUS_COL[s]} 50%, var(--ink))` }}>{s.replace('_', ' ')}</span>
 }
 
 export default function Complaints() {

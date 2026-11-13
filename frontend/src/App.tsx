@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import { ArrowSquareOut, BellRinging, ChatCircleText, DotsThreeOutline, List, MapPinArea, MapTrifold, Moon, SignIn, SignOut, Sun, UsersThree, VideoCamera, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, BellRinging, ChatCircleText, DotsThreeOutline, MapPinArea, CaretLeft, CaretRight, MapTrifold, Moon, SignIn, SignOut, Sun, UsersThree, VideoCamera } from '@phosphor-icons/react'
 import { api, ops, panelUrl, voice } from './api'
 import { AlarmControl } from './alarm'
 import { useAuth } from './auth'
@@ -59,15 +59,13 @@ const TABS: { to: string; icon: any; short: string; badge?: string }[] = [
 function useTheme() {
   const [theme, setTheme] = useState<string>(() => {
     try {
-      return localStorage.getItem('rw-theme') ?? 'light'
+      return localStorage.getItem('rw-theme') === 'light' ? 'light' : 'dark'
     } catch {
-      return 'auto'
+      return 'dark'
     }
   })
   useEffect(() => {
-    const el = document.documentElement
-    if (theme === 'auto') el.removeAttribute('data-theme')
-    else el.setAttribute('data-theme', theme)
+    document.documentElement.setAttribute('data-theme', theme)
     try {
       localStorage.setItem('rw-theme', theme)
     } catch {
@@ -75,8 +73,40 @@ function useTheme() {
     }
     window.dispatchEvent(new Event('rw-theme'))
   }, [theme])
-  const dark = theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  return { dark, toggle: () => setTheme(dark ? 'light' : 'dark') }
+  return { dark: theme === 'dark', toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark') }
+}
+
+/** Tables collapse to stacked cards on phones: copy each header label onto its cells so CSS can show it. */
+function useTableLabels(root: string) {
+  useEffect(() => {
+    const el = document.querySelector(root)
+    if (!el) return
+    let raf = 0
+    const run = () => {
+      el.querySelectorAll('table.t').forEach((t) => {
+        const heads = Array.from(t.querySelectorAll('thead th')).map((h) => (h.textContent ?? '').trim())
+        if (!heads.length) return
+        t.classList.add('stack')
+        t.querySelectorAll('tbody tr').forEach((tr) => {
+          Array.from(tr.children).forEach((td, i) => {
+            if (td.hasAttribute('colspan')) return
+            const l = heads[i] ?? ''
+            if (td.getAttribute('data-label') !== l) td.setAttribute('data-label', l)
+          })
+        })
+      })
+    }
+    const obs = new MutationObserver(() => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(run)
+    })
+    obs.observe(el, { childList: true, subtree: true })
+    run()
+    return () => {
+      obs.disconnect()
+      cancelAnimationFrame(raf)
+    }
+  }, [root])
 }
 
 export default function App() {
@@ -94,10 +124,17 @@ export default function App() {
   }
   useEffect(loadBadges, [isOfficer])
   useLiveRefresh(['complaint.', 'detection.', 'inspection.', 'alert.'], loadBadges)
+  useTableLabels('#main')
   const initials = (profile?.full_name || profile?.email || '?').split(/[\s@.]/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
-  const flush = loc.pathname === '/' || loc.pathname === '/map'
   const isMap = loc.pathname === '/map'
+  const flush = isMap
   const [menu, setMenu] = useState(false)
+  const [rail, setRail] = useState<boolean>(() => {
+    try { return localStorage.getItem('rw-rail') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('rw-rail', rail ? '1' : '0') } catch { /* ignore */ }
+  }, [rail])
   useEffect(() => setMenu(false), [loc.pathname])
   useEffect(() => {
     if (!menu) return
@@ -108,33 +145,72 @@ export default function App() {
   const title = NAV_GROUPS.flatMap((g) => g.items).find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to)))?.label ?? 'Disha AI'
 
   return (
-    <div className="shell">
+    <div className={`shell ${rail ? 'collapsed' : ''}`}>
       <a className="skip-link" href="#main">Skip to content</a>
-      <header className="topbar">
-        <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Open menu" aria-expanded={menu}><List size={18} weight="bold" /></button>
-        <img src="/logo.svg" alt="" />
-        <b>{title}</b>
-        <span className="spacer" />
-        <a className="btn sm go tb-link" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer"><ArrowSquareOut size={14} weight="bold" /> Feed panel</a>
-        <AlarmControl />
-        <button className="icon-btn tb-theme" onClick={toggle} aria-label="Toggle appearance">{dark ? <Sun size={16} weight="bold" /> : <Moon size={16} weight="bold" />}</button>
-      </header>
-      {menu && <div className="side-scrim" onClick={() => setMenu(false)} />}
-      <aside className={`side ${menu ? 'open' : ''}`}>
-        <button className="icon-btn side-close" onClick={() => setMenu(false)} aria-label="Close menu"><X size={16} weight="bold" /></button>
-        <div className="brand">
+      <aside className="rail" aria-label="Sidebar">
+        <Link className="brandmark" to="/" aria-label="Disha AI home">
           <img src="/logo.svg" alt="" />
-          <div>
-            <b>Disha AI</b>
-            <small>Admin panel</small>
+          <b className="rl">Disha<em>AI</em></b>
+        </Link>
+        <div className="rail-scroll">
+          {NAV_GROUPS.map((g) => (
+            <div key={g.title} className="rail-group">
+              <h6 className="rl">{g.title}</h6>
+              <nav aria-label={g.title}>
+                {g.items.filter((n) => !n.admin || isAdmin).map((n) => (
+                  <NavLink key={n.to} to={n.to} end={n.to === '/'} data-tip={n.label} aria-label={n.label}>
+                    <n.icon size={20} weight="duotone" />
+                    <span className="lbl rl">{n.label}</span>
+                    {n.badge && badges[n.badge] ? <span className="nb">{badges[n.badge]}</span> : null}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          ))}
+        </div>
+        <div className="rail-foot">
+          <a className="rail-link" href={panelUrl(5174)} target="_blank" rel="noopener noreferrer" title="Citizen portal"><UsersThree size={18} weight="bold" /><span className="rl">Citizen portal</span></a>
+          {enabled &&
+            (profile ? (
+              <div className="userbox">
+                <div className="avatar">{initials}</div>
+                <div className="rl" style={{ minWidth: 0, flex: 1 }}>
+                  <div className="who">{profile.full_name || profile.email}</div>
+                  <div className="role">{profile.role}{profile.ward ? `, ${profile.ward}` : ''}</div>
+                </div>
+                <button className="icon-btn" onClick={signOut} aria-label="Sign out" title="Sign out"><SignOut size={16} weight="bold" /></button>
+              </div>
+            ) : (
+              <Link className="btn primary wide" to="/login" title="Officer sign in"><SignIn size={16} weight="bold" /><span className="rl">Officer sign in</span></Link>
+            ))}
+          <div className="rail-ctl">
+            <button className="icon-btn" onClick={toggle} aria-label="Toggle appearance" title="Toggle appearance">{dark ? <Sun size={17} weight="bold" /> : <Moon size={17} weight="bold" />}</button>
+            <button className="icon-btn" onClick={() => setRail(!rail)} aria-label={rail ? 'Expand sidebar' : 'Collapse sidebar'} title={rail ? 'Expand sidebar' : 'Collapse sidebar'}>{rail ? <CaretRight size={16} weight="bold" /> : <CaretLeft size={16} weight="bold" />}</button>
           </div>
         </div>
+      </aside>
+      <div className="content">
+      <header className="topbar">
+        <Link className="brandmark mob" to="/" aria-label="Disha AI home"><img src="/logo.svg" alt="" /></Link>
+        <span className="title-m">{title}</span>
+        <span className="spacer" />
+        <span className="sys-live" title={connected ? 'Live updates on' : 'Reconnecting'}>
+          <span className={`dot ${connected ? 'ok' : ''}`} />
+          <span className="t">{connected ? 'System live' : 'Reconnecting'}</span>
+        </span>
+        <a className="btn sm tb-link" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer"><ArrowSquareOut size={14} weight="bold" /> Feed panel</a>
+        <AlarmControl />
+        <button className="icon-btn tb-theme" onClick={toggle} aria-label="Toggle appearance">{dark ? <Sun size={17} weight="bold" /> : <Moon size={17} weight="bold" />}</button>
+      </header>
+      <div className={`side-scrim ${menu ? 'on' : ''}`} onClick={() => setMenu(false)} />
+      <aside className={`sheet ${menu ? 'open' : ''}`} aria-label="All pages" aria-hidden={!menu}>
+        <div className="sheet-grip" />
         {NAV_GROUPS.map((g) => (
           <div key={g.title}>
-            <div className="nav-group">{g.title}</div>
-            <nav className="nav" aria-label={g.title}>
+            <h6>{g.title}</h6>
+            <nav className="sheet-grid" aria-label={g.title}>
               {g.items.filter((n) => !n.admin || isAdmin).map((n) => (
-                <NavLink key={n.to} to={n.to} end={n.to === '/'}>
+                <NavLink key={n.to} to={n.to} end={n.to === '/'} tabIndex={menu ? 0 : -1}>
                   <Tile icon={n.icon} color={n.color} />
                   <span className="lbl">{n.label}</span>
                   {n.badge && badges[n.badge] ? <span className="badge">{badges[n.badge]}</span> : null}
@@ -143,16 +219,16 @@ export default function App() {
             </nav>
           </div>
         ))}
-        <div className="ext-links">
-          <a className="feed-link" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer"><ArrowSquareOut size={18} weight="bold" /> <span><b>Open Feed panel</b><small>Field feed, port 5175</small></span></a>
-          <a className="cit-link" href={panelUrl(5174)} target="_blank" rel="noopener noreferrer"><UsersThree size={16} weight="bold" /> Citizen portal</a>
+        <div className="sheet-ext">
+          <a className="btn sm" href={panelUrl(5175)} target="_blank" rel="noopener noreferrer" tabIndex={menu ? 0 : -1}><ArrowSquareOut size={15} weight="bold" /> Feed panel</a>
+          <a className="btn sm" href={panelUrl(5174)} target="_blank" rel="noopener noreferrer" tabIndex={menu ? 0 : -1}><UsersThree size={15} weight="bold" /> Citizen portal</a>
         </div>
-        <div className="foot">
+        <div className="sheet-foot">
           <div className="status-line">
             <span className={`dot ${connected ? 'ok' : ''}`} />
-            <span>{connected ? 'Live updates on' : 'Reconnecting'}</span>
+            <span>{connected ? 'System live' : 'Reconnecting'}</span>
             <span className="spacer" />
-            <button className="icon-btn" onClick={toggle} aria-label="Toggle appearance" title="Toggle appearance">
+            <button className="icon-btn" onClick={toggle} aria-label="Toggle appearance" title="Toggle appearance" tabIndex={menu ? 0 : -1}>
               {dark ? <Sun size={16} weight="bold" /> : <Moon size={16} weight="bold" />}
             </button>
           </div>
@@ -164,10 +240,10 @@ export default function App() {
                   <div className="who">{profile.full_name || profile.email}</div>
                   <div className="role">{profile.role}{profile.ward ? `, ${profile.ward}` : ''}</div>
                 </div>
-                <button className="icon-btn" onClick={signOut} aria-label="Sign out" title="Sign out"><SignOut size={16} weight="bold" /></button>
+                <button className="icon-btn" onClick={signOut} aria-label="Sign out" title="Sign out" tabIndex={menu ? 0 : -1}><SignOut size={16} weight="bold" /></button>
               </div>
             ) : (
-              <Link className="btn primary wide" to="/login"><SignIn size={16} weight="bold" /> Officer sign in</Link>
+              <Link className="btn primary wide" to="/login" tabIndex={menu ? 0 : -1}><SignIn size={16} weight="bold" /> Officer sign in</Link>
             ))}
         </div>
       </aside>
@@ -190,6 +266,7 @@ export default function App() {
           <Route path="*" element={<AdminGate><AdminRoutes /></AdminGate>} />
         </Routes>
       </main>
+      </div>
     </div>
   )
 }

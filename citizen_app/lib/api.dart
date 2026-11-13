@@ -375,6 +375,13 @@ class Api {
     }
   }
 
+  // ---------- in-app voice call ----------
+  Future<Map<String, dynamic>> callStart(String lang, double? lat, double? lon) =>
+      _postJson('/api/call/start', {'lang': lang, 'lat': lat, 'lon': lon, 'device_id': prefs.deviceId});
+
+  Future<Map<String, dynamic>> callTurn(String sessionId, String text) =>
+      _postJson('/api/call/turn', {'session_id': sessionId, 'text': text});
+
   // ---------- drive mode ----------
   Future<String> driveStart() async =>
       '${(await _postJson('/api/drive/start', {'device_id': prefs.deviceId}))['session_id']}';

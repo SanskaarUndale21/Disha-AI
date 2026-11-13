@@ -38,19 +38,19 @@ type FrameMsg = {
 type Emergency = { id: number; type: string; pothole_id: number; message: string; snapshot_url: string }
 
 export const CLASS_COLOR: Record<string, string> = {
-  pothole: '#ff3b30',
-  alligator_crack: '#ff9500',
-  transverse_crack: '#0a84ff',
-  longitudinal_crack: '#bf5af2',
-  manhole: '#1f8cc7',
-  speed_breaker: '#f2b705',
-  debris: '#8c7a3c',
-  barricade: '#c8c8c8',
+  pothole: '#e07a5f',
+  alligator_crack: '#f2cc8f',
+  transverse_crack: '#b3b6d6',
+  longitudinal_crack: '#81b29a',
+  manhole: '#8e91b0',
+  speed_breaker: '#d9b56b',
+  debris: '#a58e6f',
+  barricade: '#a9abc0',
 }
 export const PREFIX: Record<string, string> = { pothole: 'PH', alligator_crack: 'AC', transverse_crack: 'TC', longitudinal_crack: 'LC', manhole: 'MH', speed_breaker: 'SB', debris: 'DB', barricade: 'BR' }
 const SEV_W: Record<string, number> = { Low: 2, Medium: 3, High: 4.5, Minor: 2, Moderate: 2.8, Severe: 3.8, Critical: 5 }
-const SEV_COL: Record<string, string> = { Minor: '#2e9a57', Moderate: '#f2b705', Severe: '#dd7a07', Critical: '#d92d20', Low: '#2e9a57', Medium: '#dd7a07', High: '#d92d20' }
-const RISK_COL: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
+const SEV_COL: Record<string, string> = { Minor: '#81b29a', Moderate: '#f2cc8f', Severe: '#f2cc8f', Critical: '#e07a5f', Low: '#81b29a', Medium: '#f2cc8f', High: '#e07a5f' }
+const RISK_COL: Record<string, string> = { High: '#e07a5f', Medium: '#f2cc8f', Low: '#81b29a' }
 const SEND_W = 640
 const IN_FLIGHT = 2
 
@@ -104,7 +104,7 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
   for (const h of m.hazards ?? []) {
     const [X, Y] = P(h.box[0], h.box[1])
     const Wd = (h.box[2] - h.box[0]) * s, Ht = (h.box[3] - h.box[1]) * s
-    const col = h.kind === 'animal' ? '#ff9500' : '#32d2ff'
+    const col = h.kind === 'animal' ? '#f2cc8f' : '#b3b6d6'
     ctx.strokeStyle = col
     ctx.lineWidth = h.kind === 'animal' ? 3 : 2
     ctx.strokeRect(X, Y, Wd, Ht)
@@ -119,14 +119,14 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
   for (const p of m.people ?? []) {
     const [X, Y] = P(p.box[0], p.box[1])
     const Wd = (p.box[2] - p.box[0]) * s, Ht = (p.box[3] - p.box[1]) * s
-    ctx.strokeStyle = p.fallen ? '#ff3b30' : '#ffffff'
+    ctx.strokeStyle = p.fallen ? '#e07a5f' : '#ffffff'
     ctx.lineWidth = p.fallen ? 3 : 1.5
     ctx.setLineDash(p.fallen ? [] : [6, 4])
     ctx.strokeRect(X, Y, Wd, Ht)
     ctx.setLineDash([])
     if (p.fallen) {
       ctx.font = '700 13px -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif'
-      ctx.fillStyle = '#ff3b30'
+      ctx.fillStyle = '#e07a5f'
       ctx.fillRect(X, Y - 20, ctx.measureText('Fallen').width + 12, 20)
       ctx.fillStyle = '#fff'
       ctx.fillText('Fallen', X + 6, Y - 6)
@@ -629,7 +629,7 @@ export default function Live() {
             <div><b>{msg?.unique ?? 0}</b><span>unique</span></div>
             <div><b>{msg?.frame ?? 0}</b><span>frames</span></div>
             {msg?.lane && (
-              <div><b style={{ color: msg.lane.status === 'good' ? '#34c759' : msg.lane.status === 'faded' ? '#ff9f0a' : '#ff453a', textTransform: 'capitalize' }}>{msg.lane.status}</b><span>lane lines</span></div>
+              <div><b style={{ color: msg.lane.status === 'good' ? '#81b29a' : msg.lane.status === 'faded' ? '#f2cc8f' : '#e07a5f', textTransform: 'capitalize' }}>{msg.lane.status}</b><span>lane lines</span></div>
             )}
           </div>
         </div>
@@ -663,13 +663,13 @@ export default function Live() {
           {list.map((t) => (
             <div key={t.id} className={`dcard ${visible.has(t.id) ? 'vis' : ''}`} style={{ ['--cls' as any]: CLASS_COLOR[t.cls] }}>
               <div className="row">
-                <b style={{ color: CLASS_COLOR[t.cls] }}>{PREFIX[t.cls]} {t.id}</b>
+                <b style={{ color: `color-mix(in srgb, ${CLASS_COLOR[t.cls]} 55%, var(--ink))` }}>{PREFIX[t.cls]} {t.id}</b>
                 <span>{label(t.cls)}</span>
-                <span className="pill" style={{ background: t.tier === 'high' ? '#2e9a5722' : '#8a909722', color: t.tier === 'high' ? '#2e9a57' : '#5d636b' }}>{t.tier === 'high' ? `High confidence ${Math.round(t.conf * 100)}%` : `Possible ${Math.round(t.conf * 100)}%`}</span>
+                <span className="pill" style={{ background: t.tier === 'high' ? 'color-mix(in srgb, #81b29a 22%, transparent)' : 'var(--fill-2)', color: t.tier === 'high' ? 'var(--sage-t)' : 'var(--ink-2)' }}>{t.tier === 'high' ? `High confidence ${Math.round(t.conf * 100)}%` : `Possible ${Math.round(t.conf * 100)}%`}</span>
                 <span className="spacer" />
                 <span className="riskbadge" style={{ background: RISK_COL[t.risk] }}>{Math.round(t.risk_score)}</span>
               </div>
-              <div className="meter"><div style={{ width: `${Math.round(t.sev * 100)}%`, background: SEV_COL[t.severity] ?? '#8a9097' }} /></div>
+              <div className="meter"><div style={{ width: `${Math.round(t.sev * 100)}%`, background: SEV_COL[t.severity] ?? '#a9abc0' }} /></div>
               <div className="dmeta">
                 <span>{t.severity} severity</span>
                 <span>size {Math.round(t.size * 100)}</span>

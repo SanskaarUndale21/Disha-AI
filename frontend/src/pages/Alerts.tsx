@@ -18,7 +18,7 @@ const TYPE_LABEL: Record<string, string> = {
 }
 const typeLabel = (t: string) => TYPE_LABEL[t] ?? (t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ') : 'Alert')
 
-const LEVEL_HEX: Record<string, string> = { critical: '#d92d20', warning: '#dd7a07', info: '#1f5fbf' }
+const LEVEL_HEX: Record<string, string> = { critical: '#e07a5f', warning: '#f2cc8f', info: '#b3b6d6' }
 const LEVEL_LABEL: Record<string, string> = { critical: 'Critical', warning: 'Warning', info: 'Info' }
 
 const FILTERS = [
@@ -109,13 +109,13 @@ export default function Alerts() {
 
       <div className="grid g4" style={{ marginBottom: 16 }}>
         <div className="card kpi al-kpi">
-          <Tile icon={BellRinging} color="#16181b" size={34} />
+          <Tile icon={BellRinging} color="#a9abc0" size={34} />
           <div><div className="l">Open</div><div className="v">{sum?.open ?? '-'}</div></div>
         </div>
         {levels.map(({ k, icon }) => (
           <div key={k} className="card kpi al-kpi">
             <Tile icon={icon} color={LEVEL_HEX[k]} size={34} />
-            <div><div className="l">{LEVEL_LABEL[k]}</div><div className="v" style={{ color: k === 'info' ? undefined : LEVEL_HEX[k] }}>{sum?.[k] ?? '-'}</div></div>
+            <div><div className="l">{LEVEL_LABEL[k]}</div><div className="v" style={{ color: k === 'critical' ? 'var(--terra-t)' : k === 'warning' ? 'var(--peach-t)' : undefined }}>{sum?.[k] ?? '-'}</div></div>
           </div>
         ))}
       </div>
@@ -130,7 +130,7 @@ export default function Alerts() {
         {!emsLoaded && <Skeleton rows={2} h={64} />}
         <div className="al-list">
           {ems.map((m) => (
-            <div key={m.id} className={`al-row em ${m.status === 'acknowledged' ? 'acknowledged' : 'open'}`} style={{ ['--lv' as any]: '#d92d20' }}>
+            <div key={m.id} className={`al-row em ${m.status === 'acknowledged' ? 'acknowledged' : 'open'}`} style={{ ['--lv' as any]: '#e07a5f' }}>
               {m.snapshot_url && <a href={m.snapshot_url} target="_blank" rel="noopener noreferrer"><img className="thumb em-snap" src={m.snapshot_url} alt="Fall snapshot" /></a>}
               <div className="al-main">
                 <div className="row" style={{ gap: 10 }}>
@@ -168,7 +168,7 @@ export default function Alerts() {
         {actErr && <div className="err" style={{ marginBottom: 12 }}>{actErr}</div>}
         <div className="al-list">
           {rows.map((a) => (
-            <div key={a.id} className={`al-row ${a.status}`} style={{ ['--lv' as any]: LEVEL_HEX[a.level] ?? '#8a9097' }}>
+            <div key={a.id} className={`al-row ${a.status}`} style={{ ['--lv' as any]: LEVEL_HEX[a.level] ?? '#a9abc0' }}>
               <div className="al-main">
                 <div className="row" style={{ gap: 10 }}>
                   <span className="al-level">{LEVEL_LABEL[a.level] ?? a.level}</span>

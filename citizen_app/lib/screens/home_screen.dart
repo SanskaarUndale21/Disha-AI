@@ -8,6 +8,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'detail_screen.dart';
+import 'call_screen.dart';
 import 'drive_screen.dart';
 import 'import_screen.dart';
 import 'notifications_screen.dart';
@@ -108,6 +109,25 @@ class _HomeScreenState extends State<HomeScreen> {
               _HeroCard(onTap: () => _report()),
               const SizedBox(height: 14),
               _CallCard(number: prefs.helpline),
+              const SizedBox(height: 10),
+              Pressable(
+                onTap: () => openCallScreen(context),
+                child: CardBox(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                  child: Row(children: [
+                    const IconBadge(CupertinoIcons.mic_fill, AppColors.teal, size: 48),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Talk to Disha in the app', style: T.headline(context)),
+                        const SizedBox(height: 2),
+                        Text('Voice and camera, 4 languages', style: T.sub(context).copyWith(fontSize: 13)),
+                      ]),
+                    ),
+                    const Icon(CupertinoIcons.chevron_right, size: 18),
+                  ]),
+                ),
+              ),
               const SectionLabel('More ways to help'),
               Row(children: [
                 Expanded(

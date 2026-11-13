@@ -4,17 +4,17 @@ import { fmtDate, timeAgo, voice, type PhoneComplaint } from '../api'
 import { useLiveRefresh } from '../events'
 
 const VER: Record<string, { label: string; color: string }> = {
-  unverified: { label: 'Unverified', color: '#8a9097' },
-  corroborated: { label: 'Corroborated', color: '#1f5fbf' },
-  photo_verified: { label: 'Photo verified', color: '#1f9d55' },
-  field_verified: { label: 'Field verified', color: '#0d5c33' },
+  unverified: { label: 'Unverified', color: '#a9abc0' },
+  corroborated: { label: 'Corroborated', color: '#b3b6d6' },
+  photo_verified: { label: 'Photo verified', color: '#81b29a' },
+  field_verified: { label: 'Field verified', color: '#5f9a80' },
 }
 
 function VerPill({ v }: { v: string }) {
   const m = VER[v] ?? VER.unverified
   const solid = v === 'field_verified'
   return (
-    <span className="pill" style={{ background: solid ? m.color : `${m.color}1f`, color: solid ? '#fff' : m.color }}>
+    <span className="pill" style={{ background: solid ? m.color : `color-mix(in srgb, ${m.color} 20%, transparent)`, color: solid ? '#12241b' : `color-mix(in srgb, ${m.color} 50%, var(--ink))` }}>
       {m.label}
     </span>
   )

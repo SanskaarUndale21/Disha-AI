@@ -109,7 +109,7 @@ export default function Repairs() {
       <div className="card rp-plan" style={{ marginBottom: 16 }}>
         <div className="rp-plan-in">
           <div className="row" style={{ gap: 12 }}>
-            <Tile icon={Calculator} color="#dd7a07" size={34} />
+            <Tile icon={Calculator} color="#f2cc8f" size={34} />
             <div>
               <h3 style={{ margin: 0 }}>Plan within a budget</h3>
               <div className="note">Picks the defects that remove the most risk for the money.</div>

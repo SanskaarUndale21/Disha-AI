@@ -30,9 +30,9 @@ type Stats = {
 }
 
 const V = {
-  pass: { text: 'Damage found', color: '#2e9a57', icon: CheckCircle },
-  fail: { text: 'No damage', color: '#d92d20', icon: XCircle },
-  rate_limited: { text: 'Blocked', color: '#5d636b', icon: Prohibit },
+  pass: { text: 'Damage found', color: '#81b29a', icon: CheckCircle },
+  fail: { text: 'No damage', color: '#e07a5f', icon: XCircle },
+  rate_limited: { text: 'Blocked', color: '#a9abc0', icon: Prohibit },
 } as const
 
 function ago(iso: string) {
@@ -59,7 +59,7 @@ export function ScreeningPanel() {
   return (
     <div className="card scr">
       <div className="row" style={{ marginBottom: 12 }}>
-        <Tile icon={ShieldWarning} color="#dd7a07" size={30} />
+        <Tile icon={ShieldWarning} color="#f2cc8f" size={30} />
         <div>
           <h3 style={{ margin: 0 }}>AI screening before submission</h3>
           <div className="note">
@@ -76,10 +76,10 @@ export function ScreeningPanel() {
             <b>{stats.last_24h}</b><span>Checks in 24 h</span>
           </button>
           <button className={`scr-stat ${filter === 'pass' ? 'on' : ''}`} onClick={() => setFilter('pass')}>
-            <b style={{ color: V.pass.color }}>{stats.passed}</b><span>Damage found</span>
+            <b style={{ color: 'var(--sage-t)' }}>{stats.passed}</b><span>Damage found</span>
           </button>
           <button className={`scr-stat ${filter === 'fail' ? 'on' : ''}`} onClick={() => setFilter('fail')}>
-            <b style={{ color: V.fail.color }}>{stats.failed}</b><span>Refused, no damage</span>
+            <b style={{ color: 'var(--terra-t)' }}>{stats.failed}</b><span>Refused, no damage</span>
           </button>
           <button className={`scr-stat ${filter === 'rate_limited' ? 'on' : ''}`} onClick={() => setFilter('rate_limited')}>
             <b>{stats.rate_limited}</b><span>Blocked attempts</span>

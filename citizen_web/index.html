@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F1DE" id="meta-theme">
+<script>(function(){var t="light";try{t=localStorage.getItem("rw-theme")==="dark"?"dark":"light";}catch(e){}document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("meta-theme");if(m)m.setAttribute("content",t==="dark"?"#1F2133":"#F4F1DE");})();</script>
 <meta name="description" content="Report road damage, plan safer trips and follow repairs.">
 <title>Disha AI</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -13,9 +13,10 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="callroom.css">
 </head>
 <body>
 <canvas id="bg3d" aria-hidden="true"></canvas>
@@ -65,6 +66,9 @@
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.500 4.500 5.400v5.800c0 4.700 3.100 8.400 7.500 10.300 4.400-1.900 7.500-5.600 7.500-10.300V5.400z" fill="currentColor"/><path d="M8.500 12l2.600 2.600 4.600-5" stroke="var(--icon-cut,#fff)" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
     <symbol id="i-bubble" viewBox="0 0 24 24"><path d="M5.500 3.500h13A3 3 0 0 1 21.500 6.500v8a3 3 0 0 1-3 3H11l-4.700 3.600a.6.6 0 0 1-1-.5v-3.100A3 3 0 0 1 2.500 14.500v-8a3 3 0 0 1 3-3z" fill="currentColor"/></symbol>
     <symbol id="i-install" viewBox="0 0 24 24"><rect x="5" y="2.500" width="14" height="19" rx="3" fill="currentColor"/><path d="M12 7v7M8.800 11.200 12 14.400l3.200-3.200" stroke="var(--icon-cut,#fff)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z" fill="currentColor"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.4" fill="currentColor"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7 7 17M17 7l1.7-1.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4.5 12h15M13 5.5 19.5 12 13 18.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
   </defs>
 </svg>
 
@@ -90,8 +94,25 @@
 </div>
 
 <div class="shell" id="shell">
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#/home" aria-label="Disha AI home"><img src="icons/icon-192.png" alt="" width="34" height="34"><b>Disha <span>AI</span></b></a>
+    <nav class="pillnav" id="pillnav" aria-label="Sections">
+      <a class="nl" href="#/home" data-nl="home">Home</a>
+      <a class="nl" href="#/report" data-nl="report">Report</a>
+      <a class="nl" href="#/drive" data-nl="drive">Video analysis</a>
+      <a class="nl" href="#/map" data-nl="map">Map</a>
+      <a class="nl" href="#/reports" data-nl="reports">My reports</a>
+      <a class="nl" href="#/alerts" data-nl="alerts">Alerts</a>
+    </nav>
+    <div class="tools-r">
+      <button type="button" class="pbtn sage" id="talk-btn" style="padding:8px 16px;min-height:40px" aria-label="Talk to Disha, a live voice call">Talk to Disha</button>
+      <button type="button" class="ibtn" id="theme-btn" aria-label="Switch to dark mode"><svg class="ic i-moon" aria-hidden="true"><use href="#i-moon"/></svg><svg class="ic i-sun" aria-hidden="true"><use href="#i-sun"/></svg></button>
+      <button type="button" class="ibtn bell" id="bell" aria-label="Notifications"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg><em id="bell-badge" class="badge" hidden>0</em></button>
+      <a class="ibtn who" href="#/profile" id="who" data-nl="profile" aria-label="Profile"><svg class="ic" aria-hidden="true"><use href="#i-person-s"/></svg></a>
+    </div>
+  </header>
+
   <nav class="tabbar" id="tabbar" aria-label="Main">
-    <div class="side-brand"><img src="icons/icon-192.png" alt="" width="36" height="36"><b>Disha AI</b></div>
     <a class="tab" href="#/home" data-tab="home"><svg class="ic" aria-hidden="true"><use href="#i-house"/></svg><span>Home</span></a>
     <a class="tab" href="#/reports" data-tab="reports"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg><span>My Reports</span></a>
     <a class="tab tab-report" href="#/report" data-tab="report" aria-label="New report"><span class="fab"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span>Report</span></a>
@@ -100,7 +121,6 @@
   </nav>
 
   <div class="stage">
-    <button type="button" class="bell" id="bell" aria-label="Notifications"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg><em id="bell-badge" class="badge" hidden>0</em></button>
     <main id="main" tabindex="-1"><div id="view" class="view"></div></main>
     <section id="mapview" class="mapview" hidden aria-label="Road damage map">
       <div id="map-coach" class="coach" hidden>
@@ -124,6 +144,7 @@
 
 <noscript><p style="padding:24px;font-family:sans-serif">Disha AI needs JavaScript. Please turn it on, or call the helpline at 080 6427 0577.</p></noscript>
 <script src="road3d.js" defer></script>
+<script src="callroom.js" defer></script>
 <script src="app.js"></script>
 </body>
 </html>

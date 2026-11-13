@@ -46,7 +46,7 @@ export function RoadRecord({ lat, lon, defectId }: { lat?: number | null; lon?: 
   return (
     <div className="card rr-card">
       <div className="row" style={{ marginBottom: 10 }}>
-        <Tile icon={RoadHorizon} color="#1f5fbf" />
+        <Tile icon={RoadHorizon} color="#b3b6d6" />
         <b className="rr-title">Road record</b>
         <span className="spacer" />
         {r?.found && <span className="rr-sample">Sample data for demonstration</span>}

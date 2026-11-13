@@ -47,13 +47,13 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 ]
 
 export const CLASS_HEX: Record<string, string> = {
-  pothole: '#ff3b30',
-  alligator_crack: '#ff9500',
-  transverse_crack: '#007aff',
-  longitudinal_crack: '#af52de',
-  manhole: '#1f8cc7',
-  speed_breaker: '#f2b705',
-  debris: '#8c7a3c',
-  barricade: '#8a9097',
+  pothole: '#e07a5f',
+  alligator_crack: '#f2cc8f',
+  transverse_crack: '#b3b6d6',
+  longitudinal_crack: '#81b29a',
+  manhole: '#8e91b0',
+  speed_breaker: '#d9b56b',
+  debris: '#a58e6f',
+  barricade: '#a9abc0',
 }
-export const RISK_HEX: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
+export const RISK_HEX: Record<string, string> = { High: '#e07a5f', Medium: '#f2cc8f', Low: '#81b29a', Repaired: '#b3b6d6' }

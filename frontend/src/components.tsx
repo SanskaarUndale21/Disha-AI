@@ -6,11 +6,11 @@ import { MeasurePanel } from './measure'
 import { RoadRecord } from './roadrecord'
 import { api, fmtDate, fmtDay, inr, label, ops, reportUrl, type CostRow, type Defect } from './api'
 
-const RISK_HEX: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
+const RISK_HEX: Record<string, string> = { High: '#e07a5f', Medium: '#f2cc8f', Low: '#81b29a' }
 
 /** Apple Maps-style marker: white-ringed disc in the risk colour, sized by reports, halo when high risk. */
 function pinIcon(d: Defect) {
-  const col = d.status === 'repaired' ? '#007aff' : RISK_HEX[d.risk_level] ?? '#8e8e93'
+  const col = d.status === 'repaired' ? '#b3b6d6' : RISK_HEX[d.risk_level] ?? '#a9abc0'
   const size = 18 + Math.min(10, (d.report_count - 1) * 3)
   const halo = d.status !== 'repaired' && d.risk_level === 'High'
   return L.divIcon({
@@ -24,7 +24,7 @@ function pinIcon(d: Defect) {
 // default marker icon fix for bundlers
 const pin = L.divIcon({
   className: '',
-  html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:#f5b100;border:2px solid #111;transform:rotate(-45deg)"></div>',
+  html: '<div style="width:18px;height:18px;border-radius:50% 50% 50% 0;background:#f2cc8f;border:2px solid #111;transform:rotate(-45deg)"></div>',
   iconSize: [18, 18],
   iconAnchor: [9, 18],
 })
@@ -286,7 +286,7 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
                       <XAxis dataKey="day" fontSize={11} />
                       <YAxis domain={[0, 1]} fontSize={11} />
                       <Tooltip />
-                      <Line type="monotone" dataKey="sev" name="severity score" stroke="#f5b100" strokeWidth={2} />
+                      <Line type="monotone" dataKey="sev" name="severity score" stroke="#f2cc8f" strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
