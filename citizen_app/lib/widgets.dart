@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -7,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'theme.dart';
@@ -17,10 +17,12 @@ Future<void> callAgent(BuildContext context, String number) async {
   HapticFeedback.mediumImpact();
   final uri = Uri(scheme: 'tel', path: number.replaceAll(' ', ''));
   final ok = await launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false);
-  if (!ok && context.mounted) toast(context, 'This device can\'t place calls. Dial $number from your phone.');
+  if (!ok && context.mounted) {
+    toast(context, 'No dialer available. Call $number from your phone.');
+  }
 }
 
-/// +918064270577 -> 080 6427 0577 (how Indians write landline numbers).
+/// +918064270577 -> 080 6427 0577
 String prettyPhone(String n) {
   final d = n.replaceAll(RegExp(r'[^0-9]'), '');
   if (d.length == 12 && d.startsWith('91')) {
@@ -34,26 +36,21 @@ void toast(BuildContext context, String msg, {bool error = false}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(error ? PhosphorIconsBold.warningCircle : PhosphorIconsBold.info,
-            color: error ? Palette.yellow : Colors.white, size: 20),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15))),
-      ]),
+      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w500)),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: Palette.asphalt,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      backgroundColor: error ? AppColors.red : const Color(0xE61C1C1E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
     ));
 }
 
-/// Press feedback: quick scale-down, settles back. Answers the tap, nothing more.
+/// Springy scale-down on press, like iOS buttons and cards.
 class Pressable extends StatefulWidget {
-  const Pressable({super.key, required this.child, this.onTap, this.scale = 0.97});
+  const Pressable({super.key, required this.child, this.onTap, this.scale = 0.97, this.haptic = true});
   final Widget child;
   final VoidCallback? onTap;
   final double scale;
+  final bool haptic;
   @override
   State<Pressable> createState() => _PressableState();
 }
@@ -73,121 +70,130 @@ class _PressableState extends State<Pressable> {
         onTap: widget.onTap == null
             ? null
             : () {
-                HapticFeedback.selectionClick();
+                if (widget.haptic) HapticFeedback.selectionClick();
                 widget.onTap!();
               },
         child: AnimatedScale(
           scale: _down ? widget.scale : 1,
-          duration: Duration(milliseconds: _down ? 80 : 180),
-          curve: Curves.easeOut,
-          child: widget.child,
+          duration: Duration(milliseconds: _down ? 90 : 260),
+          curve: _down ? Curves.easeOut : Curves.elasticOut,
+          child: AnimatedOpacity(
+              opacity: _down ? 0.85 : 1, duration: const Duration(milliseconds: 120), child: widget.child),
         ),
       ),
     );
   }
 }
 
-/// A road sign plate: solid face, inset border in the legend colour. The app's one signature element.
-class SignPlate extends StatelessWidget {
-  const SignPlate({
-    super.key,
-    required this.face,
-    required this.legend,
-    required this.child,
-    this.onTap,
-    this.padding = const EdgeInsets.fromLTRB(18, 16, 18, 16),
-    this.radius = 12,
-  });
-  final Color face, legend;
-  final Widget child;
-  final VoidCallback? onTap;
-  final EdgeInsets padding;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final plate = Container(
-      decoration: BoxDecoration(color: face, borderRadius: BorderRadius.circular(radius)),
-      padding: const EdgeInsets.all(5),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(radius - 4),
-          border: Border.all(color: legend, width: 2.5),
-        ),
-        padding: padding,
-        child: DefaultTextStyle.merge(style: TextStyle(color: legend), child: IconTheme.merge(data: IconThemeData(color: legend), child: child)),
-      ),
-    );
-    return onTap == null ? plate : Pressable(onTap: onTap, scale: 0.98, child: plate);
-  }
-}
-
-/// Primary action: yellow sign plate with a single line label.
-class YellowButton extends StatelessWidget {
-  const YellowButton({super.key, required this.label, this.icon, this.onTap, this.busy = false, this.enabled = true});
-  final String label;
-  final IconData? icon;
-  final VoidCallback? onTap;
-  final bool busy, enabled;
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 150),
-      opacity: enabled || busy ? 1 : 0.45,
-      child: SignPlate(
-        face: Palette.yellow,
-        legend: Palette.asphalt,
-        radius: 12,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        onTap: enabled && !busy ? onTap : null,
-        child: SizedBox(
-          width: double.infinity,
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            if (busy)
-              const CupertinoActivityIndicator(color: Palette.asphalt)
-            else if (icon != null)
-              Icon(icon, size: 22),
-            const SizedBox(width: 10),
-            Text(label,
-                style: const TextStyle(
-                    fontFamily: fontDisplay, fontSize: 22, fontWeight: FontWeight.w800, color: Palette.asphalt)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-/// Plain surface block. Flat, no shadow: hierarchy comes from spacing and type, not elevation.
-class Surface extends StatelessWidget {
-  const Surface({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = 16, this.onTap});
+class CardBox extends StatelessWidget {
+  const CardBox({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius = 22});
   final Widget child;
   final EdgeInsets padding;
   final double radius;
-  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
-    final box = Container(
+    final c = AppColors.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
       padding: padding,
-      decoration: BoxDecoration(color: AppColors.of(context).surface, borderRadius: BorderRadius.circular(radius)),
+      decoration: BoxDecoration(
+        color: c.card,
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: dark ? null : [const BoxShadow(color: Color(0x0F000000), blurRadius: 24, offset: Offset(0, 8))],
+      ),
       child: child,
     );
-    return onTap == null ? box : Pressable(onTap: onTap, child: box);
   }
 }
 
-class StatusTag extends StatelessWidget {
-  const StatusTag(this.status, {super.key});
+class Glass extends StatelessWidget {
+  const Glass({super.key, required this.child, this.radius = 0, this.opacity = 0.72});
+  final Widget child;
+  final double radius, opacity;
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(color: c.card.withValues(alpha: opacity), child: child),
+      ),
+    );
+  }
+}
+
+class StatusPill extends StatelessWidget {
+  const StatusPill(this.status, {super.key});
   final String status;
   @override
   Widget build(BuildContext context) {
     final s = statusStyle(status);
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 8, height: 8, decoration: BoxDecoration(color: s.color, borderRadius: BorderRadius.circular(2))),
-      const SizedBox(width: 6),
-      Text(s.label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: s.color)),
-    ]);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: s.color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(99)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(s.icon, size: 12, color: s.color),
+        const SizedBox(width: 5),
+        Text(s.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: s.color)),
+      ]),
+    );
   }
+}
+
+class IconBadge extends StatelessWidget {
+  const IconBadge(this.icon, this.color, {super.key, this.size = 40});
+  final IconData icon;
+  final Color color;
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(size * 0.3),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color.lerp(color, Colors.white, 0.18)!, color],
+          ),
+        ),
+        child: Icon(icon, color: Colors.white, size: size * 0.5),
+      );
+}
+
+/// Real photo tile with a soft scrim and a label, used for issue types.
+class PhotoTile extends StatelessWidget {
+  const PhotoTile({super.key, required this.asset, required this.label, this.radius = 20, this.labelSize = 14});
+  final String asset, label;
+  final double radius, labelSize;
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(fit: StackFit.expand, children: [
+          Image.asset(asset, fit: BoxFit.cover),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x00000000), Color(0xB3000000)],
+                stops: [0.4, 1],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 9,
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: Colors.white, fontSize: labelSize, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
+          ),
+        ]),
+      );
 }
 
 /// Local preview of a picked image or video.
@@ -199,70 +205,73 @@ class LocalThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isVideo) {
       return Container(
-        color: Palette.asphalt,
-        child: const Center(child: Icon(PhosphorIconsFill.playCircle, color: Colors.white, size: 36)),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+              colors: [Color(0xFF2C2C2E), Color(0xFF0B0B0F)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+        child: const Center(child: Icon(CupertinoIcons.play_circle_fill, color: Colors.white, size: 34)),
       );
     }
     return kIsWeb ? Image.network(file.path, fit: BoxFit.cover) : Image.file(File(file.path), fit: BoxFit.cover);
   }
 }
 
-class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.trailing, this.top = 28});
+class SectionLabel extends StatelessWidget {
+  const SectionLabel(this.text, {super.key, this.trailing});
   final String text;
   final Widget? trailing;
-  final double top;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(2, top, 2, 12),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Expanded(child: Text(text, style: T.h2(context))),
+        padding: const EdgeInsets.fromLTRB(4, 26, 4, 10),
+        child: Row(children: [
+          Expanded(child: Text(text, style: T.title(context).copyWith(fontSize: 20))),
           ?trailing,
         ]),
       );
 }
 
-/// Base map tiles (CARTO, OpenStreetMap data). Light or dark to match the theme.
+// ---------- maps (OpenStreetMap tiles) ----------
+
 class MapTiles extends StatelessWidget {
   const MapTiles({super.key});
   @override
-  Widget build(BuildContext context) {
-    return TileLayer(
-      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      userAgentPackageName: 'com.roadwatch.roadwatch_citizen',
-    );
-  }
+  Widget build(BuildContext context) => TileLayer(
+        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        userAgentPackageName: 'com.roadwatch.roadwatch_citizen',
+      );
 }
 
 class MapCredit extends StatelessWidget {
   const MapCredit({super.key});
   @override
   Widget build(BuildContext context) => Align(
-        alignment: Alignment.bottomLeft,
+        alignment: Alignment.bottomRight,
         child: Container(
           margin: const EdgeInsets.all(6),
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          color: Colors.white.withValues(alpha: 0.75),
-          child: const Text('© OpenStreetMap contributors', style: TextStyle(fontSize: 9.5, color: Color(0xFF444444))),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(4)),
+          child: const Text('© OpenStreetMap', style: TextStyle(fontSize: 9.5, color: Color(0xFF444444))),
         ),
       );
 }
 
-/// Report pin: yellow plate with black legend, like a hazard marker.
-class ReportPin extends StatelessWidget {
-  const ReportPin({super.key, this.size = 30, this.color = Palette.yellow});
-  final double size;
+/// iOS Maps style pin: coloured disc with a white ring and glyph.
+class MapPin extends StatelessWidget {
+  const MapPin({super.key, this.color = AppColors.orange, this.icon = CupertinoIcons.exclamationmark, this.size = 30});
   final Color color;
+  final IconData icon;
+  final double size;
   @override
   Widget build(BuildContext context) => Container(
         width: size,
         height: size,
         decoration: BoxDecoration(
+          shape: BoxShape.circle,
           color: color,
-          borderRadius: BorderRadius.circular(size * 0.22),
-          border: Border.all(color: Palette.asphalt, width: 2.5),
+          border: Border.all(color: Colors.white, width: 2.5),
+          boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 6, offset: Offset(0, 2))],
         ),
-        child: Icon(PhosphorIconsBold.warning, size: size * 0.55, color: Palette.asphalt),
+        child: Icon(icon, color: Colors.white, size: size * 0.5),
       );
 }
 
@@ -270,16 +279,16 @@ class YouAreHere extends StatelessWidget {
   const YouAreHere({super.key});
   @override
   Widget build(BuildContext context) => Container(
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Palette.blue.withValues(alpha: 0.18)),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.blue.withValues(alpha: 0.18)),
         child: Container(
           width: 16,
           height: 16,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Palette.blue,
+            color: AppColors.blue,
             border: Border.all(color: Colors.white, width: 3),
           ),
         ),
@@ -290,15 +299,10 @@ LatLng? latLng(double? lat, double? lon) => lat == null || lon == null ? null : 
 
 String timeAgo(DateTime t) {
   final d = DateTime.now().difference(t);
-  if (d.inMinutes < 1) return 'just now';
-  if (d.inMinutes < 60) return '${d.inMinutes} min ago';
-  if (d.inHours < 24) return '${d.inHours} h ago';
-  if (d.inDays == 1) return 'yesterday';
-  if (d.inDays < 7) return '${d.inDays} days ago';
-  return dateLabel(t);
-}
-
-String dateLabel(DateTime t) {
+  if (d.inMinutes < 1) return 'Just now';
+  if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+  if (d.inHours < 24) return '${d.inHours}h ago';
+  if (d.inDays < 7) return '${d.inDays}d ago';
   const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return '${t.day} ${m[t.month - 1]} ${t.year}';
 }

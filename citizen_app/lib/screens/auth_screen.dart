@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../main.dart';
@@ -45,7 +44,7 @@ class _AuthScreenState extends State<AuthScreen> {
     FocusScope.of(context).unfocus();
     final email = _email.text.trim(), pw = _password.text;
     if (!email.contains('@') || pw.length < 6) {
-      setState(() => _error = 'Enter a valid email and a password of at least 6 characters.');
+      setState(() => _error = 'Enter a valid email and a password of at least 6 characters');
       return;
     }
     setState(() => (_busy = true, _error = null, _info = null));
@@ -56,7 +55,7 @@ class _AuthScreenState extends State<AuthScreen> {
         final r = await auth.signUp(email: email, password: pw, data: {if (name.isNotEmpty) 'full_name': name});
         if (name.isNotEmpty) await prefs.save(name: name);
         if (r.session == null) {
-          setState(() => (_info = 'We sent a link to $email. Open it to confirm, then sign in here.', _signUp = false));
+          setState(() => (_info = 'Check $email to confirm your account, then sign in.', _signUp = false));
           return;
         }
       } else {
@@ -67,7 +66,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
-      setState(() => _error = 'Sign-in is unreachable. Check your internet connection and try again.');
+      setState(() => _error = "Couldn't reach the sign-in service. Check your connection.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -90,120 +89,137 @@ class _AuthScreenState extends State<AuthScreen> {
           padding: EdgeInsets.zero,
           children: [
             SizedBox(
-              height: 300 + top,
+              height: 280 + top,
               child: Stack(fit: StackFit.expand, children: [
                 Image.asset('assets/photos/street.jpg', fit: BoxFit.cover),
-                const DecoratedBox(
+                DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x55000000), Color(0x00000000), Color(0xE61F2326)],
-                      stops: [0, 0.35, 1],
+                      colors: [const Color(0x33000000), const Color(0x00000000), c.bg],
+                      stops: const [0, 0.45, 1],
                     ),
-                  ),
-                ),
-                Positioned(
-                  top: top + 16,
-                  left: 20,
-                  child: const SignPlate(
-                    face: Palette.asphalt,
-                    legend: Colors.white,
-                    radius: 10,
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    child: Text('RoadWatch',
-                        style: TextStyle(
-                            fontFamily: fontDisplay, fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
                   ),
                 ),
                 if (!widget.canSkip)
                   Positioned(
-                    top: top + 16,
-                    right: 16,
+                    top: top + 8,
+                    right: 14,
                     child: Pressable(
                       onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(PhosphorIconsBold.x, color: Colors.white, size: 20, semanticLabel: 'Close'),
+                      child: Glass(
+                        radius: 99,
+                        opacity: 0.6,
+                        child: SizedBox(
+                            width: 40, height: 40, child: Icon(CupertinoIcons.xmark, size: 18, color: c.text)),
                       ),
                     ),
                   ),
-                const Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 22,
-                  child: Text('Report bad roads.\nTrack every repair.',
-                      style: TextStyle(
-                          fontFamily: fontDisplay, fontSize: 38, height: 1.02, fontWeight: FontWeight.w800, color: Colors.white)),
+                Positioned(
+                  left: 24,
+                  bottom: 8,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 24, offset: Offset(0, 10))],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Image.asset('assets/icon/icon.png', width: 76, height: 76),
+                    ),
+                  ),
                 ),
               ]),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Row(children: [
-                  _modeTab(false, 'Sign in'),
-                  _modeTab(true, 'Create account'),
-                ]),
-                Divider(height: 1, thickness: 1, color: c.line),
-                const SizedBox(height: 18),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  alignment: Alignment.topCenter,
-                  child: _signUp
-                      ? Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _field(_name, 'Full name', PhosphorIconsBold.user, TextInputType.name),
-                        )
-                      : const SizedBox(width: double.infinity),
+                Text('RoadWatch', style: T.largeTitle(context)),
+                const SizedBox(height: 6),
+                Text(
+                  _signUp ? 'Create an account to track every report' : 'Sign in to track your reports anywhere',
+                  style: T.sub(context).copyWith(fontSize: 15.5),
                 ),
-                _field(_email, 'Email', PhosphorIconsBold.envelopeSimple, TextInputType.emailAddress),
-                const SizedBox(height: 10),
-                _field(_password, 'Password', PhosphorIconsBold.lockSimple, TextInputType.visiblePassword,
-                    obscure: _hide,
-                    suffix: IconButton(
-                      onPressed: () => setState(() => _hide = !_hide),
-                      tooltip: _hide ? 'Show password' : 'Hide password',
-                      icon: Icon(_hide ? PhosphorIconsBold.eye : PhosphorIconsBold.eyeSlash, size: 20, color: c.inkSoft),
-                    )),
+                const SizedBox(height: 22),
+                CupertinoSlidingSegmentedControl<bool>(
+                  groupValue: _signUp,
+                  onValueChanged: (v) => setState(() => (_signUp = v ?? false, _error = null)),
+                  children: const {
+                    false: Padding(padding: EdgeInsets.symmetric(vertical: 7), child: Text('Sign in')),
+                    true: Text('Create account'),
+                  },
+                ),
+                const SizedBox(height: 16),
+                CardBox(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
+                      child: _signUp
+                          ? Column(children: [
+                              _field(_name, 'Full name', CupertinoIcons.person_fill, TextInputType.name),
+                              Divider(height: 1, thickness: 0.5, color: c.separator, indent: 32),
+                            ])
+                          : const SizedBox(width: double.infinity),
+                    ),
+                    _field(_email, 'Email', CupertinoIcons.mail_solid, TextInputType.emailAddress),
+                    Divider(height: 1, thickness: 0.5, color: c.separator, indent: 32),
+                    _field(_password, 'Password', CupertinoIcons.lock_fill, TextInputType.visiblePassword,
+                        obscure: _hide,
+                        suffix: CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(32, 32),
+                          onPressed: () => setState(() => _hide = !_hide),
+                          child: Icon(_hide ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+                              size: 18, color: c.textTertiary),
+                        )),
+                  ]),
+                ),
                 if (_error != null || _info != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.fromLTRB(6, 12, 6, 0),
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Icon(_error != null ? PhosphorIconsFill.warningCircle : PhosphorIconsFill.envelopeSimpleOpen,
-                          size: 18, color: _error != null ? Palette.red : Palette.green),
+                      Icon(
+                          _error != null
+                              ? CupertinoIcons.exclamationmark_circle_fill
+                              : CupertinoIcons.envelope_badge_fill,
+                          size: 16,
+                          color: _error != null ? AppColors.red : AppColors.green),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(_error ?? _info!,
-                            style: TextStyle(fontSize: 14.5, color: _error != null ? Palette.red : Palette.green)),
+                            style: TextStyle(fontSize: 13.5, color: _error != null ? AppColors.red : AppColors.green)),
                       ),
                     ]),
                   ),
-                const SizedBox(height: 20),
-                YellowButton(
-                  label: _signUp ? 'Create account' : 'Sign in',
-                  icon: _signUp ? PhosphorIconsBold.userPlus : PhosphorIconsBold.signIn,
-                  busy: _busy,
-                  onTap: _submit,
+                const SizedBox(height: 22),
+                Pressable(
+                  onTap: _busy ? null : _submit,
+                  child: Container(
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.blue,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [BoxShadow(color: Color(0x550A84FF), blurRadius: 20, offset: Offset(0, 8))],
+                    ),
+                    child: _busy
+                        ? const CupertinoActivityIndicator(color: Colors.white)
+                        : Text(_signUp ? 'Create account' : 'Sign in',
+                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+                  ),
                 ),
                 if (widget.canSkip) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   CupertinoButton(
                     onPressed: _busy ? null : _skip,
                     child: Text('Continue without an account',
-                        style: TextStyle(
-                            fontSize: 16,
-                            color: c.ink,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Palette.yellow,
-                            decorationThickness: 2.5)),
+                        style: TextStyle(fontSize: 15, color: c.textSecondary, fontWeight: FontWeight.w500)),
                   ),
-                  Text('You can still report damage. Your reports stay on this phone.',
-                      textAlign: TextAlign.center, style: T.small(context)),
+                  Text('You can still file reports. They stay linked to this phone only.',
+                      textAlign: TextAlign.center, style: T.sub(context).copyWith(fontSize: 12.5)),
                 ],
               ]),
             ),
@@ -213,49 +229,31 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _modeTab(bool signUp, String label) {
-    final c = AppColors.of(context);
-    final active = _signUp == signUp;
-    return Pressable(
-      onTap: () => setState(() => (_signUp = signUp, _error = null)),
-      child: Padding(
-        padding: const EdgeInsets.only(right: 24),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 17, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? c.ink : c.inkFaint)),
-          const SizedBox(height: 8),
-          AnimatedContainer(
-              duration: const Duration(milliseconds: 180), height: 3, width: active ? 32 : 0, color: Palette.yellow),
-        ]),
-      ),
-    );
-  }
-
   Widget _field(TextEditingController ctl, String hint, IconData icon, TextInputType type,
       {bool obscure = false, Widget? suffix}) {
     final c = AppColors.of(context);
-    return TextField(
-      controller: ctl,
-      keyboardType: type,
-      obscureText: obscure,
-      autocorrect: false,
-      enableSuggestions: !obscure,
-      textCapitalization: type == TextInputType.name ? TextCapitalization.words : TextCapitalization.none,
-      onSubmitted: (_) => _submit(),
-      style: T.body(context),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: c.surface,
-        prefixIcon: Icon(icon, size: 20, color: c.inkSoft),
-        suffixIcon: suffix,
-        hintText: hint,
-        hintStyle: T.body(context).copyWith(color: c.inkFaint),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.line)),
-        focusedBorder:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.ink, width: 2)),
+    return Row(children: [
+      Icon(icon, size: 18, color: c.textTertiary),
+      const SizedBox(width: 14),
+      Expanded(
+        child: TextField(
+          controller: ctl,
+          keyboardType: type,
+          obscureText: obscure,
+          autocorrect: false,
+          enableSuggestions: !obscure,
+          textCapitalization: type == TextInputType.name ? TextCapitalization.words : TextCapitalization.none,
+          onSubmitted: (_) => _submit(),
+          style: T.body(context),
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            hintText: hint,
+            hintStyle: T.body(context).copyWith(color: c.textTertiary),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
       ),
-    );
+      ?suffix,
+    ]);
   }
 }

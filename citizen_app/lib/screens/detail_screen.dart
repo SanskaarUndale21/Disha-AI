@@ -3,14 +3,13 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:video_player/video_player.dart';
 
 import '../api.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'home_screen.dart' show HelplinePlate;
+import 'home_screen.dart' show CallCard;
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({super.key, required this.id, this.initial});
@@ -54,145 +53,174 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final c = _c;
-    final colors = AppColors.of(context);
     if (c == null) return const Scaffold(body: Center(child: CupertinoActivityIndicator()));
     final cat = categoryOf(c.category);
     final photo = c.media.where((m) => !m.isVideo).firstOrNull;
-    final heroUrl = photo == null ? null : (_showAi ? (photo.annotatedUrl ?? photo.mediaUrl) : photo.mediaUrl);
+    final hero = photo == null ? null : (_showAi ? (photo.annotatedUrl ?? photo.mediaUrl) : photo.mediaUrl);
     final top = MediaQuery.paddingOf(context).top;
     final where = latLng(c.lat, c.lon);
-
     return Scaffold(
       body: Stack(children: [
-        ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.zero,
-          children: [
-            SizedBox(
-              height: 320 + top,
-              child: Stack(fit: StackFit.expand, children: [
-                heroUrl != null
-                    ? Image.network(api.url(heroUrl),
-                        fit: BoxFit.cover, errorBuilder: (_, _, _) => Image.asset(cat.thumb, fit: BoxFit.cover))
-                    : Image.asset('assets/photos/${cat.photo}.jpg', fit: BoxFit.cover),
-                if (photo?.annotatedUrl != null)
-                  Positioned(
-                    right: 14,
-                    bottom: 14,
-                    child: Pressable(
-                      onTap: () => setState(() => _showAi = !_showAi),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(8)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(_showAi ? PhosphorIconsBold.eyeSlash : PhosphorIconsBold.scan,
-                              size: 16, color: Palette.yellow),
-                          const SizedBox(width: 6),
-                          Text(_showAi ? 'Show original' : 'Show damage boxes',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                        ]),
+        CustomScrollView(
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 300 + top,
+                child: Stack(fit: StackFit.expand, children: [
+                  if (hero != null)
+                    Image.network(api.url(hero),
+                        fit: BoxFit.cover, errorBuilder: (_, _, _) => Image.asset(cat.image, fit: BoxFit.cover))
+                  else
+                    Image.asset(cat.image, fit: BoxFit.cover),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0x66000000), Color(0x00000000), Color(0xB3000000)],
+                        stops: [0, 0.4, 1],
                       ),
                     ),
                   ),
-              ]),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 22,
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(c.ticket,
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(cat.label,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
+                          const SizedBox(height: 4),
+                          Text('Reported ${timeAgo(c.createdAt)}',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
+                        ]),
+                      ),
+                      if (photo?.annotatedUrl != null)
+                        Pressable(
+                          onTap: () => setState(() => _showAi = !_showAi),
+                          child: Glass(
+                            radius: 99,
+                            opacity: 0.55,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(_showAi ? CupertinoIcons.eye_slash_fill : CupertinoIcons.viewfinder,
+                                    size: 14, color: AppColors.of(context).text),
+                                const SizedBox(width: 5),
+                                Text(_showAi ? 'Original' : 'AI view',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                              ]),
+                            ),
+                          ),
+                        ),
+                    ]),
+                  ),
+                ]),
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.ticket, style: T.small(context)),
-                const SizedBox(height: 2),
-                Text(cat.label, style: T.display(context)),
-                const SizedBox(height: 6),
-                Text('Reported ${timeAgo(c.createdAt)}', style: T.sub(context)),
-                const SizedBox(height: 22),
-                _RoadProgress(status: c.status),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 60),
+              sliver: SliverList.list(children: [
+                _Timeline(status: c.status),
                 if (c.adminNote?.isNotEmpty == true) ...[
-                  const SizedBox(height: 16),
-                  SignPlate(
-                    face: Palette.blue,
-                    legend: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  const SizedBox(height: 12),
+                  CardBox(
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Icon(PhosphorIconsFill.chatCenteredText, size: 22),
+                      const IconBadge(CupertinoIcons.bubble_left_fill, AppColors.indigo, size: 34),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('From the city',
-                              style: TextStyle(fontFamily: fontDisplay, fontSize: 19, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 2),
-                          Text(c.adminNote!, style: const TextStyle(fontSize: 15.5, height: 1.4, color: Colors.white)),
+                          Text('Update from the city', style: T.headline(context).copyWith(fontSize: 15)),
+                          const SizedBox(height: 3),
+                          Text(c.adminNote!, style: T.sub(context)),
                         ]),
                       ),
                     ]),
                   ),
                 ],
-                ..._aiSection(c),
-                if (c.media.length > 1 || c.media.any((m) => m.isVideo)) ...[
-                  const SectionTitle('Your photos and videos'),
+                _aiSection(c),
+                if (c.media.isNotEmpty) ...[
+                  const SectionLabel('Evidence'),
                   GridView.count(
                     crossAxisCount: 3,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 6,
-                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
                     children: [for (final m in c.media) _mediaCell(m)],
                   ),
                 ],
-                if (c.description.isNotEmpty) ...[
-                  const SectionTitle('What you told us'),
-                  Text(c.description, style: T.body(context)),
-                ],
-                const SectionTitle('Location'),
-                if (where != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: SizedBox(
-                      height: 170,
-                      child: FlutterMap(
-                        options: MapOptions(
-                          initialCenter: where,
-                          initialZoom: 16.5,
-                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                const SectionLabel('Location'),
+                CardBox(
+                  padding: EdgeInsets.zero,
+                  child: Column(children: [
+                    if (where != null)
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                        child: SizedBox(
+                          height: 160,
+                          child: FlutterMap(
+                            options: MapOptions(
+                              initialCenter: where,
+                              initialZoom: 16.5,
+                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                            ),
+                            children: [
+                              const MapTiles(),
+                              MarkerLayer(markers: [
+                                Marker(point: where, width: 34, height: 34, child: MapPin(color: cat.color, size: 34)),
+                              ]),
+                              const MapCredit(),
+                            ],
+                          ),
                         ),
-                        children: [
-                          const MapTiles(),
-                          MarkerLayer(markers: [Marker(point: where, width: 34, height: 34, child: const ReportPin(size: 32))]),
-                          const MapCredit(),
-                        ],
                       ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        if (c.description.isNotEmpty) ...[
+                          Text(c.description, style: T.body(context)),
+                          const SizedBox(height: 14),
+                        ],
+                        _info(
+                            CupertinoIcons.location_solid,
+                            c.address?.isNotEmpty == true
+                                ? c.address!
+                                : (where != null
+                                    ? '${c.lat!.toStringAsFixed(5)}, ${c.lon!.toStringAsFixed(5)}'
+                                    : 'No location')),
+                        const SizedBox(height: 10),
+                        _info(CupertinoIcons.clock_fill, 'Updated ${timeAgo(c.updatedAt)}'),
+                      ]),
                     ),
-                  ),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Icon(PhosphorIconsFill.mapPin, size: 18, color: colors.inkSoft),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      c.address?.isNotEmpty == true
-                          ? c.address!
-                          : (where != null
-                              ? '${c.lat!.toStringAsFixed(5)}, ${c.lon!.toStringAsFixed(5)}'
-                              : 'No location was attached'),
-                      style: T.sub(context),
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 28),
-                HelplinePlate(number: prefs.helpline, subtitle: 'Quote ${c.ticket} when you call'),
+                  ]),
+                ),
+                const SizedBox(height: 16),
+                CallCard(number: prefs.helpline, subtitle: 'Questions? Quote ${c.ticket}'),
               ]),
             ),
           ],
         ),
         Positioned(
-          top: top + 10,
+          top: top + 8,
           left: 14,
           child: Pressable(
             onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(12)),
-              child: const Icon(PhosphorIconsBold.arrowLeft, size: 22, color: Colors.white, semanticLabel: 'Back'),
+            child: Glass(
+              radius: 99,
+              opacity: 0.55,
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(CupertinoIcons.chevron_left, size: 20, color: AppColors.of(context).text),
+              ),
             ),
           ),
         ),
@@ -200,72 +228,100 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  List<Widget> _aiSection(Complaint c) {
-    if (c.media.isEmpty) return [];
+  Widget _info(IconData icon, String text) => Row(children: [
+        Icon(icon, size: 16, color: AppColors.of(context).textTertiary),
+        const SizedBox(width: 10),
+        Expanded(child: Text(text, style: T.sub(context))),
+      ]);
+
+  Widget _aiSection(Complaint c) {
+    if (c.media.isEmpty) return const SizedBox.shrink();
     final processing = c.media.any((m) => m.processing);
-    final colors = AppColors.of(context);
-    return [
-      const SectionTitle('What the camera check found'),
-      if (processing && c.findings.isEmpty)
-        Row(children: [
-          const CupertinoActivityIndicator(),
-          const SizedBox(width: 12),
-          Expanded(child: Text('Going through your video frame by frame. This takes a minute.', style: T.sub(context))),
-        ])
-      else if (c.findings.isEmpty)
-        Text('Nothing clear enough to measure automatically. An inspector will review your photos.', style: T.sub(context))
-      else
-        for (final f in c.findings)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.line))),
-            child: Row(children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: f.cropUrl != null
-                      ? Image.network(api.url(f.cropUrl),
-                          fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: colors.fill))
-                      : Container(color: colors.fill),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(f.label[0].toUpperCase() + f.label.substring(1), style: T.bodyStrong(context)),
-                  Text('${(f.confidence * 100).round()}% sure${f.severity.isNotEmpty ? ', ${f.severity.toLowerCase()} severity' : ''}',
-                      style: T.small(context)),
-                ]),
-              ),
-              _RiskTag(f.riskLevel ?? f.severity),
-            ]),
-          ),
-    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SectionLabel('AI inspection'),
+      CardBox(
+        child: processing && c.findings.isEmpty
+            ? Row(children: [
+                const CupertinoActivityIndicator(),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Scanning your video frame by frame...', style: T.sub(context))),
+              ])
+            : c.findings.isEmpty
+                ? Row(children: [
+                    const IconBadge(CupertinoIcons.person_2_fill, AppColors.blue, size: 34),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text('No damage auto-detected. An inspector will review your media.', style: T.sub(context)),
+                    ),
+                  ])
+                : Column(children: [
+                    for (var i = 0; i < c.findings.length; i++) ...[
+                      if (i > 0) Divider(height: 20, thickness: 0.5, color: AppColors.of(context).separator),
+                      _finding(c.findings[i]),
+                    ],
+                  ]),
+      ),
+    ]);
+  }
+
+  Widget _finding(Finding f) {
+    final color = switch (f.riskLevel ?? f.severity) {
+      'High' => AppColors.red,
+      'Medium' => AppColors.orange,
+      _ => AppColors.green,
+    };
+    return Row(children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: f.cropUrl != null
+              ? Image.network(api.url(f.cropUrl),
+                  fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: color.withValues(alpha: 0.15)))
+              : Container(color: color.withValues(alpha: 0.15)),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(f.label[0].toUpperCase() + f.label.substring(1), style: T.headline(context).copyWith(fontSize: 15.5)),
+          Text('${(f.confidence * 100).round()}% confidence${f.defectUid != null ? '  ·  ${f.defectUid}' : ''}',
+              style: T.sub(context).copyWith(fontSize: 12.5)),
+        ]),
+      ),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(99)),
+        child: Text('${f.riskLevel ?? f.severity} risk',
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+      ),
+    ]);
   }
 
   Widget _mediaCell(MediaItem m) {
-    final src = m.mediaUrl;
+    final src = m.isVideo ? m.mediaUrl : (m.annotatedUrl ?? m.mediaUrl);
     return Pressable(
       onTap: src == null
           ? null
           : () => Navigator.of(context).push(PageRouteBuilder(
                 opaque: false,
                 barrierColor: Colors.black,
-                pageBuilder: (_, _, _) => _Viewer(
-                  url: api.url(m.isVideo ? (m.annotatedUrl ?? src) : src),
-                  video: m.isVideo,
-                ),
+                pageBuilder: (_, _, _) =>
+                    _Viewer(url: api.url(m.isVideo ? (m.annotatedUrl ?? src) : src), video: m.isVideo),
                 transitionsBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
               )),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         child: Stack(fit: StackFit.expand, children: [
           if (!m.isVideo && src != null)
-            Image.network(api.url(src), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Palette.asphalt))
+            Image.network(api.url(src), fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(color: Colors.black12))
           else
-            Container(color: Palette.asphalt),
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [Color(0xFF2C2C2E), Color(0xFF0B0B0F)]),
+              ),
+            ),
           if (m.isVideo)
             Center(
               child: m.processing
@@ -273,9 +329,9 @@ class _DetailScreenState extends State<DetailScreen> {
                       const CupertinoActivityIndicator(color: Colors.white),
                       const SizedBox(height: 6),
                       Text('${(m.progress * 100).round()}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
                     ])
-                  : const Icon(PhosphorIconsFill.playCircle, color: Colors.white, size: 38),
+                  : const Icon(CupertinoIcons.play_circle_fill, color: Colors.white, size: 36),
             ),
         ]),
       ),
@@ -283,139 +339,78 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 }
 
-class _RiskTag extends StatelessWidget {
-  const _RiskTag(this.level);
-  final String level;
-  @override
-  Widget build(BuildContext context) {
-    final (bg, fg) = switch (level) {
-      'High' => (Palette.red, Colors.white),
-      'Medium' => (Palette.yellow, Palette.asphalt),
-      _ => (AppColors.of(context).fill, AppColors.of(context).ink),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text('$level risk', style: TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w700)),
-    );
-  }
-}
-
-/// Repair progress drawn as a stretch of road: the finished part is fresh asphalt with lane dashes,
-/// the part still ahead is unpaved grey. Stops are the four stages.
-class _RoadProgress extends StatelessWidget {
-  const _RoadProgress({required this.status});
+class _Timeline extends StatelessWidget {
+  const _Timeline({required this.status});
   final String status;
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
+    final c = AppColors.of(context);
     if (status == 'rejected') {
-      return SignPlate(
-        face: Palette.red,
-        legend: Colors.white,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: const Row(children: [
-          Icon(PhosphorIconsBold.prohibit, size: 22),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text('The city closed this report without a repair.',
-                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600, color: Colors.white)),
-          ),
+      return CardBox(
+        child: Row(children: [
+          const IconBadge(CupertinoIcons.xmark, AppColors.red, size: 36),
+          const SizedBox(width: 12),
+          Expanded(child: Text('This report was closed by the city.', style: T.headline(context).copyWith(fontSize: 15.5))),
         ]),
       );
     }
     final idx = statusOrder.indexOf(status).clamp(0, statusOrder.length - 1);
-    final st = statusStyle(status);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(st.label, style: T.h2(context).copyWith(color: idx == 0 ? colors.ink : st.color)),
-      const SizedBox(height: 4),
-      Text(
-        const [
-          'We have it. An officer will look at it soon.',
-          'An officer is checking your photos and the spot.',
-          'A crew has been assigned to fix it.',
-          'The road has been repaired. Thanks for reporting it.',
-        ][idx],
-        style: T.sub(context),
-      ),
-      const SizedBox(height: 16),
-      LayoutBuilder(builder: (context, box) {
-        final w = box.maxWidth;
-        const stopW = 30.0;
-        final step = (w - stopW) / (statusOrder.length - 1);
-        return SizedBox(
-          height: 30,
-          child: Stack(clipBehavior: Clip.none, children: [
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 7,
-              child: CustomPaint(size: Size(w, 16), painter: _RoadPainter(progress: idx / (statusOrder.length - 1), ahead: colors.fill)),
-            ),
-            for (var i = 0; i < statusOrder.length; i++)
-              Positioned(
-                left: i * step,
-                top: 0,
+    return CardBox(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text('Status', style: T.caption(context)),
+          const Spacer(),
+          StatusPill(status),
+        ]),
+        const SizedBox(height: 18),
+        Row(children: [
+          for (var i = 0; i < statusOrder.length; i++) ...[
+            _dot(i <= idx, statusStyle(statusOrder[i]).color, i == idx),
+            if (i < statusOrder.length - 1)
+              Expanded(
                 child: Container(
-                  width: stopW,
-                  height: stopW,
+                  height: 3,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    color: i < idx ? Palette.asphalt : (i == idx ? Palette.yellow : colors.surface),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: i <= idx ? Palette.asphalt : colors.line, width: 2.5),
-                  ),
-                  child: Icon(
-                    i < idx ? PhosphorIconsBold.check : statusStyle(statusOrder[i]).icon,
-                    size: 15,
-                    color: i < idx ? Palette.yellow : (i == idx ? Palette.asphalt : colors.inkFaint),
+                    color: i < idx ? AppColors.blue : c.fill,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-          ]),
-        );
-      }),
-      const SizedBox(height: 8),
-      Row(children: [
-        for (var i = 0; i < statusOrder.length; i++)
-          Expanded(
-            child: Text(
-              statusStyle(statusOrder[i]).step,
-              textAlign: i == 0 ? TextAlign.left : (i == statusOrder.length - 1 ? TextAlign.right : TextAlign.center),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: i == idx ? FontWeight.w700 : FontWeight.w500,
-                color: i <= idx ? colors.ink : colors.inkFaint,
+          ],
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (var i = 0; i < statusOrder.length; i++)
+            Expanded(
+              child: Text(
+                const ['Submitted', 'Review', 'Repair', 'Fixed'][i],
+                textAlign: i == 0 ? TextAlign.left : (i == statusOrder.length - 1 ? TextAlign.right : TextAlign.center),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: i == idx ? FontWeight.w700 : FontWeight.w500,
+                  color: i <= idx ? c.text : c.textTertiary,
+                ),
               ),
             ),
-          ),
+        ]),
       ]),
-    ]);
-  }
-}
-
-class _RoadPainter extends CustomPainter {
-  _RoadPainter({required this.progress, required this.ahead});
-  final double progress;
-  final Color ahead;
-  @override
-  void paint(Canvas canvas, Size s) {
-    final r = RRect.fromRectAndRadius(Offset.zero & s, const Radius.circular(3));
-    canvas.drawRRect(r, Paint()..color = ahead);
-    final doneW = (s.width * progress).clamp(0.0, s.width);
-    if (doneW > 0) {
-      canvas.save();
-      canvas.clipRect(Rect.fromLTWH(0, 0, doneW, s.height));
-      canvas.drawRRect(r, Paint()..color = Palette.asphalt);
-      final dash = Paint()..color = Palette.yellow;
-      for (double x = 6; x < doneW; x += 18) {
-        canvas.drawRect(Rect.fromLTWH(x, s.height / 2 - 1.25, 9, 2.5), dash);
-      }
-      canvas.restore();
-    }
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant _RoadPainter old) => old.progress != progress || old.ahead != ahead;
+  Widget _dot(bool done, Color color, bool current) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: current ? 22 : 16,
+        height: current ? 22 : 16,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: done ? (current ? color : AppColors.blue) : Colors.transparent,
+          border: Border.all(color: done ? Colors.transparent : const Color(0x33888888), width: 2),
+          boxShadow: current ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 10)] : null,
+        ),
+        child: done ? Icon(CupertinoIcons.checkmark, size: current ? 13 : 10, color: Colors.white) : null,
+      );
 }
 
 class _Viewer extends StatefulWidget {
@@ -466,15 +461,15 @@ class _ViewerState extends State<_Viewer> {
               : InteractiveViewer(maxScale: 5, child: Image.network(widget.url)),
         ),
         Positioned(
-          top: MediaQuery.paddingOf(context).top + 10,
+          top: MediaQuery.paddingOf(context).top + 8,
           right: 14,
           child: Pressable(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(12)),
-              child: const Icon(PhosphorIconsBold.x, color: Colors.white, size: 20, semanticLabel: 'Close'),
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(color: Color(0x33FFFFFF), shape: BoxShape.circle),
+              child: const Icon(CupertinoIcons.xmark, color: Colors.white, size: 18),
             ),
           ),
         ),

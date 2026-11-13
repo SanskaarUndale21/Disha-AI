@@ -1,6 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../api.dart';
 import '../main.dart';
@@ -17,7 +15,7 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   List<Complaint>? _items;
   String? _error;
-  int _filter = 0; // 0 open, 1 fixed or closed, 2 all
+  int _filter = 0; // 0 all, 1 open, 2 closed
 
   @override
   void initState() {
@@ -41,141 +39,126 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  bool _open(Complaint x) => x.status != 'resolved' && x.status != 'rejected';
+  List<Complaint> get _visible {
+    final all = _items ?? [];
+    return switch (_filter) {
+      1 => all.where((x) => x.status != 'resolved' && x.status != 'rejected').toList(),
+      2 => all.where((x) => x.status == 'resolved' || x.status == 'rejected').toList(),
+      _ => all,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final all = _items ?? [];
-    final open = all.where(_open).toList();
-    final closed = all.where((x) => !_open(x)).toList();
-    final list = switch (_filter) { 0 => open, 1 => closed, _ => all };
-    final c = AppColors.of(context);
-    return SafeArea(
-      bottom: false,
-      child: RefreshIndicator(
-        onRefresh: _load,
-        color: Palette.asphalt,
-        backgroundColor: Palette.yellow,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          children: [
-            Text('Your reports', style: T.display(context)),
-            const SizedBox(height: 6),
-            Text(
-              all.isEmpty
-                  ? 'Reports you send appear here.'
-                  : '${all.length} sent, ${all.where((x) => x.status == 'resolved').length} fixed so far.',
-              style: T.sub(context),
-            ),
-            const SizedBox(height: 20),
-            Row(children: [
-              _tab(0, 'Open', open.length),
-              _tab(1, 'Fixed or closed', closed.length),
-              _tab(2, 'All', all.length),
+    final list = _visible;
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      slivers: [
+        CupertinoSliverRefreshControl(onRefresh: _load),
+        SliverSafeArea(
+          bottom: false,
+          sliver: SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+            sliver: SliverList.list(children: [
+              Text('My Reports', style: T.largeTitle(context)),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoSlidingSegmentedControl<int>(
+                  groupValue: _filter,
+                  onValueChanged: (v) => setState(() => _filter = v ?? 0),
+                  children: const {
+                    0: Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Text('All')),
+                    1: Text('Open'),
+                    2: Text('Closed'),
+                  },
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (_items == null && _error == null)
+                const Padding(padding: EdgeInsets.all(40), child: CupertinoActivityIndicator())
+              else if (_error != null && (_items ?? []).isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(30),
+                  child: Text(_error!, textAlign: TextAlign.center, style: T.sub(context)),
+                )
+              else if (list.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset('assets/photos/crack_sq.jpg', width: 110, height: 110, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(_filter == 2 ? 'Nothing closed yet' : 'Nothing here', style: T.headline(context)),
+                    const SizedBox(height: 4),
+                    Text('Report a road issue from Home and track it here.', style: T.sub(context)),
+                  ]),
+                )
+              else
+                for (final x in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: ComplaintTile(x)),
             ]),
-            Divider(height: 1, thickness: 1, color: c.line),
-            const SizedBox(height: 8),
-            if (_items == null && _error == null)
-              const Padding(padding: EdgeInsets.all(40), child: CupertinoActivityIndicator())
-            else if (_error != null && all.isEmpty)
-              Padding(padding: const EdgeInsets.symmetric(vertical: 32), child: Text(_error!, style: T.sub(context)))
-            else if (list.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                child: Column(children: [
-                  Icon(_filter == 1 ? PhosphorIconsBold.hourglassMedium : PhosphorIconsBold.checkCircle,
-                      size: 40, color: c.inkFaint),
-                  const SizedBox(height: 10),
-                  Text(_filter == 1 ? 'Nothing fixed yet' : 'No open reports', style: T.h3(context)),
-                  const SizedBox(height: 4),
-                  Text(
-                      _filter == 1
-                          ? 'When the city fixes or closes a report, it moves here.'
-                          : 'Spot something? Report it from the map.',
-                      textAlign: TextAlign.center,
-                      style: T.sub(context)),
-                ]),
-              )
-            else
-              for (final x in list) ComplaintRow(x),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tab(int i, String label, int count) {
-    final c = AppColors.of(context);
-    final active = _filter == i;
-    return Pressable(
-      onTap: () => setState(() => _filter = i),
-      child: Padding(
-        padding: const EdgeInsets.only(right: 22),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('$label  $count',
-              style: TextStyle(
-                  fontSize: 15.5, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? c.ink : c.inkFaint)),
-          const SizedBox(height: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 3,
-            width: active ? 28 : 0,
-            color: Palette.yellow,
           ),
-        ]),
-      ),
+        ),
+      ],
     );
   }
 }
 
-/// One report in a list: real photo, what and where, current stage.
-class ComplaintRow extends StatelessWidget {
-  const ComplaintRow(this.c, {super.key});
+class ComplaintTile extends StatelessWidget {
+  const ComplaintTile(this.c, {super.key});
   final Complaint c;
   @override
   Widget build(BuildContext context) {
     final cat = categoryOf(c.category);
     final colors = AppColors.of(context);
     final thumb = c.media.where((m) => !m.isVideo).map((m) => m.mediaUrl).firstOrNull;
-    final place = c.address?.isNotEmpty == true ? c.address!.split(',').first : null;
     return Pressable(
       onTap: () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => DetailScreen(id: c.id, initial: c))),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.line))),
+      child: CardBox(
+        padding: const EdgeInsets.all(12),
+        radius: 20,
         child: Row(children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
             child: SizedBox(
-              width: 68,
-              height: 68,
+              width: 64,
+              height: 64,
               child: thumb != null
                   ? Image.network(api.url(thumb),
                       fit: BoxFit.cover, errorBuilder: (_, _, _) => Image.asset(cat.thumb, fit: BoxFit.cover))
-                  : (c.media.any((m) => m.isVideo)
-                      ? Container(
-                          color: Palette.asphalt,
-                          child: const Icon(PhosphorIconsFill.videoCamera, color: Colors.white, size: 26))
-                      : Image.asset(cat.thumb, fit: BoxFit.cover)),
+                  : Image.asset(cat.thumb, fit: BoxFit.cover),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(cat.label, style: T.h3(context)),
+              Row(children: [
+                Expanded(child: Text(cat.label, style: T.headline(context).copyWith(fontSize: 16))),
+                Text(timeAgo(c.createdAt), style: T.sub(context).copyWith(fontSize: 12.5)),
+              ]),
               const SizedBox(height: 2),
               Text(
-                [?place, timeAgo(c.createdAt)].join(', '),
+                c.description.isNotEmpty ? c.description : (c.address ?? c.ticket),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: T.small(context),
+                style: T.sub(context),
               ),
-              const SizedBox(height: 6),
-              StatusTag(c.status),
+              const SizedBox(height: 8),
+              Row(children: [
+                StatusPill(c.status),
+                const SizedBox(width: 8),
+                Text(c.ticket, style: TextStyle(fontSize: 12, color: colors.textTertiary, fontWeight: FontWeight.w500)),
+                const Spacer(),
+                if (c.media.isNotEmpty) ...[
+                  Icon(CupertinoIcons.photo_on_rectangle, size: 14, color: colors.textTertiary),
+                  const SizedBox(width: 3),
+                  Text('${c.media.length}', style: TextStyle(fontSize: 12, color: colors.textTertiary)),
+                ],
+              ]),
             ]),
           ),
-          Icon(PhosphorIconsBold.caretRight, size: 18, color: colors.inkFaint),
         ]),
       ),
     );

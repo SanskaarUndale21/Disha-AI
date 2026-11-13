@@ -1,133 +1,106 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-/// Design language: Indian road infrastructure.
-/// Asphalt, concrete, thermoplastic lane yellow, highway-sign green, info-sign blue, hazard red.
-/// Typeface: Barlow (drawn from highway signage); condensed cut for headings.
-class Palette {
-  static const asphalt = Color(0xFF1F2326);
-  static const asphaltSoft = Color(0xFF2C3135);
-  static const yellow = Color(0xFFFFC20E);
-  static const yellowDeep = Color(0xFFE5A900);
-  static const green = Color(0xFF0B6B4A);
-  static const blue = Color(0xFF1F5FAD);
-  static const red = Color(0xFFD52B2B);
-  static const white = Color(0xFFFFFFFF);
-}
-
+/// iOS-inspired design tokens. Light + dark aware via [AppColors.of].
 class AppColors {
-  final Color bg, surface, raised, ink, inkSoft, inkFaint, line, fill;
-  const AppColors._(this.bg, this.surface, this.raised, this.ink, this.inkSoft, this.inkFaint, this.line, this.fill);
+  final Color bg, card, cardAlt, text, textSecondary, textTertiary, separator, fill;
+  const AppColors._(this.bg, this.card, this.cardAlt, this.text, this.textSecondary, this.textTertiary,
+      this.separator, this.fill);
 
   static const light = AppColors._(
-    Color(0xFFECEDEE), // concrete
-    Color(0xFFFFFFFF),
-    Color(0xFFF6F7F7),
-    Color(0xFF15181A),
-    Color(0xFF575F66),
-    Color(0xFF8A9299),
-    Color(0xFFD9DCDF),
-    Color(0xFFE4E6E8),
+    Color(0xFFF2F2F7), Colors.white, Color(0xFFF7F7FA), Color(0xFF0B0B0F), Color(0xFF6E6E73),
+    Color(0xFFAEAEB2), Color(0x1F3C3C43), Color(0x14767680),
   );
   static const dark = AppColors._(
-    Color(0xFF16191B), // night asphalt
-    Color(0xFF212528),
-    Color(0xFF2A2F33),
-    Color(0xFFF1F2F3),
-    Color(0xFFA9B0B6),
-    Color(0xFF737B82),
-    Color(0xFF353A3F),
-    Color(0xFF30353A),
+    Color(0xFF000000), Color(0xFF1C1C1E), Color(0xFF2C2C2E), Color(0xFFF5F5F7), Color(0xFF98989F),
+    Color(0xFF636366), Color(0x33545458), Color(0x3D767680),
   );
 
   static AppColors of(BuildContext c) => Theme.of(c).brightness == Brightness.dark ? dark : light;
+
+  static const blue = Color(0xFF0A84FF);
+  static const indigo = Color(0xFF5E5CE6);
+  static const green = Color(0xFF30D158);
+  static const orange = Color(0xFFFF9F0A);
+  static const red = Color(0xFFFF453A);
+  static const teal = Color(0xFF40C8E0);
+  static const purple = Color(0xFFBF5AF2);
+  static const yellow = Color(0xFFFFD60A);
 }
 
 class Category {
   final String key, label, hint, photo;
   final IconData icon;
-  const Category(this.key, this.label, this.hint, this.photo, this.icon);
+  final Color color;
+  const Category(this.key, this.label, this.hint, this.icon, this.color, this.photo);
+
+  /// Real road photo for this kind of damage (square crop for tiles, full frame for headers).
   String get thumb => 'assets/photos/${photo}_sq.jpg';
+  String get image => 'assets/photos/$photo.jpg';
 }
 
-final categories = [
-  Category('pothole', 'Pothole', 'A hole or crater in the road', 'pothole', PhosphorIconsBold.circleDashed),
-  Category('crack', 'Cracks', 'Cracked or split surface', 'crack', PhosphorIconsBold.lightning),
-  Category('waterlogging', 'Waterlogging', 'Water standing on the road', 'waterlogging', PhosphorIconsBold.drop),
-  Category('broken_road', 'Broken edge', 'Road edge or surface caved in', 'broken_road', PhosphorIconsBold.warning),
-  Category('other', 'Something else', 'Open manhole, debris, anything', 'other', PhosphorIconsBold.dotsThreeCircle),
+const categories = [
+  Category('pothole', 'Pothole', 'Holes or craters', CupertinoIcons.circle_grid_hex_fill, AppColors.orange, 'pothole'),
+  Category('crack', 'Cracks', 'Surface cracking', CupertinoIcons.bolt_fill, AppColors.yellow, 'crack'),
+  Category('waterlogging', 'Waterlogging', 'Flooded stretch', CupertinoIcons.drop_fill, AppColors.teal, 'waterlogging'),
+  Category('broken_road', 'Broken road', 'Caved or washed out', CupertinoIcons.exclamationmark_triangle_fill,
+      AppColors.red, 'broken_road'),
+  Category('other', 'Other', 'Open manhole, debris', CupertinoIcons.ellipsis_circle_fill, AppColors.purple, 'other'),
 ];
 
 Category categoryOf(String key) => categories.firstWhere((c) => c.key == key, orElse: () => categories.last);
 
 class StatusStyle {
-  final String label, step;
+  final String label;
   final Color color;
   final IconData icon;
-  const StatusStyle(this.label, this.step, this.color, this.icon);
+  const StatusStyle(this.label, this.color, this.icon);
 }
 
 const statusOrder = ['submitted', 'in_review', 'in_progress', 'resolved'];
 
 StatusStyle statusStyle(String s) => switch (s) {
-      'in_review' => const StatusStyle('Being reviewed', 'Review', Palette.blue, PhosphorIconsBold.magnifyingGlass),
-      'in_progress' => const StatusStyle('Repair crew assigned', 'Repair', Palette.yellowDeep, PhosphorIconsBold.hardHat),
-      'resolved' => const StatusStyle('Fixed', 'Fixed', Palette.green, PhosphorIconsBold.checkCircle),
-      'rejected' => const StatusStyle('Closed', 'Closed', Palette.red, PhosphorIconsBold.xCircle),
-      _ => const StatusStyle('Received', 'Received', Color(0xFF5B636A), PhosphorIconsBold.paperPlaneTilt),
+      'in_review' => const StatusStyle('In review', AppColors.indigo, CupertinoIcons.eye_fill),
+      'in_progress' => const StatusStyle('Repair underway', AppColors.orange, CupertinoIcons.hammer_fill),
+      'resolved' => const StatusStyle('Resolved', AppColors.green, CupertinoIcons.checkmark_seal_fill),
+      'rejected' => const StatusStyle('Closed', AppColors.red, CupertinoIcons.xmark_circle_fill),
+      _ => const StatusStyle('Submitted', AppColors.blue, CupertinoIcons.paperplane_fill),
     };
-
-const fontBody = 'Barlow';
-const fontDisplay = 'BarlowCondensed';
 
 ThemeData buildTheme(Brightness b) {
   final c = b == Brightness.dark ? AppColors.dark : AppColors.light;
-  final base = ThemeData(brightness: b, useMaterial3: true, fontFamily: fontBody);
+  final base = ThemeData(brightness: b, useMaterial3: true);
+  final text = GoogleFonts.interTextTheme(base.textTheme).apply(bodyColor: c.text, displayColor: c.text);
   return base.copyWith(
     scaffoldBackgroundColor: c.bg,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: Palette.yellow,
-      brightness: b,
-      primary: b == Brightness.dark ? Palette.yellow : Palette.asphalt,
-      surface: c.surface,
-    ),
-    textTheme: base.textTheme.apply(bodyColor: c.ink, displayColor: c.ink, fontFamily: fontBody),
+    colorScheme: ColorScheme.fromSeed(seedColor: AppColors.blue, brightness: b, surface: c.card),
+    textTheme: text,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
-    textSelectionTheme: TextSelectionThemeData(
-      cursorColor: c.ink,
-      selectionColor: Palette.yellow.withValues(alpha: 0.45),
-      selectionHandleColor: Palette.yellowDeep,
-    ),
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
       TargetPlatform.android: CupertinoPageTransitionsBuilder(),
       TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
     }),
     cupertinoOverrideTheme: CupertinoThemeData(
       brightness: b,
-      primaryColor: c.ink,
-      textTheme: CupertinoTextThemeData(textStyle: TextStyle(fontFamily: fontBody, fontSize: 16, color: c.ink)),
+      primaryColor: AppColors.blue,
+      textTheme: CupertinoTextThemeData(textStyle: GoogleFonts.inter(fontSize: 16, color: c.text)),
     ),
   );
 }
 
-/// Type scale (ratio ~1.25). Condensed for display, regular Barlow for reading.
 class T {
-  static TextStyle display(BuildContext c) => TextStyle(
-      fontFamily: fontDisplay, fontSize: 40, height: 1.0, fontWeight: FontWeight.w800, color: AppColors.of(c).ink);
-  static TextStyle h1(BuildContext c) => TextStyle(
-      fontFamily: fontDisplay, fontSize: 32, height: 1.05, fontWeight: FontWeight.w800, color: AppColors.of(c).ink);
-  static TextStyle h2(BuildContext c) => TextStyle(
-      fontFamily: fontDisplay, fontSize: 24, height: 1.1, fontWeight: FontWeight.w700, color: AppColors.of(c).ink);
-  static TextStyle h3(BuildContext c) => TextStyle(
-      fontFamily: fontDisplay, fontSize: 20, height: 1.15, fontWeight: FontWeight.w700, color: AppColors.of(c).ink);
+  static TextStyle largeTitle(BuildContext c) =>
+      TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1.1, color: AppColors.of(c).text);
+  static TextStyle title(BuildContext c) =>
+      TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: AppColors.of(c).text);
+  static TextStyle headline(BuildContext c) =>
+      TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: AppColors.of(c).text);
   static TextStyle body(BuildContext c) =>
-      TextStyle(fontSize: 16, height: 1.45, fontWeight: FontWeight.w400, color: AppColors.of(c).ink);
-  static TextStyle bodyStrong(BuildContext c) =>
-      TextStyle(fontSize: 16, height: 1.35, fontWeight: FontWeight.w600, color: AppColors.of(c).ink);
+      TextStyle(fontSize: 16, height: 1.35, letterSpacing: -0.2, color: AppColors.of(c).text);
   static TextStyle sub(BuildContext c) =>
-      TextStyle(fontSize: 14.5, height: 1.4, fontWeight: FontWeight.w400, color: AppColors.of(c).inkSoft);
-  static TextStyle small(BuildContext c) =>
-      TextStyle(fontSize: 13, height: 1.35, fontWeight: FontWeight.w500, color: AppColors.of(c).inkFaint);
+      TextStyle(fontSize: 14, height: 1.3, letterSpacing: -0.1, color: AppColors.of(c).textSecondary);
+  static TextStyle caption(BuildContext c) => TextStyle(
+      fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: AppColors.of(c).textSecondary);
 }

@@ -1,9 +1,8 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
@@ -90,31 +89,23 @@ void _onEvent(String type, Map<String, dynamic> data) {
     ?..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: Palette.asphalt,
+      backgroundColor: const Color(0xF21C1C1E),
       elevation: 0,
-      duration: const Duration(seconds: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 84),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      duration: const Duration(seconds: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 90),
       content: Row(children: [
-        Container(
-          width: 6,
-          height: 40,
-          decoration: BoxDecoration(color: st.color == const Color(0xFF5B636A) ? Palette.yellow : st.color,
-              borderRadius: BorderRadius.circular(3)),
-        ),
+        IconBadge(st.icon, st.color, size: 34),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text('$ticket: ${st.label}',
-                style: const TextStyle(
-                    fontFamily: fontDisplay, color: Colors.white, fontWeight: FontWeight.w700, fontSize: 19)),
-            const SizedBox(height: 2),
+            Text('$ticket is now ${st.label.toLowerCase()}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
             Text(
-              (data['admin_note'] as String?)?.isNotEmpty == true ? data['admin_note'] : 'The city updated your report.',
+              (data['admin_note'] as String?)?.isNotEmpty == true ? data['admin_note'] : 'Status updated by the city',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 14),
+              style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
             ),
           ]),
         ),
@@ -193,22 +184,25 @@ class _ShellState extends State<Shell> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
+        extendBody: true,
         body: IndexedStack(index: _tab, children: [
           HomeScreen(onSeeAll: () => go(1)),
           const ReportsScreen(),
           const ProfileScreen(),
         ]),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(color: c.surface, border: Border(top: BorderSide(color: c.line))),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 62,
-              child: Row(children: [
-                _tabItem(0, PhosphorIconsBold.mapTrifold, PhosphorIconsFill.mapTrifold, 'Map'),
-                _tabItem(1, PhosphorIconsBold.listChecks, PhosphorIconsFill.listChecks, 'Your reports'),
-                _tabItem(2, PhosphorIconsBold.userCircle, PhosphorIconsFill.userCircle, 'Profile'),
-              ]),
+        bottomNavigationBar: Glass(
+          child: Container(
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: c.separator, width: 0.5))),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 58,
+                child: Row(children: [
+                  _tabItem(0, CupertinoIcons.house_fill, 'Home'),
+                  _tabItem(1, CupertinoIcons.doc_text_fill, 'My Reports'),
+                  _tabItem(2, CupertinoIcons.person_crop_circle_fill, 'Profile'),
+                ]),
+              ),
             ),
           ),
         ),
@@ -216,28 +210,21 @@ class _ShellState extends State<Shell> {
     );
   }
 
-  /// Active tab is marked with a lane-marking dash above the icon.
-  Widget _tabItem(int i, IconData icon, IconData activeIcon, String label) {
-    final c = AppColors.of(context);
+  Widget _tabItem(int i, IconData icon, String label) {
     final active = _tab == i;
-    final color = active ? c.ink : c.inkFaint;
+    final color = active ? AppColors.blue : AppColors.of(context).textTertiary;
     return Expanded(
       child: Pressable(
-        scale: 0.94,
+        scale: 0.9,
         onTap: () => go(i),
-        child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-          AnimatedContainer(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          AnimatedScale(
+            scale: active ? 1.08 : 1,
             duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            width: active ? 28 : 0,
-            height: 4,
-            decoration: BoxDecoration(color: Palette.yellow, borderRadius: BorderRadius.circular(2)),
+            child: Icon(icon, color: color, size: 25),
           ),
-          const SizedBox(height: 8),
-          Icon(active ? activeIcon : icon, color: color, size: 24),
           const SizedBox(height: 3),
-          Text(label,
-              style: TextStyle(fontSize: 12, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: color)),
+          Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color)),
         ]),
       ),
     );

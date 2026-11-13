@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 import '../api.dart';
@@ -8,7 +7,6 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'auth_screen.dart';
-import 'home_screen.dart' show HelplinePlate;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,7 +18,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final _name = TextEditingController(text: prefs.name);
   late final _phone = TextEditingController(text: prefs.phone);
   late final _server = TextEditingController(text: prefs.server);
-  bool _saving = false;
 
   @override
   void dispose() {
@@ -32,7 +29,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
-    setState(() => _saving = true);
     final serverChanged = _server.text.trim() != prefs.server;
     await prefs.save(name: _name.text, phone: _phone.text, server: _server.text);
     await api.updateMe(fullName: _name.text.trim(), phone: _phone.text.trim());
@@ -43,8 +39,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     refreshTick.value++;
     if (mounted) {
-      setState(() => _saving = false);
-      toast(context, 'Profile saved');
+      setState(() {});
+      toast(context, 'Saved');
     }
   }
 
@@ -71,105 +67,125 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final c = AppColors.of(context);
     final email = _email;
     final initials = prefs.name.trim().isEmpty
-        ? null
+        ? '?'
         : prefs.name.trim().split(RegExp(r'\s+')).take(2).map((w) => w[0].toUpperCase()).join();
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: SafeArea(
-        bottom: false,
-        child: ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-          children: [
-            Row(children: [
-              Container(
-                width: 64,
-                height: 64,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(14)),
-                child: initials != null
-                    ? Text(initials,
-                        style: const TextStyle(
-                            fontFamily: fontDisplay, color: Palette.yellow, fontSize: 30, fontWeight: FontWeight.w800))
-                    : const Icon(PhosphorIconsFill.user, color: Palette.yellow, size: 30),
+      child: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 12, 20, 120),
+        children: [
+          Text('Profile', style: T.largeTitle(context)),
+          const SizedBox(height: 22),
+          Center(
+            child: Container(
+              width: 92,
+              height: 92,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [AppColors.blue, AppColors.indigo]),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(prefs.name.isEmpty ? 'Your profile' : prefs.name, style: T.h1(context)),
-                  const SizedBox(height: 2),
-                  Text(email ?? 'Not signed in. Reports stay on this phone.', style: T.sub(context)),
-                ]),
+              child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w700)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Center(child: Text(prefs.name.isEmpty ? 'Citizen' : prefs.name, style: T.title(context))),
+          const SizedBox(height: 4),
+          Center(child: Text(email ?? 'Not signed in · reports linked to this phone', style: T.sub(context))),
+          if (Api.supabaseReady)
+            _group('ACCOUNT', [
+              Pressable(
+                onTap: email == null ? _signIn : _signOut,
+                child: email == null
+                    ? _row(CupertinoIcons.person_crop_circle_badge_plus, AppColors.blue, 'Sign in or create account', '',
+                        chevron: true)
+                    : _row(CupertinoIcons.square_arrow_right, AppColors.red, 'Sign out', ''),
               ),
             ]),
-            if (Api.supabaseReady) ...[
-              const SizedBox(height: 18),
-              email == null
-                  ? YellowButton(label: 'Sign in or create account', icon: PhosphorIconsBold.signIn, onTap: _signIn)
-                  : const SizedBox.shrink(),
-            ],
-            const SectionTitle('Contact details'),
-            Text('Shared with the repair team only if they need to reach you about a report.', style: T.sub(context)),
-            const SizedBox(height: 12),
-            _field(_name, 'Name', PhosphorIconsBold.user, TextInputType.name),
-            const SizedBox(height: 10),
-            _field(_phone, 'Mobile number', PhosphorIconsBold.phone, TextInputType.phone),
-            const SectionTitle('Help'),
-            HelplinePlate(number: prefs.helpline),
-            const SectionTitle('Server'),
-            Text('The RoadWatch backend this app talks to. On a phone, use the computer\'s Wi-Fi address.',
-                style: T.sub(context)),
-            const SizedBox(height: 12),
-            _field(_server, 'http://192.168.1.10:8000', PhosphorIconsBold.hardDrives, TextInputType.url),
-            const SizedBox(height: 24),
+          _group('YOUR DETAILS', [
+            _field(_name, 'Name', CupertinoIcons.person_fill, AppColors.blue, TextInputType.name),
+            _field(_phone, 'Mobile', CupertinoIcons.phone_fill, AppColors.green, TextInputType.phone),
+          ]),
+          _group('HELP', [
             Pressable(
-              onTap: _saving ? null : _save,
-              child: Container(
-                height: 54,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: Palette.asphalt, borderRadius: BorderRadius.circular(12)),
-                child: _saving
-                    ? const CupertinoActivityIndicator(color: Colors.white)
-                    : const Text('Save profile',
-                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
-              ),
+              onTap: () => callAgent(context, prefs.helpline),
+              child: _row(CupertinoIcons.waveform, AppColors.indigo, 'Call RoadWatch agent', prettyPhone(prefs.helpline),
+                  chevron: true),
             ),
-            if (email != null) ...[
-              const SizedBox(height: 8),
-              Center(
-                child: CupertinoButton(
-                  onPressed: _signOut,
-                  child: const Text('Sign out',
-                      style: TextStyle(color: Palette.red, fontSize: 16, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Center(child: Text('RoadWatch citizen app, version 1.0', style: TextStyle(fontSize: 12.5, color: c.inkFaint))),
-          ],
-        ),
+          ]),
+          _group('SERVER', [
+            _field(_server, 'http://192.168.x.x:8000', CupertinoIcons.cloud_fill, AppColors.teal, TextInputType.url),
+          ]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text('Point this to the RoadWatch backend. On a real phone use your computer\'s LAN IP.',
+                style: T.sub(context).copyWith(fontSize: 12.5)),
+          ),
+          const SizedBox(height: 24),
+          Pressable(
+            onTap: _save,
+            child: Container(
+              height: 54,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(16)),
+              child: const Text('Save', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(child: Text('RoadWatch Citizen 1.1', style: TextStyle(fontSize: 12, color: c.textTertiary))),
+        ],
       ),
     );
   }
 
-  Widget _field(TextEditingController ctl, String hint, IconData icon, TextInputType type) {
+  Widget _group(String title, List<Widget> rows) {
     final c = AppColors.of(context);
-    return TextField(
-      controller: ctl,
-      keyboardType: type,
-      autocorrect: false,
-      style: T.body(context),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: c.surface,
-        prefixIcon: Icon(icon, size: 20, color: c.inkSoft),
-        hintText: hint,
-        hintStyle: T.body(context).copyWith(color: c.inkFaint),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.line)),
-        focusedBorder:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.ink, width: 2)),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(6, 28, 6, 8), child: Text(title, style: T.caption(context))),
+      CardBox(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        radius: 18,
+        child: Column(children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 0.5, color: c.separator, indent: 44),
+            rows[i],
+          ],
+        ]),
       ),
-    );
+    ]);
   }
+
+  Widget _row(IconData icon, Color color, String title, String value, {bool chevron = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          IconBadge(icon, color, size: 30),
+          const SizedBox(width: 14),
+          Expanded(child: Text(title, style: T.body(context))),
+          Text(value, style: T.sub(context)),
+          if (chevron) ...[
+            const SizedBox(width: 6),
+            Icon(CupertinoIcons.chevron_right, size: 16, color: AppColors.of(context).textTertiary),
+          ],
+        ]),
+      );
+
+  Widget _field(TextEditingController ctl, String hint, IconData icon, Color color, TextInputType type) => Row(children: [
+        IconBadge(icon, color, size: 30),
+        const SizedBox(width: 14),
+        Expanded(
+          child: TextField(
+            controller: ctl,
+            keyboardType: type,
+            autocorrect: false,
+            style: T.body(context),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              hintText: hint,
+              hintStyle: T.body(context).copyWith(color: AppColors.of(context).textTertiary),
+              contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            ),
+          ),
+        ),
+      ]);
 }
