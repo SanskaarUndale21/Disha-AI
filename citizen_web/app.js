@@ -23,7 +23,7 @@
     $("toasts").appendChild(e); setTimeout(function () { e.remove(); }, 6000);
   }
   function show(tab) {
-    document.querySelectorAll("#tabs button").forEach(function (b) { b.className = b.dataset.tab === tab ? "on" : ""; });
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === tab); });
     document.querySelectorAll(".pane").forEach(function (p) { p.className = "pane" + (p.id === "tab-" + tab ? " on" : ""); });
     if (tab === "mine") loadMine();
     if (tab === "map" && !$("mapframe").getAttribute("src")) $("mapframe").setAttribute("src", API + "/map");
@@ -109,6 +109,82 @@
           (c.admin_note ? "<p><b>Note from the team:</b> " + esc(c.admin_note) + "</p>" : "") + imgs + "</article>";
       }).join("");
     }).catch(function () { box.innerHTML = "<p class=\"note err\">Could not load your reports. Is the server running?</p>"; });
+  }
+
+  // ---- 3D tilt on cards
+  document.querySelectorAll(".tilt").forEach(function (el) {
+    el.addEventListener("mousemove", function (e) {
+      var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = "rotateY(" + (x * 5).toFixed(2) + "deg) rotateX(" + (-y * 4).toFixed(2) + "deg)";
+    });
+    el.addEventListener("mouseleave", function () { el.style.transform = ""; });
+  });
+
+  // ---- video / photo analysis with boxed output
+  var vq = "2k";
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.onclick = function () { vq = b.dataset.q; document.querySelectorAll(".seg button").forEach(function (x) { x.className = x === b ? "on" : ""; }); };
+  });
+  $("vgps").onclick = function () {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(function (p) { $("vlat").value = p.coords.latitude.toFixed(6); $("vlon").value = p.coords.longitude.toFixed(6); });
+  };
+  function vmsg(t, err) { $("vmsg").className = "note" + (err ? " err" : ""); $("vmsg").textContent = t; }
+  $("vgo").onclick = function () {
+    var f = $("vfile").files[0];
+    if (!f) { vmsg("Choose a video or photo first.", true); return; }
+    var isVid = f.type.indexOf("video") === 0 || /\.(mp4|mov|avi|mkv|webm)$/i.test(f.name);
+    var fd = new FormData(); fd.append("file", f);
+    if (isVid) fd.append("quality", vq);
+    if ($("vlat").value && $("vlon").value) { fd.append("lat", $("vlat").value); fd.append("lon", $("vlon").value); }
+    fd.append("inspector", "citizen-web");
+    $("vgo").disabled = true; $("vout").classList.add("hidden"); $("vprog").classList.remove("hidden"); $("vbar").style.width = "6%";
+    vmsg(isVid ? "Uploading and analyzing in " + vq.toUpperCase() + " mode..." : "Analyzing photo...");
+    fetch(API + "/api/inspections", { method: "POST", body: fd }).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Upload failed"); return j; });
+    }).then(function (j) {
+      if (j.job_id) return pollJob(j.job_id);
+      return j;
+    }).then(function (insp) { renderResult(insp, isVid); vmsg(""); })
+      .catch(function (e) { vmsg(e.message, true); })
+      .then(function () { $("vgo").disabled = false; $("vprog").classList.add("hidden"); });
+  };
+  function pollJob(id) {
+    return new Promise(function (resolve, reject) {
+      (function tick() {
+        fetch(API + "/api/jobs/" + id).then(function (r) { return r.json(); }).then(function (j) {
+          var pct = Math.max(6, Math.round((j.progress || 0) * (j.progress > 1 ? 1 : 100)));
+          $("vbar").style.width = Math.min(pct, 98) + "%";
+          if (j.status === "done") return resolve(j.inspection);
+          if (j.status === "error" || j.status === "failed") return reject(new Error(j.error || "Analysis failed"));
+          setTimeout(tick, 1200);
+        }).catch(reject);
+      })();
+    });
+  }
+  function renderResult(i, isVid) {
+    var s = i.summary || {}, dets = (i.detections || []).filter(function (d) { return d.verification !== "rejected"; });
+    var byc = s.by_class || {}, classes = Object.keys(byc).map(function (k) { return k.replace(/_/g, " ") + " " + byc[k]; }).join(", ");
+    var media = i.annotated_url ? (isVid
+      ? "<video controls autoplay muted loop playsinline src=\"" + esc(API + i.annotated_url) + "\"></video>"
+      : "<img alt=\"annotated photo\" src=\"" + esc(API + i.annotated_url) + "\">") : "<p class=\"note\">No annotated output.</p>";
+    var seen = {}, rows = dets.filter(function (d) { var k = d.track_id != null ? "t" + d.track_id : "d" + d.id; if (seen[k]) return false; seen[k] = 1; return true; });
+    rows.sort(function (a, b) { return (b.risk_score || 0) - (a.risk_score || 0); });
+    var list = rows.slice(0, 80).map(function (d) {
+      return "<div class=\"trow\">" + (d.crop_url ? "<img alt=\"\" src=\"" + esc(API + d.crop_url) + "\">" : "") +
+        "<span class=\"id\">" + (d.track_id != null ? "ID " + d.track_id : "#" + d.id) + "</span><span>" + esc(String(d.final_class || d.class_name).replace(/_/g, " ")) + " " + Math.round((d.confidence || 0) * 100) + "%</span>" +
+        "<span class=\"sev " + esc(d.final_severity || d.severity) + "\">" + esc(d.final_severity || d.severity || "") + "</span></div>";
+    }).join("") || "<p class=\"note\">No road damage found.</p>";
+    var o = $("vout"); o.classList.remove("hidden");
+    o.innerHTML = "<div class=\"vgrid\"><div class=\"vbox tilt\">" + media + "</div><div class=\"card tilt\">" +
+      "<div class=\"stats\"><div class=\"stat\"><b>" + (s.total != null ? s.total : rows.length) + "</b><span>defects found</span></div>" +
+      "<div class=\"stat\"><b>" + (s.unique_tracks != null ? s.unique_tracks : rows.length) + "</b><span>tracked IDs</span></div>" +
+      "<div class=\"stat\"><b>" + (s.max_risk != null ? Math.round(s.max_risk) : "-") + "</b><span>top risk</span></div></div>" +
+      "<p class=\"note\">" + esc(classes || "No classes") + (s.quality ? " | " + String(s.quality).toUpperCase() + " mode" : "") + "</p>" +
+      "<div class=\"tlist\">" + list + "</div>" +
+      "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a>" +
+      "</div></div>";
+    o.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   var retry = 1000;

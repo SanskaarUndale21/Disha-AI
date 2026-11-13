@@ -271,6 +271,43 @@ def detect_people(frame, conf=0.4, imgsz=480):
     return out
 
 
+# ---------------------------------------------------------------- road hazards (COCO model)
+HAZARD_CLASSES = {16: ("animal", "Dog on road"), 17: ("animal", "Horse on road"), 18: ("animal", "Sheep on road"),
+                  19: ("animal", "Cow on road"), 20: ("animal", "Elephant on road"), 11: ("sign", "Stop sign"),
+                  9: ("signal", "Traffic light")}
+_haz = None
+_haz_err = None
+
+
+def hazard_model():
+    global _haz, _haz_err
+    if _haz is None and _haz_err is None:
+        try:
+            from ultralytics import YOLO
+            w = config.ROOT / "yolo11s.pt"
+            _haz = YOLO(str(w if w.exists() else "yolo11s.pt"))
+        except Exception as e:
+            _haz_err = e
+            print(f"[safety] hazard model unavailable: {e!r}")
+    return _haz
+
+
+def detect_hazards(frame, conf=0.35, imgsz=512):
+    """Road-safety objects: animals on the road, stop signs, traffic lights. [{box, kind, label, conf}]"""
+    m = hazard_model()
+    if m is None:
+        return []
+    r = m.predict(frame, conf=conf, imgsz=imgsz, verbose=False, classes=list(HAZARD_CLASSES),
+                  **({"quantize": 16} if _pose_dev != "cpu" else {}))[0]
+    out = []
+    if r.boxes is None or not len(r.boxes):
+        return out
+    for b, c, k in zip(r.boxes.xyxy.cpu().numpy(), r.boxes.conf.cpu().numpy(), r.boxes.cls.cpu().numpy().astype(int)):
+        kind, label = HAZARD_CLASSES[int(k)]
+        out.append({"box": [float(v) for v in b], "kind": kind, "label": label, "conf": round(float(c), 2)})
+    return out
+
+
 # ---------------------------------------------------------------- fall logic
 FALL_WINDOW_S = 1.5
 FALL_HOLD_S = 0.5

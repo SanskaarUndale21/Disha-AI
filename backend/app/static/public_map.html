@@ -50,6 +50,10 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
 .live i{width:9px;height:9px;border-radius:50%;background:#9aa1aa}.live.on i{background:var(--green);box-shadow:0 0 0 3px rgba(30,158,87,.25)}
 #toasts{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;z-index:9;display:grid;gap:8px;width:min(440px,calc(100vw - 24px))}
 .toast{background:#202124;color:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:14px}
+.stat3{display:flex;gap:10px;align-items:baseline;margin-top:6px}.stat3 b{font-size:34px;line-height:1}.stat3 span{color:var(--muted)}
+.dl{display:grid;gap:2px;margin-top:8px;max-height:260px;overflow:auto}
+.dl button{display:flex;gap:8px;align-items:center;border:0;background:none;text-align:left;padding:6px 4px;border-radius:8px;cursor:pointer;font:inherit;font-size:14px}
+.dl button:hover{background:#f1f3f4}.dl em{font-style:normal;color:var(--muted);min-width:52px}.dl .sv{margin-left:auto;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:#fff3e0;color:#8a4b00}.dl .sv.hi{background:#fdecea;color:#8c1d14}
 .pin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .maplibregl-ctrl-bottom-right{bottom:12px}
 @media (max-width:760px){
@@ -79,6 +83,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
 <div class="layers" id="layers">
   <button class="pill on" data-l="zones"><i></i>Damage zones</button>
   <button class="pill on" data-l="defects"><i></i>Potholes</button>
+  <button class="pill" id="p3d"><i></i>3D view</button>
 </div>
 <div class="live" id="live"><i></i><span>Connecting</span></div>
 <div class="legend"><span><i style="background:#1a73e8"></i>Clear road</span><span><i style="background:#f0a30a"></i>Damaged</span><span><i style="background:#d92d20"></i>Severe</span></div>
@@ -157,6 +162,14 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
       if (h) showDefect(h, true);
     }).catch(function () { toast("Could not load road damage data."); });
   }
+
+  var is3d = false;
+  function set3d(on) {
+    is3d = on; $("p3d").classList.toggle("on", on);
+    try { map.setLayoutProperty("building-3d", "visibility", "visible"); } catch (e) {}
+    map.easeTo({ pitch: on ? 58 : 0, bearing: on ? -18 : 0, duration: 800 });
+  }
+  $("p3d").onclick = function () { set3d(!is3d); };
 
   // ---- layer toggles
   document.querySelectorAll("#layers .pill").forEach(function (b) {
@@ -278,10 +291,33 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
       html += "<div class='route" + (r.index === selIdx ? " sel" : "") + "' data-i='" + r.index + "'><div class='t'>" + fmtMin(r.duration_min) + "<span>" + r.distance_km + " km</span></div>" +
         "<div class='d'>" + chips + "<span class='chip " + (r.defect_count ? "bad" : "ok") + "'>" + (r.defect_count ? r.defect_count + " potholes and defects" : "No damage reported") + "</span></div></div>";
     });
+    html += routeDetail(res.routes[selIdx]);
     $("body").innerHTML = html;
+    Array.prototype.forEach.call($("body").querySelectorAll(".dl button"), function (el) {
+      el.onclick = function () { map.flyTo({ center: [+el.dataset.lon, +el.dataset.lat], zoom: 17, pitch: is3d ? 58 : 0 }); };
+    });
     Array.prototype.forEach.call($("body").querySelectorAll(".route"), function (el) {
       el.onclick = function () { selIdx = +el.dataset.i; renderRoutes(); drawRoute(false); };
     });
+  }
+  function routeDetail(r) {
+    var g = r.geometry, cum = [0];
+    for (var i = 1; i < g.length; i++) cum.push(cum[i - 1] + dist(g[i - 1][0], g[i - 1][1], g[i][0], g[i][1]));
+    var scale = (r.distance_km * 1000) / (cum[cum.length - 1] || 1);
+    var list = r.defects.map(function (h) {
+      var bi = 0, bd = 1e9;
+      for (var k = 0; k < g.length; k += 1) { var dd = dist(g[k][0], g[k][1], h.lat, h.lon); if (dd < bd) { bd = dd; bi = k; } }
+      return { h: h, km: cum[bi] * scale / 1000 };
+    }).sort(function (a, b) { return a.km - b.km; });
+    var ph = r.defects.filter(function (h) { return h["class"] === "pothole"; }).length, other = r.defects.length - ph, cnt = {};
+    r.defects.forEach(function (h) { var n = NAMES[h["class"]] || "Other"; cnt[n] = (cnt[n] || 0) + 1; });
+    var chips = Object.keys(cnt).map(function (n) { return "<span class='chip'>" + esc(n) + " " + cnt[n] + "</span>"; }).join("");
+    return "<div class='card'><h3>Road damage on Route " + (r.index + 1) + "</h3>" +
+      "<div class='stat3'><b>" + ph + "</b><span>potholes</span><b style='font-size:22px'>" + other + "</b><span>other defects</span><b style='font-size:22px;color:var(--red)'>" + r.severe_count + "</b><span>serious</span></div>" +
+      "<div class='row'>" + chips + "</div>" +
+      "<div class='dl'>" + (list.map(function (x) {
+        var h = x.h; return "<button data-lat='" + h.lat + "' data-lon='" + h.lon + "'><em>" + x.km.toFixed(1) + " km</em><span>" + esc(NAMES[h["class"]] || "Damage") + " " + esc(h.number) + "</span><span class='sv" + (h.risk >= 70 ? " hi" : "") + "'>" + (h.risk >= 70 ? "Serious" : "Moderate") + "</span></button>";
+      }).join("") || "<div style='color:var(--muted);padding:6px 0'>No reported damage on this route.</div>") + "</div></div>";
   }
   function drawRoute(fit) {
     var res = lastRes; if (!res) return;
@@ -306,7 +342,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     if (fit) {
       var b = new maplibregl.LngLatBounds();
       g.forEach(function (p) { b.extend([p[1], p[0]]); });
-      map.fitBounds(b, { padding: { top: 60, bottom: 60, left: window.innerWidth > 760 ? 440 : 40, right: 60 }, duration: 700 });
+      map.fitBounds(b, { padding: { top: 60, bottom: 60, left: window.innerWidth > 760 ? 440 : 40, right: 60 }, duration: 700, pitch: is3d ? 58 : 0 });
     }
   }
 

@@ -31,6 +31,7 @@ type FrameMsg = {
   frame: number
   cracks: boolean
   people?: { box: number[]; fallen: boolean }[]
+  hazards?: { box: number[]; kind: string; label: string; conf: number }[]
   lane?: { status: string; score: number; segments: number[][] }
   emergency?: Emergency
 }
@@ -97,6 +98,21 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
       ctx.lineTo(...P(pts[i][0], pts[i][1]))
       ctx.stroke()
     }
+  }
+
+  // road-safety objects: animals (orange), signs and signals (cyan)
+  for (const h of m.hazards ?? []) {
+    const [X, Y] = P(h.box[0], h.box[1])
+    const Wd = (h.box[2] - h.box[0]) * s, Ht = (h.box[3] - h.box[1]) * s
+    const col = h.kind === 'animal' ? '#ff9500' : '#32d2ff'
+    ctx.strokeStyle = col
+    ctx.lineWidth = h.kind === 'animal' ? 3 : 2
+    ctx.strokeRect(X, Y, Wd, Ht)
+    ctx.font = '700 13px -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif'
+    ctx.fillStyle = col
+    ctx.fillRect(X, Y - 20, ctx.measureText(h.label).width + 12, 20)
+    ctx.fillStyle = '#000'
+    ctx.fillText(h.label, X + 6, Y - 6)
   }
 
   // people (pose model): white, red when fallen

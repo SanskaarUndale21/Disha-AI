@@ -7,23 +7,26 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="scene" aria-hidden="true"><div class="road"><i></i><i></i><i></i><i></i><i></i></div><div class="sky"></div></div>
+
 <header class="top">
   <div class="brand"><span class="mark"></span><b>RoadWatch</b><small>Citizen portal</small></div>
   <nav id="tabs" role="tablist">
-    <button role="tab" data-tab="report" class="on">Report damage</button>
-    <button role="tab" data-tab="mine">My reports</button>
-    <button role="tab" data-tab="map">Map and routes</button>
+    <button role="tab" data-tab="report" class="key on">Report</button>
+    <button role="tab" data-tab="video" class="key">Video analysis</button>
+    <button role="tab" data-tab="map" class="key">Map and routes</button>
+    <button role="tab" data-tab="mine" class="key">My reports</button>
   </nav>
   <span id="live" class="live"><i></i><span>Connecting</span></span>
 </header>
 
 <main>
   <section id="tab-report" class="pane on">
-    <div class="hero">
+    <div class="hero tilt">
       <h1>See a bad road? Tell the city in a minute.</h1>
       <p>Add a photo or video. We check it shows real road damage before it is filed, so reports reach the repair team faster.</p>
     </div>
-    <form id="form" class="card">
+    <form id="form" class="card tilt">
       <label>What is wrong
         <select id="category">
           <option value="pothole">Pothole</option>
@@ -41,7 +44,7 @@
         <label class="grow">Location
           <input id="addr" placeholder="Street, area, landmark">
         </label>
-        <button type="button" id="gps" class="ghost">Use my location</button>
+        <button type="button" id="gps" class="btn3d">Use my location</button>
       </div>
       <p id="gps-note" class="note"></p>
       <label>Details (optional)
@@ -51,14 +54,40 @@
         <label class="grow">Your name (optional)<input id="name"></label>
         <label class="grow">Phone for updates (optional)<input id="phone" inputmode="tel"></label>
       </div>
-      <button id="submit" class="primary" type="submit">Check and submit report</button>
+      <button id="submit" class="btn3d primary" type="submit">Check and submit report</button>
       <p id="msg" class="note" role="status"></p>
     </form>
     <div id="done" class="card ok hidden"></div>
   </section>
 
+  <section id="tab-video" class="pane">
+    <div class="hero tilt"><h1>Upload a road video. See every pothole boxed.</h1>
+      <p>We track each defect across frames, draw a box and an ID on it, and give you the annotated video, a count and a PDF report.</p></div>
+    <div class="card tilt" id="vcard">
+      <label>Video or photo
+        <input id="vfile" type="file" accept="video/*,image/*">
+      </label>
+      <div class="field">
+        <span class="lbl">Video quality</span>
+        <div class="seg" role="group" aria-label="Video quality">
+          <button type="button" class="on" data-q="2k">2K (fast)</button>
+          <button type="button" data-q="4k">4K (detailed)</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="grow">Latitude (optional)<input id="vlat" inputmode="decimal"></label>
+        <label class="grow">Longitude (optional)<input id="vlon" inputmode="decimal"></label>
+        <button type="button" id="vgps" class="btn3d">Use my location</button>
+      </div>
+      <button id="vgo" class="btn3d primary" type="button">Analyze</button>
+      <div id="vprog" class="prog hidden"><div id="vbar"></div></div>
+      <p id="vmsg" class="note" role="status"></p>
+    </div>
+    <div id="vout" class="hidden"></div>
+  </section>
+
   <section id="tab-mine" class="pane">
-    <div class="hero"><h1>Your reports</h1><p>Reports filed from this browser. Status updates appear here as the repair team works on them.</p></div>
+    <div class="hero tilt"><h1>Your reports</h1><p>Reports filed from this browser. Status updates appear here as the repair team works on them.</p></div>
     <div id="mine" class="list"></div>
   </section>
 

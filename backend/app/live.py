@@ -33,6 +33,7 @@ class LiveSession:
         self.lane = safety.LaneSmoother(15)
         self.fall = safety.FallMonitor()
         self.people = []
+        self.hazards = []
         self.gps = None  # (lat, lon) from the client
 
     def _safety(self, frame, out):
@@ -58,6 +59,12 @@ class LiveSession:
             res["people"] = [{"box": p["box"], "fallen": p["fallen"]} for p in self.people]
         except Exception as e:
             print(f"[live] fall check failed: {e!r}")
+        try:
+            if n % 4 == 2:
+                self.hazards = safety.detect_hazards(frame)
+            res["hazards"] = [{"box": [round(v, 1) for v in h["box"]], "kind": h["kind"], "label": h["label"], "conf": h["conf"]} for h in self.hazards]
+        except Exception as e:
+            print(f"[live] hazard check failed: {e!r}")
         return res
 
     def process(self, frame):
