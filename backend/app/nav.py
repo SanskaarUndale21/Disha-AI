@@ -147,14 +147,15 @@ def _trip_to_route(trip, defects, mode, idx, detour=False):
     return {"index": idx, "distance_km": round(trip["summary"]["length"], 2), "duration_min": round(dur, 1),
             "defects": hits, "defect_count": len(hits), "severe_count": sum(1 for h in hits if h["risk"] >= 70),
             "potholes": sum(1 for h in hits if h["class"] == "pothole"), "penalty_min": penalty,
-            "effective_min": round(dur + penalty, 1), "comfort": _comfort(len(hits), trip["summary"]["length"], penalty),
+            "effective_min": round(dur + penalty, 1), "comfort": _comfort(hits, trip["summary"]["length"], mode),
             "detour": detour, "geometry": geom, "maneuvers": man}
 
 
-def _comfort(n, km, penalty):
-    """0 to 100, higher is a smoother ride."""
-    per_km = n / max(km, 0.3)
-    return int(max(0, min(100, round(100 - per_km * 9 - penalty * 1.5))))
+def _comfort(hits, km, mode):
+    """0 to 100, higher is a smoother ride. Severity weighted damage per km, decaying smoothly so dense and
+    sparse roads still differ (a plain linear score hit zero on every dense route)."""
+    load = sum(h["risk"] / 100.0 * CLASS_W.get(h["class"], 0.5) * MODE_FACTOR[mode] for h in hits) / max(km, 0.5)
+    return int(round(100 * math.exp(-load / 3.0)))
 
 
 def _clusters(hits, cell_m=45.0):

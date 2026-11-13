@@ -12,7 +12,7 @@ import 'call_screen.dart';
 import 'drive_screen.dart';
 import 'import_screen.dart';
 import 'notifications_screen.dart';
-import 'public_map_screen.dart';
+import 'nav_map_screen.dart';
 import 'report_screen.dart';
 import 'reports_screen.dart';
 
@@ -154,7 +154,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'City map',
                         detail: 'Every known pothole',
                         onTap: () => Navigator.of(context)
-                            .push(CupertinoPageRoute(builder: (_) => const PublicMapScreen())))),
+                            .push(CupertinoPageRoute(builder: (_) => const NavMapScreen())))),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(
+                    child: _ToolTile(
+                        icon: CupertinoIcons.location_north_fill,
+                        color: AppColors.blue,
+                        title: 'Plan a safe trip',
+                        detail: 'Routes that avoid potholes',
+                        onTap: () => Navigator.of(context).push(CupertinoPageRoute(
+                            builder: (_) => const NavMapScreen(startOnDirections: true))))),
+                const SizedBox(width: 10),
+                const Expanded(child: SizedBox.shrink()),
               ]),
               SectionLabel('Near you',
                   trailing: locator.spot?.area?.isNotEmpty == true

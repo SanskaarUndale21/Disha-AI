@@ -13,7 +13,7 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/public_map_screen.dart';
+import 'screens/nav_map_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/reports_screen.dart';
 import 'theme.dart';
@@ -215,7 +215,7 @@ class _ShellState extends State<Shell> {
                 child: Row(children: [
                   _tabItem(0, CupertinoIcons.house_fill, 'Home'),
                   _actionItem(CupertinoIcons.map_fill, 'Map',
-                      () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const PublicMapScreen(startOnPlanner: true)))),
+                      () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const NavMapScreen(startOnDirections: true)))),
                   _tabItem(1, CupertinoIcons.doc_text_fill, 'My Reports'),
                   _tabItem(2, CupertinoIcons.person_crop_circle_fill, 'Profile'),
                 ]),

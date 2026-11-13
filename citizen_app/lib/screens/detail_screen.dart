@@ -15,6 +15,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'home_screen.dart' show CallCard;
+import 'nav_map_screen.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({super.key, required this.id, this.initial});
@@ -272,6 +273,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                     : 'No location')),
                         const SizedBox(height: 10),
                         _info(CupertinoIcons.clock_fill, 'Updated ${timeAgo(c.updatedAt)}'),
+                        if (where != null) ...[
+                          const SizedBox(height: 12),
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(32, 32),
+                            onPressed: () => NavMapScreen.open(context,
+                                toLat: c.lat, toLon: c.lon, toName: c.address?.isNotEmpty == true ? c.address : 'Reported spot'),
+                            child: const Text('View on map'),
+                          ),
+                        ],
                       ]),
                     ),
                   ]),

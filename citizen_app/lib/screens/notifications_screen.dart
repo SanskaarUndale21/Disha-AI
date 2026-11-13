@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../notifications.dart';
+import 'nav_map_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -246,6 +247,17 @@ class EmergencyBanner extends StatelessWidget {
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
                       const SizedBox(height: 3),
                       Text(n.body, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                      if (notifs.emergencyLat != null && notifs.emergencyLon != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: GestureDetector(
+                            onTap: () => NavMapScreen.open(context,
+                                toLat: notifs.emergencyLat, toLon: notifs.emergencyLon, toName: 'Emergency location'),
+                            child: const Text('View on map',
+                                style: TextStyle(
+                                    color: Colors.white, fontWeight: FontWeight.w800, decoration: TextDecoration.underline)),
+                          ),
+                        ),
                     ]),
                   ),
                   IconButton(
