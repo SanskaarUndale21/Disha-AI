@@ -421,3 +421,24 @@ table.t.rp-sub td { padding: 4px 8px 4px 0; border-bottom: 0; font-size: 14px; }
 /* live fixes: cards keep their natural height; list scrolls instead of squashing */
 .cards > .dcard, .cards > .empty { flex: none; }
 .live-side { max-height: calc(100vh - 60px); }
+
+/* ===== live safety: fall near pothole emergency ===== */
+.fall-banner { position: absolute; left: 12px; right: 12px; top: 12px; z-index: 8; display: flex; align-items: center; gap: 14px; background: var(--red); color: #fff; padding: 12px 16px; border-radius: 12px; border: 2px solid #fff; box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5); animation: fall-pulse 1s ease-in-out infinite; }
+.fall-banner img { width: 112px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.6); flex: none; background: #000; }
+.fall-icon { flex: none; }
+.fall-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.fall-txt b { font-family: var(--display); font-size: 24px; line-height: 1.15; }
+.fall-txt span { font-size: 14px; opacity: 0.92; }
+.fall-txt .fall-err { background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 2px 8px; width: fit-content; }
+.fall-actions { display: flex; gap: 8px; flex: none; }
+.fall-actions .btn { background: #fff; color: var(--red); border-color: #fff; font-weight: 700; }
+.toast.sticky { border-width: 2px; }
+@keyframes fall-pulse { 50% { box-shadow: 0 0 0 6px rgba(217, 45, 32, 0.35), 0 10px 34px rgba(0, 0, 0, 0.5); } }
+@media (max-width: 760px) {
+  .fall-banner { flex-wrap: wrap; }
+  .fall-banner img { width: 88px; height: 56px; }
+  .fall-txt b { font-size: 19px; }
+  .fall-actions { width: 100%; }
+  .fall-actions .btn { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .fall-banner { animation: none; } }

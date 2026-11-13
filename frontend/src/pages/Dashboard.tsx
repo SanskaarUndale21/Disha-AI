@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ChatCircleText, CheckCircle, FilePdf, Images, MapPin, SealCheck, VideoCamera, Warning, DownloadSimple,
+  ChatCircleText, CheckCircle, FilePdf, Images, MapPin, SealCheck, Siren, VideoCamera, Warning, DownloadSimple,
 } from '@phosphor-icons/react'
 import { api, label, type Defect } from '../api'
 import { DefectDrawer, DefectMap } from '../components'
@@ -16,6 +16,7 @@ const EVENT_UI: Record<string, { icon: any; color: string; title: (d: any) => st
   'detection.verified': { icon: SealCheck, color: '#34c759', title: (d) => `${d.uid} ${d.verification}`, sub: (d) => `By ${d.by ?? 'officer'}` },
   'inspection.processed': { icon: Images, color: '#30b0c7', title: (d) => `Inspection ${d.id} analysed`, sub: (d) => `${d.summary?.total ?? 0} findings` },
   'screening.checked': { icon: SealCheck, color: '#dd7a07', title: (d) => (d.verdict === 'pass' ? 'Citizen photo passed AI check' : d.verdict === 'rate_limited' ? 'Device blocked for fake reports' : 'Citizen photo refused'), sub: (d) => d.reason ?? '' },
+  'emergency.fall': { icon: Siren, color: '#d92d20', title: () => 'Emergency: fall near pothole', sub: (d) => d.message ?? `Pothole PH ${d.pothole_id ?? ''}` },
   'live.saved': { icon: VideoCamera, color: '#ff3b30', title: () => 'Live patrol saved', sub: (d) => `${d.defects} defects, ${d.new} new` },
 }
 

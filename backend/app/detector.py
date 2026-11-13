@@ -178,6 +178,65 @@ def infer(img, cracks=None, conf_floor=None):
     return d
 
 
+FAR_PASS = os.getenv("RD_FAR_PASS", "1") != "0"
+
+
+def infer_far(img):
+    """Second look at the distant road, where potholes are only a few pixels wide.
+
+    The band of the frame between the horizon and the middle of the road is cropped, enlarged 2x and run through
+    the pothole model only; boxes are mapped back to full-frame coordinates. Potholes 10 to 30 m ahead become
+    large enough for the detector to see them.
+    """
+    h, w = img.shape[:2]
+    y1, y2 = int(h * 0.30), int(h * 0.68)
+    x1, x2 = int(w * 0.10), int(w * 0.90)
+    crop = img[y1:y2, x1:x2]
+    if crop.size == 0:
+        return Dets([], [], [])
+    up = cv2.resize(crop, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+    boxes, confs = [], []
+    with _infer_lock:
+        for r in _load():
+            if r.role != "pothole":
+                continue
+            res = r.model.predict(up, conf=0.2, iou=config.IOU_THRESHOLD, imgsz=config.IMG_SIZE, quantize=16,
+                                  verbose=False)[0].boxes
+            if res is None or not len(res):
+                continue
+            for xy, cf, k in zip(res.xyxy.cpu().numpy(), res.conf.cpu().numpy(), res.cls.cpu().numpy().astype(int)):
+                if r.cmap.get(int(k)) != "pothole":
+                    continue
+                bx = xy / 2.0
+                bx[[0, 2]] += x1
+                bx[[1, 3]] += y1
+                boxes.append(bx)
+                confs.append(float(cf) * 0.95)  # tiny discount: the enlarged view is less certain
+    return Dets(boxes, confs, [CLS_ID["pothole"]] * len(boxes))
+
+
+def merge_dets(a: Dets, b: Dets, iou_thr=0.45):
+    """Union of two detection sets; overlapping same-class boxes keep the higher confidence."""
+    if not len(b):
+        return a
+    if not len(a):
+        return b
+    keep_b = np.ones(len(b), bool)
+    xyxy, conf, cls = list(a.xyxy), list(a.conf), list(a.cls)
+    for i in range(len(b)):
+        same = np.where(a.cls == b.cls[i])[0]
+        if len(same):
+            ov = _iou(b.xyxy[i], a.xyxy[same])
+            j = same[int(ov.argmax())]
+            if ov.max() > iou_thr:
+                if b.conf[i] > conf[j]:
+                    xyxy[j], conf[j] = b.xyxy[i], float(b.conf[i])
+                keep_b[i] = False
+    for i in np.where(keep_b)[0]:
+        xyxy.append(b.xyxy[i]); conf.append(float(b.conf[i])); cls.append(b.cls[i])
+    return Dets(np.array(xyxy), np.array(conf), np.array(cls))
+
+
 def make_row(frame, cls, x1, y1, x2, y2, conf, track_id=None):
     h, w = frame.shape[:2]
     a = sevmod.analyze(frame, cls, x1, y1, x2, y2, conf)
@@ -320,6 +379,11 @@ class Tracker:
         self.h, self.w = frame.shape[:2]
         proc, _ = preprocess(frame)
         d = infer(proc, cracks=cracks, conf_floor=0.1)
+        if FAR_PASS and self.frame_idx % 2 == 0:
+            self._far = infer_far(proc)
+        far = getattr(self, "_far", None)
+        if FAR_PASS and far is not None and len(far):
+            d = merge_dets(d, far)
         out = self.bt.update(d, proc) if len(d) else self.bt.update(Dets(np.zeros((0, 4)), [], []), proc)
         self.frame_idx += 1
         rows = []

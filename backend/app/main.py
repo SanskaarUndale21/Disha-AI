@@ -25,6 +25,7 @@ from .geo import GpxTrack, haversine_m, read_exif
 from . import ops
 from . import voice
 from . import citizen
+from . import measure
 
 app = FastAPI(title="RoadWatch AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -709,6 +710,7 @@ auth.register_routes(app)
 events.register(app)
 screening.register(app)
 citizen.register(app)
+measure.register(app)
 voice.register(app)
 ops.register(app)
 

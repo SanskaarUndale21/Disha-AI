@@ -24,7 +24,7 @@ export function useLiveRefresh(prefixes: string[], fn: () => void) {
   }, [prefixes.join(',')])
 }
 
-type Toast = { id: number; title: string; body: string; tone: string; to?: string }
+type Toast = { id: number; title: string; body: string; tone: string; to?: string; sticky?: boolean }
 
 function describe(e: RtEvent): Omit<Toast, 'id'> | null {
   const d = e.data ?? {}
@@ -42,6 +42,8 @@ function describe(e: RtEvent): Omit<Toast, 'id'> | null {
       return d.verdict === 'rate_limited'
         ? { title: 'Device blocked for fake reports', body: d.reason ?? '', tone: 'high', to: '/complaints' }
         : { title: 'Photo refused: no road damage', body: `device ${d.device ?? 'unknown'}`, tone: 'med', to: '/complaints' }
+    case 'emergency.fall':
+      return { title: 'Emergency: fall near pothole', body: d.message ?? `Fall near pothole PH ${d.pothole_id ?? ''}`, tone: 'high', to: '/alerts', sticky: true }
     case 'live.saved':
       return { title: 'Live patrol saved', body: `${d.defects} defects (${d.new} new) from inspection #${d.inspection_id}`, tone: 'ok', to: '/inspections' }
     default:
@@ -84,7 +86,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         if (t) {
           const id = Date.now() + Math.random()
           setToasts((x) => [...x.slice(-3), { id, ...t }])
-          setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), 6000)
+          if (!t.sticky) setTimeout(() => setToasts((x) => x.filter((y) => y.id !== id)), 6000)
         }
       }
       ws.onclose = () => {
@@ -113,7 +115,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.tone}`} onClick={() => t.to && nav(t.to)}>
+          <div key={t.id} className={`toast ${t.tone}${t.sticky ? ' sticky' : ''}`} onClick={() => {
+            if (t.sticky) setToasts((x) => x.filter((y) => y.id !== t.id)) // sticky toasts stay until clicked
+            if (t.to) nav(t.to)
+          }}>
             <b>{t.title}</b>
             <span>{t.body}</span>
           </div>

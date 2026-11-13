@@ -5,7 +5,11 @@ stable IDs (ByteTrack, per connection), class, severity, risk, and the damage ou
 analysis. Flow control is stop-and-wait, so latency never builds up.
 
 Client -> server: binary JPEG frame | {"type":"config","cracks":bool} | {"type":"reset"} | {"type":"finish",...}
+                  | {"type":"gps","lat","lon"}
 Server -> client: {"type":"frame",...} | {"type":"saved",...} | {"type":"error",...}
+
+Each frame also carries the safety layer (safety.py): "lane" (lane marking condition, computed every 3rd frame and
+smoothed over ~15 results), "people" (pose model every 2nd frame) and, once per fall, "emergency".
 """
 import asyncio
 import json
@@ -16,7 +20,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from . import config, detector, pipeline, scoring
+from . import config, detector, pipeline, safety, scoring
 
 
 class LiveSession:
@@ -26,6 +30,35 @@ class LiveSession:
         self.last_frame = None
         self.last_rows = []
         self.started = time.time()
+        self.lane = safety.LaneSmoother(15)
+        self.fall = safety.FallMonitor()
+        self.people = []
+        self.gps = None  # (lat, lon) from the client
+
+    def _safety(self, frame, out):
+        """Lane markings every 3rd frame, people / falls every 2nd frame. Never breaks the detection stream."""
+        n = self.tk.frame_idx
+        res = {}
+        try:
+            if n % 3 == 1 or self.lane.last is None:
+                self.lane.push(safety.lane_status(frame))
+            res["lane"] = self.lane.value()
+        except Exception as e:
+            print(f"[live] lane check failed: {e!r}")
+        try:
+            if n % 2 == 1:
+                pots = [(t["id"], t["box"]) for t in out if t["cls"] == "pothole" and t["confirmed"] and t["id"] is not None]
+                self.people, evs = self.fall.update(frame, pots)
+                for ev in evs[:1]:
+                    url = safety.snapshot(frame, ev)
+                    lat, lon = self.gps if self.gps else (None, None)
+                    em = safety.record_emergency(ev, url, lat, lon)
+                    res["emergency"] = {"id": em["id"], "type": "fall_near_pothole", "pothole_id": ev["pothole_id"],
+                                        "message": em["message"], "snapshot_url": url}
+            res["people"] = [{"box": p["box"], "fallen": p["fallen"]} for p in self.people]
+        except Exception as e:
+            print(f"[live] fall check failed: {e!r}")
+        return res
 
     def process(self, frame):
         t0 = time.time()
@@ -41,9 +74,12 @@ class LiveSession:
                         "poly": r["polygon"], "severity": r["severity"], "sev": r["severity_score"],
                         "size": r["size_index"], "depth": r["depth_index"], "risk": level, "risk_score": score,
                         "risk_parts": parts, "hits": r["hits"], "confirmed": r["confirmed"]})
-        return {"type": "frame", "w": self.tk.w, "h": self.tk.h, "tracks": out, "unique": len(self.tk.unique()),
-                "by_class": self.tk.by_class(), "infer_ms": round(ms, 1), "frame": self.tk.frame_idx,
-                "cracks": self.cracks}
+        res = {"type": "frame", "w": self.tk.w, "h": self.tk.h, "tracks": out, "unique": len(self.tk.unique()),
+               "by_class": self.tk.by_class(), "infer_ms": round(ms, 1), "frame": self.tk.frame_idx,
+               "cracks": self.cracks}
+        res.update(self._safety(frame, out))
+        res["safety_ms"] = round((time.time() - t0) * 1000 - ms, 1)
+        return res
 
 
 def save_session(sess: LiveSession, meta: dict):
@@ -79,6 +115,8 @@ def save_session(sess: LiveSession, meta: dict):
 
 def register_ws(app):
     from fastapi import File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+
+    safety.register(app)
 
     @app.post("/api/live/transcode")
     async def live_transcode(file: UploadFile = File(...)):
@@ -123,8 +161,15 @@ def register_ws(app):
                     if t == "config":
                         sess.cracks = bool(m.get("cracks", True))
                         await ws.send_json({"type": "config", "cracks": sess.cracks})
+                    elif t == "gps":
+                        try:
+                            sess.gps = (float(m["lat"]), float(m["lon"]))
+                        except (KeyError, TypeError, ValueError):
+                            pass
                     elif t == "reset":
+                        gps = sess.gps
                         sess = await asyncio.to_thread(LiveSession, sess.cracks)
+                        sess.gps = gps
                         await ws.send_json({"type": "reset"})
                     elif t == "finish":
                         if not sess.tk.final_rows():
@@ -135,6 +180,8 @@ def register_ws(app):
                         events.publish("live.saved", {"inspection_id": iid, "defects": len(mapping),
                                                       "new": sum(1 for x in mapping if not x["duplicate"])})
                         await ws.send_json({"type": "saved", "inspection_id": iid, "defects": mapping})
+                        gps = sess.gps
                         sess = await asyncio.to_thread(LiveSession, sess.cracks)
+                        sess.gps = gps
         except WebSocketDisconnect:
             pass

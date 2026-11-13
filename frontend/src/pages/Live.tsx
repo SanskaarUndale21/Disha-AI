@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowCounterClockwise, Camera, Crosshair, FileVideo, FilmStrip, FloppyDisk, Lightning, MapPin, Pause, Play, SpeakerHigh, SpeakerSlash, Warning } from '@phosphor-icons/react'
-import { label } from '../api'
+import { ArrowCounterClockwise, Camera, CheckCircle, Crosshair, FileVideo, FilmStrip, FloppyDisk, ImageSquare, Lightning, MapPin, Pause, Play, Siren, SpeakerHigh, SpeakerSlash, Warning } from '@phosphor-icons/react'
+import { authHeaders, label } from '../api'
 
 type Track = {
   id: number | null
@@ -29,7 +29,10 @@ type FrameMsg = {
   infer_ms: number
   frame: number
   cracks: boolean
+  people?: { box: number[]; fallen: boolean }[]
+  emergency?: Emergency
 }
+type Emergency = { id: number; type: string; pothole_id: number; message: string; snapshot_url: string }
 
 export const CLASS_COLOR: Record<string, string> = {
   pothole: '#ff3b30',
@@ -77,6 +80,24 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
       ctx.moveTo(...P(pts[i - 1][0], pts[i - 1][1]))
       ctx.lineTo(...P(pts[i][0], pts[i][1]))
       ctx.stroke()
+    }
+  }
+
+  // people (pose model): white, red when fallen
+  for (const p of m.people ?? []) {
+    const [X, Y] = P(p.box[0], p.box[1])
+    const Wd = (p.box[2] - p.box[0]) * s, Ht = (p.box[3] - p.box[1]) * s
+    ctx.strokeStyle = p.fallen ? '#ff3b30' : '#ffffff'
+    ctx.lineWidth = p.fallen ? 3 : 1.5
+    ctx.setLineDash(p.fallen ? [] : [6, 4])
+    ctx.strokeRect(X, Y, Wd, Ht)
+    ctx.setLineDash([])
+    if (p.fallen) {
+      ctx.font = '700 13px -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif'
+      ctx.fillStyle = '#ff3b30'
+      ctx.fillRect(X, Y - 20, ctx.measureText('Fallen').width + 12, 20)
+      ctx.fillStyle = '#fff'
+      ctx.fillText('Fallen', X + 6, Y - 6)
     }
   }
 
@@ -177,6 +198,65 @@ export default function Live() {
   const lastWarn = useRef<Map<number, number>>(new Map())
   const aheadTimer = useRef<any>(null)
   const audio = useRef<AudioContext | null>(null)
+  // fall near a pothole: red takeover banner + two-tone siren until acknowledged
+  const [emergency, setEmergency] = useState<Emergency | null>(null)
+  const [ackErr, setAckErr] = useState<string | null>(null)
+  const siren = useRef<{ osc: OscillatorNode; gain: GainNode; timer: any } | null>(null)
+
+  const stopSiren = () => {
+    const sn = siren.current
+    if (!sn) return
+    clearInterval(sn.timer)
+    try {
+      sn.gain.gain.setTargetAtTime(0.0001, sn.osc.context.currentTime, 0.03)
+      sn.osc.stop(sn.osc.context.currentTime + 0.1)
+    } catch {
+      /* already stopped */
+    }
+    siren.current = null
+  }
+
+  const startSiren = () => {
+    if (siren.current) return
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext
+      if (!AC) return
+      const ctx = audio.current ?? (audio.current = new AC())
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'square'
+      osc.frequency.value = 650
+      gain.gain.value = 0.08
+      osc.connect(gain).connect(ctx.destination)
+      osc.start()
+      let hi = false
+      const timer = setInterval(() => {
+        hi = !hi
+        osc.frequency.setValueAtTime(hi ? 950 : 650, ctx.currentTime)
+      }, 450)
+      siren.current = { osc, gain, timer }
+    } catch {
+      /* audio unavailable */
+    }
+  }
+
+  useEffect(() => {
+    if (emergency && sound) startSiren()
+    else stopSiren()
+  }, [emergency, sound])
+
+  const acknowledge = async () => {
+    if (!emergency) return
+    setAckErr(null)
+    try {
+      const r = await fetch(`/api/safety/emergencies/${emergency.id}/ack`, { method: 'POST', headers: authHeaders() })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? r.statusText)
+      setEmergency(null)
+    } catch (e: any) {
+      setAckErr(`Could not acknowledge: ${e.message}`)
+    }
+  }
 
   const beep = () => {
     try {
@@ -220,6 +300,7 @@ export default function Live() {
 
   useEffect(() => () => {
     clearTimeout(aheadTimer.current)
+    stopSiren()
     audio.current?.close().catch(() => {})
   }, [])
 
@@ -265,6 +346,7 @@ export default function Live() {
           }
           setMsg(m)
           checkAhead(m)
+          if (m.emergency) setEmergency(m.emergency)
           const now = performance.now()
           times.current = [...times.current.filter((x) => now - x < 1000), now]
           setFps(times.current.length)
@@ -311,6 +393,20 @@ export default function Live() {
     }
   }
 
+  // share the browser position with the session so an emergency carries a location
+  const sendGps = (s: WebSocket) => {
+    const push = (lat: number, lon: number) => s.readyState === 1 && s.send(JSON.stringify({ type: 'gps', lat, lon }))
+    if (loc) push(loc[0], loc[1])
+    navigator.geolocation?.getCurrentPosition(
+      (p) => {
+        setLoc([p.coords.latitude, p.coords.longitude])
+        push(p.coords.latitude, p.coords.longitude)
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
   const begin = async () => {
     setSaved(null)
     setSeen({})
@@ -319,6 +415,7 @@ export default function Live() {
     inflight.current = 0
     try {
       ws.current = await connect()
+      sendGps(ws.current)
       running.current = true
       setStatus('live')
       pump()
@@ -462,6 +559,21 @@ export default function Live() {
               <div>Or play the demo drive to see detection on real dashcam footage.</div>
             </div>
           )}
+          {emergency && (
+            <div className="fall-banner" role="alertdialog" aria-live="assertive">
+              <Siren size={30} weight="fill" className="fall-icon" />
+              {emergency.snapshot_url && <img src={emergency.snapshot_url} alt="Snapshot of the fall" />}
+              <div className="fall-txt">
+                <b>Fall detected near pothole {PREFIX.pothole} {emergency.pothole_id}</b>
+                <span>Emergency 112 notified (mock, not dialled). Check on the person now.</span>
+                {ackErr && <span className="fall-err">{ackErr}</span>}
+              </div>
+              <div className="fall-actions">
+                <button className="btn" onClick={acknowledge}><CheckCircle size={16} weight="fill" /> Acknowledge</button>
+                <button className="btn" onClick={() => window.open(emergency.snapshot_url, '_blank', 'noopener')}><ImageSquare size={16} weight="fill" /> Open alert</button>
+              </div>
+            </div>
+          )}
           {ahead && (
             <div className="ahead-banner" role="alert">
               <Warning size={22} weight="fill" />
@@ -483,7 +595,7 @@ export default function Live() {
             <button className={!cracks ? 'on' : ''} onClick={() => setMode(false)}><Lightning size={14} weight="fill" /> Potholes only</button>
             <button className={cracks ? 'on' : ''} onClick={() => setMode(true)}>All damage</button>
           </div>
-          <button className="btn" onClick={() => setSound((x) => !x)} aria-pressed={sound} title="Warning sound for potholes ahead">
+          <button className="btn" onClick={() => setSound((x) => !x)} aria-pressed={sound} title="Warning sound for potholes ahead and the emergency siren">
             {sound ? <SpeakerHigh size={15} weight="fill" /> : <SpeakerSlash size={15} weight="fill" />} {sound ? 'Sound on' : 'Sound off'}
           </button>
           <span className="spacer" />
