@@ -485,6 +485,7 @@ def handle_upload(ticket: str, files: list, lat, lon, accuracy) -> dict:
         note = f"Photo for complaint {c.ticket} ({c.category}) {c.description or ''}"[:1000]
         pot = crk = videos = stored = 0
         conf, jobs, skipped = 0.0, [], []
+        results = []  # what the citizen sees on the upload page: boxed picture or video plus the findings
         for data, filename in files:
             try:
                 insp, res = mm._ingest(s, data, filename, la, lo, road_name=c.address,
@@ -500,7 +501,14 @@ def handle_upload(ticket: str, files: list, lat, lon, accuracy) -> dict:
             if insp.media_type == "video":
                 videos += 1
                 jobs.append(res.get("job_id"))
+                results.append({"type": "video", "name": filename, "job_id": res.get("job_id"), "inspection_id": insp.id})
                 continue
+            _ri = res.get("inspection") or {}
+            results.append({"type": "image", "name": filename, "annotated_url": _ri.get("annotated_url"), "original_url": _ri.get("media_url"),
+                            "inspection_id": insp.id,
+                            "detections": [{"class": d.get("final_class") or d.get("class_name"), "confidence": round(d.get("confidence") or 0, 2),
+                                            "severity": d.get("final_severity") or d.get("severity"), "tier": "high" if (d.get("confidence") or 0) >= 0.40 else "possible"}
+                                           for d in (_ri.get("detections") or []) if d.get("verification") != "rejected"][:40]})
             for d in (res.get("inspection") or {}).get("detections") or []:
                 fc = d.get("final_class") or ""
                 if fc == "pothole" or "crack" in fc:
@@ -527,7 +535,7 @@ def handle_upload(ticket: str, files: list, lat, lon, accuracy) -> dict:
         events.publish("complaint.updated", {"id": c.id, "ticket": c.ticket, "status": c.status,
                                              "verification": meta.verification, "source": meta.source})
         return {"ok": True, "ticket": c.ticket, "verification": meta.verification, "files": stored,
-                "skipped": skipped, "detections": pot + crk, "job_ids": jobs, "lat": c.lat, "lon": c.lon,
+                "skipped": skipped, "detections": pot + crk, "job_ids": jobs, "results": results, "lat": c.lat, "lon": c.lon,
                 "location_source": meta.geocode_source, "message": "Thank you. " + " ".join(msgs),
                 "evidence": list(meta.evidence or [])}
     finally:
@@ -664,6 +672,34 @@ def register(app):
         if not payload:
             raise HTTPException(400, "empty file")
         return await run_in_threadpool(handle_upload, ticket, payload, _f(lat), _f(lon), _f(accuracy))
+
+    @app.get("/api/voice/result/{ticket}")
+    def voice_result(ticket: str):
+        """What the AI found in the photos and videos already attached to this complaint (shown on the upload link page)."""
+        from . import main as mm
+        s = SessionLocal()
+        try:
+            c = s.query(Complaint).filter(Complaint.ticket == ticket).first()
+            if c is None:
+                raise HTTPException(404, "ticket not found")
+            out = []
+            for m in c.media:
+                i = m.inspection
+                if i is None:
+                    continue
+                si = mm.ser_insp(i, with_dets=True)
+                if i.media_type == "video":
+                    out.append({"type": "video", "name": i.original_name, "job_id": m.job_id, "annotated_url": si.get("annotated_url"),
+                                "summary": si.get("summary")})
+                else:
+                    out.append({"type": "image", "name": i.original_name, "annotated_url": si.get("annotated_url"), "original_url": si.get("media_url"),
+                                "detections": [{"class": d.get("final_class") or d.get("class_name"), "confidence": round(d.get("confidence") or 0, 2),
+                                                "severity": d.get("final_severity") or d.get("severity"),
+                                                "tier": "high" if (d.get("confidence") or 0) >= 0.40 else "possible"}
+                                               for d in (si.get("detections") or []) if d.get("verification") != "rejected"][:40]})
+            return {"ticket": c.ticket, "status": c.status, "results": out}
+        finally:
+            s.close()
 
     @app.get("/api/voice/link/{ticket}")
     def voice_link(ticket: str, request: Request):
