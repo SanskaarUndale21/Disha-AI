@@ -35,7 +35,8 @@ DateTime? _parseUtc(Object? v) {
 
 /// Every known defect in the city, no login needed and no personal data.
 class PublicMapScreen extends StatefulWidget {
-  const PublicMapScreen({super.key});
+  const PublicMapScreen({super.key, this.startOnPlanner = false});
+  final bool startOnPlanner;
   @override
   State<PublicMapScreen> createState() => _PublicMapScreenState();
 }
@@ -52,7 +53,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   String? _error;
   bool _ready = false;
   _Show _show = _Show.both;
-  int _tab = 0;
+  late int _tab = widget.startOnPlanner ? 1 : 0;
 
   Map<String, dynamic>? _pickedCell;
   final Set<String> _fresh = {};

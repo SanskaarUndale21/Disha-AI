@@ -149,6 +149,16 @@ def _f(v):
         return None
 
 
+def _lat(v):
+    x = _f(v)
+    return x if x is not None and -90 <= x <= 90 else None
+
+
+def _lon(v):
+    x = _f(v)
+    return x if x is not None and -180 <= x <= 180 else None
+
+
 def _resolve_location(exif, lat, lon, gpx):
     if exif.get("lat") is not None:
         return exif["lat"], exif["lon"], "exif"
@@ -185,7 +195,7 @@ async def create_inspection(
             gpx = GpxTrack.parse(await gpx_file.read())
         except Exception as e:
             raise HTTPException(400, f"Invalid GPX: {e}")
-    insp, res = _ingest(s, await file.read(), file.filename, _f(lat), _f(lon), captured_at, road_name, road_type,
+    insp, res = _ingest(s, await file.read(), file.filename, _lat(lat), _lon(lon), captured_at, road_name, road_type,
                         traffic_level, inspector, notes, gpx, gpx_offset_s, quality=quality, classes=classes)
     return res
 
@@ -707,7 +717,7 @@ async def create_complaint(
         toks = [t.strip() for t in (screening_tokens or "").split(",") if t.strip()]
         check_ids = await asyncio.to_thread(screening.enforce, blobs, toks, device_id,
                                             citizen_phone or (user or {}).get("phone"), (user or {}).get("id"))
-    la, lo = _f(lat), _f(lon)
+    la, lo = _lat(lat), _lon(lon)
     if user:
         citizen_name = citizen_name or user.get("full_name")
         citizen_phone = citizen_phone or user.get("phone")

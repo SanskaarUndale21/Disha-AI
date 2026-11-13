@@ -13,6 +13,7 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/public_map_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/reports_screen.dart';
 import 'theme.dart';
@@ -213,6 +214,8 @@ class _ShellState extends State<Shell> {
                 height: 58,
                 child: Row(children: [
                   _tabItem(0, CupertinoIcons.house_fill, 'Home'),
+                  _actionItem(CupertinoIcons.map_fill, 'Map',
+                      () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const PublicMapScreen(startOnPlanner: true)))),
                   _tabItem(1, CupertinoIcons.doc_text_fill, 'My Reports'),
                   _tabItem(2, CupertinoIcons.person_crop_circle_fill, 'Profile'),
                 ]),
@@ -220,6 +223,21 @@ class _ShellState extends State<Shell> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _actionItem(IconData icon, String label, VoidCallback onTap) {
+    final color = AppColors.blue;
+    return Expanded(
+      child: Pressable(
+        scale: 0.9,
+        onTap: onTap,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: color, size: 25),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color)),
+        ]),
       ),
     );
   }
