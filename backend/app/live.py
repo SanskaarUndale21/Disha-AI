@@ -69,7 +69,7 @@ class LiveSession:
         for r in rows:
             score, level, parts = scoring.risk(r["class_name"], r["severity_score"], lane=r["lane"], breakdown=True)
             out.append({"id": r["display_id"], "tid": r["track_id"], "cls": r["class_name"],
-                        "conf": round(r["confidence"], 3),
+                        "conf": round(r["confidence"], 3), "tier": r.get("tier", "possible"),
                         "box": [round(r["x1"], 1), round(r["y1"], 1), round(r["x2"], 1), round(r["y2"], 1)],
                         "poly": r["polygon"], "severity": r["severity"], "sev": r["severity_score"],
                         "size": r["size_index"], "depth": r["depth_index"], "risk": level, "risk_score": score,

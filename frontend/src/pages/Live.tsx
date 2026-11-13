@@ -7,6 +7,7 @@ type Track = {
   tid: number
   cls: string
   conf: number
+  tier?: string
   box: number[]
   poly: number[][][]
   severity: string
@@ -30,6 +31,7 @@ type FrameMsg = {
   frame: number
   cracks: boolean
   people?: { box: number[]; fallen: boolean }[]
+  lane?: { status: string; score: number; segments: number[][] }
   emergency?: Emergency
 }
 type Emergency = { id: number; type: string; pothole_id: number; message: string; snapshot_url: string }
@@ -51,7 +53,7 @@ const RISK_COL: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', L
 const SEND_W = 640
 const IN_FLIGHT = 2
 
-function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg | null, trails: Map<number, number[][]>, t: number) {
+function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg | null, trails: Map<number, number[][]>, t: number, bg: ImageBitmap | null) {
   const rect = video.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
   const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr)
@@ -67,6 +69,20 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
   const ox = (rect.width - m.w * s) / 2
   const oy = (rect.height - m.h * s) / 2
   const P = (x: number, y: number): [number, number] => [ox + x * s, oy + y * s]
+  // synced view: paint the exact frame these results were computed from, so boxes can never drift
+  if (bg) ctx.drawImage(bg, ox, oy, m.w * s, m.h * s)
+  // lane paint found on the road (cyan)
+  if (m.lane?.segments?.length) {
+    ctx.strokeStyle = 'rgba(64, 224, 255, 0.85)'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    for (const [x1, y1, x2, y2] of m.lane.segments) {
+      ctx.beginPath()
+      ctx.moveTo(...P(x1, y1))
+      ctx.lineTo(...P(x2, y2))
+      ctx.stroke()
+    }
+  }
 
   // motion trails (proof of tracking)
   for (const [tid, pts] of trails) {
@@ -146,7 +162,7 @@ function drawOverlay(cv: HTMLCanvasElement, video: HTMLVideoElement, m: FrameMsg
     ctx.shadowBlur = 0
     // tag: ID + severity + risk
     const tag = `${PREFIX[tr.cls] ?? 'RD'} ${tr.id}`
-    const sub = `${tr.severity} severity, risk ${Math.round(tr.risk_score)}`
+    const sub = `${tr.tier === 'high' ? 'Confident' : 'Possible'} ${Math.round(tr.conf * 100)}%, ${tr.severity}, risk ${Math.round(tr.risk_score)}`
     ctx.font = '600 13px -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif'
     const tw = ctx.measureText(tag).width
     ctx.font = '500 11px -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif'
@@ -178,6 +194,10 @@ export default function Live() {
   const last = useRef<FrameMsg | null>(null)
   const trails = useRef<Map<number, number[][]>>(new Map())
   const running = useRef(false)
+  const sentQ = useRef<Promise<ImageBitmap>[]>([])
+  const shown = useRef<ImageBitmap | null>(null)
+  const syncedRef = useRef(true)
+  const [synced, setSynced] = useState(true)
   const inflight = useRef(0)
   const times = useRef<number[]>([])
   const [msg, setMsg] = useState<FrameMsg | null>(null)
@@ -307,7 +327,7 @@ export default function Live() {
   useEffect(() => {
     let raf = 0
     const loop = (t: number) => {
-      if (overlay.current && video.current) drawOverlay(overlay.current, video.current, last.current, trails.current, t)
+      if (overlay.current && video.current) drawOverlay(overlay.current, video.current, last.current, trails.current, t, syncedRef.current ? shown.current : null)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -336,7 +356,9 @@ export default function Live() {
         const m = JSON.parse(e.data)
         if (m.type === 'frame') {
           inflight.current = Math.max(0, inflight.current - 1)
-          last.current = m
+          const pending = sentQ.current.shift()
+          if (pending) pending.then((bm) => { shown.current?.close(); shown.current = bm; last.current = m })
+          else last.current = m
           for (const tr of m.tracks as Track[]) {
             const cx = (tr.box[0] + tr.box[2]) / 2, cy = (tr.box[1] + tr.box[3]) / 2
             const arr = trails.current.get(tr.tid) ?? []
@@ -358,6 +380,7 @@ export default function Live() {
           pump()
         } else if (m.type === 'error') {
           inflight.current = Math.max(0, inflight.current - 1)
+          sentQ.current.shift()
           pump()
         } else if (m.type === 'saved') {
           setSaved(m)
@@ -377,9 +400,10 @@ export default function Live() {
     g.height = Math.round(v.videoHeight * sc)
     g.getContext('2d')!.drawImage(v, 0, 0, g.width, g.height)
     inflight.current++
+    sentQ.current.push(createImageBitmap(g))
     g.toBlob((b) => {
       if (b && s.readyState === 1) b.arrayBuffer().then((buf) => s.send(buf))
-      else inflight.current--
+      else { inflight.current--; sentQ.current.pop() }
     }, 'image/jpeg', 0.72)
     return true
   }
@@ -413,6 +437,8 @@ export default function Live() {
     trails.current.clear()
     last.current = null
     inflight.current = 0
+    sentQ.current = []
+    shown.current = null
     try {
       ws.current = await connect()
       sendGps(ws.current)
@@ -550,7 +576,7 @@ export default function Live() {
           </div>
         </div>
         <div className="live-wrap">
-          <video ref={video} className="live-video" playsInline muted />
+          <video ref={video} className={`live-video ${synced ? 'synced' : ''}`} playsInline muted />
           <canvas ref={overlay} className="live-overlay" />
           {src === 'none' && (
             <div className="live-empty">
@@ -586,11 +612,15 @@ export default function Live() {
             <div><b>{msg?.infer_ms ?? '-'}</b><span>ms</span></div>
             <div><b>{msg?.unique ?? 0}</b><span>unique</span></div>
             <div><b>{msg?.frame ?? 0}</b><span>frames</span></div>
+            {msg?.lane && (
+              <div><b style={{ color: msg.lane.status === 'good' ? '#34c759' : msg.lane.status === 'faded' ? '#ff9f0a' : '#ff453a', textTransform: 'capitalize' }}>{msg.lane.status}</b><span>lane lines</span></div>
+            )}
           </div>
         </div>
         <div className="live-controls">
           <button className="btn" disabled={src === 'none'} onClick={togglePause}>{isLive ? <><Pause size={15} weight="fill" /> Pause</> : <><Play size={15} weight="fill" /> Resume</>}</button>
           <button className="btn" disabled={!ws.current} onClick={reset}><ArrowCounterClockwise size={15} weight="bold" /> Reset IDs</button>
+          <button className={`btn ${synced ? 'primary' : ''}`} onClick={() => { syncedRef.current = !synced; setSynced(!synced) }} title="Draw each result on the exact frame it was computed from">Synced boxes {synced ? 'on' : 'off'}</button>
           <div className="seg">
             <button className={!cracks ? 'on' : ''} onClick={() => setMode(false)}><Lightning size={14} weight="fill" /> Potholes only</button>
             <button className={cracks ? 'on' : ''} onClick={() => setMode(true)}>All damage</button>
@@ -619,6 +649,7 @@ export default function Live() {
               <div className="row">
                 <b style={{ color: CLASS_COLOR[t.cls] }}>{PREFIX[t.cls]} {t.id}</b>
                 <span>{label(t.cls)}</span>
+                <span className="pill" style={{ background: t.tier === 'high' ? '#2e9a5722' : '#8a909722', color: t.tier === 'high' ? '#2e9a57' : '#5d636b' }}>{t.tier === 'high' ? `High confidence ${Math.round(t.conf * 100)}%` : `Possible ${Math.round(t.conf * 100)}%`}</span>
                 <span className="spacer" />
                 <span className="riskbadge" style={{ background: RISK_COL[t.risk] }}>{Math.round(t.risk_score)}</span>
               </div>

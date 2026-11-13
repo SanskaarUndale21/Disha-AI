@@ -237,11 +237,19 @@ def merge_dets(a: Dets, b: Dets, iou_thr=0.45):
     return Dets(np.array(xyxy), np.array(conf), np.array(cls))
 
 
+HIGH_CONF = float(os.getenv("RD_HIGH_CONF", "0.40"))  # measured: precision 87% at this cut-off (models/confidence_levels.json)
+
+
+def tier_for(conf):
+    """high = right about 87% of the time on held-out day, night, fog and rain photos; otherwise possible."""
+    return "high" if float(conf) >= HIGH_CONF else "possible"
+
+
 def make_row(frame, cls, x1, y1, x2, y2, conf, track_id=None):
     h, w = frame.shape[:2]
     a = sevmod.analyze(frame, cls, x1, y1, x2, y2, conf)
     lane = scoring.lane_factor(((x1 + x2) / 2) / w)
-    return {"class_name": cls, "confidence": round(float(conf), 4), "x1": float(x1), "y1": float(y1),
+    return {"class_name": cls, "confidence": round(float(conf), 4), "tier": tier_for(conf), "x1": float(x1), "y1": float(y1),
             "x2": float(x2), "y2": float(y2), "track_id": track_id, "lane": lane, **a}
 
 

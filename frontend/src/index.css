@@ -442,3 +442,6 @@ table.t.rp-sub td { padding: 4px 8px 4px 0; border-bottom: 0; font-size: 14px; }
   .fall-actions .btn { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .fall-banner { animation: none; } }
+
+/* synced live view: the canvas shows the analysed frame, the raw video keeps playing invisibly as the source */
+.live-video.synced { opacity: 0; }
