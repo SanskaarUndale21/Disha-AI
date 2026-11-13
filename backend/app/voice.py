@@ -506,7 +506,7 @@ def register(app):
             s.close()
         return {"created": sum(1 for r in out if r.get("ticket") and not r.get("duplicate")), "results": out}
 
-    @app.get("/api/voice/queue")
+    @app.get("/api/voice/queue", dependencies=[Depends(auth.require_officer)])
     def voice_queue(request: Request, filter: str = "needs_check", limit: int = 300):
         base = _base(request)
         s = SessionLocal()
@@ -525,7 +525,7 @@ def register(app):
         finally:
             s.close()
 
-    @app.get("/api/voice/queue/count")
+    @app.get("/api/voice/queue/count", dependencies=[Depends(auth.require_officer)])
     def voice_queue_count():
         s = SessionLocal()
         try:

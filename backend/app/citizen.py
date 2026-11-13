@@ -24,12 +24,12 @@ from typing import Optional
 import cv2
 import httpx
 import numpy as np
-from fastapi import File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, func
 
-from . import detector, events
+from . import auth, detector, events
 from .db import Base, Complaint, Defect, SessionLocal, engine, now
 from .geo import haversine_m
 
@@ -545,7 +545,9 @@ def register(app):
             s.close()
 
     @app.get("/api/drive/sessions")
-    def drive_sessions(device_id: Optional[str] = None, limit: int = 50):
+    def drive_sessions(device_id: Optional[str] = None, limit: int = 50, user: Optional[dict] = Depends(auth.optional_user)):
+        if not device_id and not (user and auth.RANK.get(user.get("role"), 0) >= auth.RANK["officer"]):
+            raise HTTPException(401, "Pass device_id or sign in as an officer")
         s = SessionLocal()
         try:
             q = s.query(DriveSession)

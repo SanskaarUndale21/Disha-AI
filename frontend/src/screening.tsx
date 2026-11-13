@@ -1,3 +1,4 @@
+import { authHeaders } from './api'
 import { useEffect, useState } from 'react'
 import { CheckCircle, Prohibit, ShieldWarning, XCircle } from '@phosphor-icons/react'
 import { label } from './api'
@@ -50,7 +51,7 @@ export function ScreeningPanel() {
   const [err, setErr] = useState('')
   const load = () => {
     fetch('/api/screening/stats').then((r) => r.json()).then(setStats).catch(() => setErr('Screening data is not available.'))
-    fetch(`/api/screening/checks?limit=24${filter ? `&verdict=${filter}` : ''}`).then((r) => r.json()).then(setRows).catch(() => {})
+    fetch(`/api/screening/checks?limit=24${filter ? `&verdict=${filter}` : ''}`, { headers: authHeaders() }).then((r) => r.json()).then(setRows).catch(() => {})
   }
   useEffect(load, [filter])
   useLiveRefresh(['screening.'], load)

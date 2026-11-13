@@ -258,7 +258,7 @@ def register(app):
         phone = phone or (user or {}).get("phone")
         return await asyncio.to_thread(run_check, data, name, device_id, phone, (user or {}).get("id"))
 
-    @app.get("/api/screening/checks")
+    @app.get("/api/screening/checks", dependencies=[Depends(auth.require_officer)])
     def screening_list(verdict: Optional[str] = None, limit: int = 60):
         s = SessionLocal()
         try:

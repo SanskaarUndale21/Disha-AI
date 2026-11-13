@@ -640,7 +640,7 @@ def register(app):
         if interval > 0:
             threading.Thread(target=_scan_loop, args=(interval,), daemon=True, name="alert-scan").start()
 
-    @app.get("/api/ops/rates")
+    @app.get("/api/ops/rates", dependencies=[Depends(auth.require_officer)])
     def get_rates():
         return dict(RATES, notes=RATES_NOTES)
 
@@ -715,7 +715,7 @@ def register(app):
     def alerts_scan(_u=Depends(auth.require_officer)):
         return scan()
 
-    @app.get("/api/alerts/summary")
+    @app.get("/api/alerts/summary", dependencies=[Depends(auth.require_officer)])
     def alerts_summary():
         s = SessionLocal()
         try:
@@ -723,7 +723,7 @@ def register(app):
         finally:
             s.close()
 
-    @app.get("/api/alerts")
+    @app.get("/api/alerts", dependencies=[Depends(auth.require_officer)])
     def alerts_list(status: str = "open", limit: int = 500):
         s = SessionLocal()
         try:
@@ -757,7 +757,7 @@ def register(app):
             s.close()
 
     # reports
-    @app.get("/api/reports/complaint/{defect_id}.pdf")
+    @app.get("/api/reports/complaint/{defect_id}.pdf", dependencies=[Depends(auth.require_officer)])
     def complaint_pdf(defect_id: int, request: Request):
         s = SessionLocal()
         try:
@@ -768,7 +768,7 @@ def register(app):
         return Response(pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="complaint_{d.uid}.pdf"'})
 
-    @app.get("/api/reports/authority/{defect_id}.pdf")
+    @app.get("/api/reports/authority/{defect_id}.pdf", dependencies=[Depends(auth.require_officer)])
     def authority_pdf(defect_id: int, request: Request):
         s = SessionLocal()
         try:
@@ -779,7 +779,7 @@ def register(app):
         return Response(pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="authority_{d.uid}.pdf"'})
 
-    @app.get("/api/reports/evidence/{defect_id}.pdf")
+    @app.get("/api/reports/evidence/{defect_id}.pdf", dependencies=[Depends(auth.require_officer)])
     def evidence_pdf(defect_id: int, request: Request):
         s = SessionLocal()
         try:
@@ -790,7 +790,7 @@ def register(app):
         return Response(pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="evidence_{d.uid}.pdf"'})
 
-    @app.get("/api/ops/complaint-text/{defect_id}")
+    @app.get("/api/ops/complaint-text/{defect_id}", dependencies=[Depends(auth.require_officer)])
     def get_complaint_text(defect_id: int):
         s = SessionLocal()
         try:

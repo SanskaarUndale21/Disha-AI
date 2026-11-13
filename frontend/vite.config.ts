@@ -5,6 +5,10 @@ const target = process.env.VITE_API ?? 'http://127.0.0.1:8000'
 
 export default defineConfig({
   plugins: [react()],
+  preview: {
+    port: 5173,
+    proxy: { '/api': target, '/media': target, '/ws': { target: target.replace('http', 'ws'), ws: true } },
+  },
   server: {
     port: 5173,
     proxy: { '/api': target, '/media': target, '/ws': { target: target.replace('http', 'ws'), ws: true } },

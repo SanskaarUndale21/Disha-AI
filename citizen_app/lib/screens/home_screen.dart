@@ -10,6 +10,7 @@ import '../widgets.dart';
 import 'detail_screen.dart';
 import 'drive_screen.dart';
 import 'import_screen.dart';
+import 'notifications_screen.dart';
 import 'public_map_screen.dart';
 import 'report_screen.dart';
 import 'reports_screen.dart';
@@ -99,6 +100,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 2),
               Row(children: [
                 Expanded(child: Text('RoadWatch', style: T.largeTitle(context))),
+                const NotificationBell(),
+                const SizedBox(width: 4),
                 const IconBadge(CupertinoIcons.location_north_fill, AppColors.blue, size: 38),
               ]),
               const SizedBox(height: 20),

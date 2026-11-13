@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../api.dart';
 import '../main.dart';
+import '../notifications.dart';
+import '../places.dart';
 import '../realtime.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -66,6 +68,11 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
   String? _routeMsg;
   bool _routeErr = false;
   String? _banner;
+  LatLng? _fromPt, _toPt;
+  String? _lastO, _lastD, _anKey;
+  int _planVer = 0;
+  bool _stepsOpen = false;
+  _RouteInfo? _an;
 
   @override
   void initState() {
@@ -79,7 +86,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 900), () {
           _load();
-          if (_plan != null) _compare(quiet: true);
+          if (_plan != null) _runPlan(quiet: true);
         });
       }
     });
@@ -208,14 +215,16 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       });
       return;
     }
-    _from.text = '${s.lat.toStringAsFixed(5)}, ${s.lon.toStringAsFixed(5)}';
+    _fromPt = LatLng(s.lat, s.lon);
+    _from.text = 'My location';
+    setState(() => _routeMsg = null);
   }
 
   String _friendly(Object e) {
     final m = '$e';
     final l = m.toLowerCase();
     if (l.contains('not found') || l.contains('geocode') || l.contains('could not find') || l.contains('no place')) {
-      return "We couldn't find one of those places. Try a nearby landmark or type latitude, longitude.";
+      return "We couldn't find one of those places. Pick a suggestion, try a nearby landmark, or type latitude, longitude.";
     }
     if (l.contains('busy') || l.contains('timeout') || l.contains('503') || l.contains('502') || l.contains('504') || l.contains('unavailable') || l.contains('(5')) {
       return 'The routing service is busy right now. Please try again in a moment.';
@@ -223,7 +232,16 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     return m;
   }
 
-  Future<void> _compare({bool quiet = false}) async {
+  Future<LatLng> _resolve(String text, LatLng? picked) async {
+    if (picked != null) return picked;
+    final c = Places.parseCoords(text);
+    if (c != null) return c;
+    final r = await Places.search(text, limit: 1);
+    if (r.isEmpty) throw ApiException("We couldn't find \"$text\". Pick a suggestion or try a nearby landmark.");
+    return r.first.point;
+  }
+
+  Future<void> _compare() async {
     final o = _from.text.trim(), d = _to.text.trim();
     if (o.isEmpty || d.isEmpty) {
       setState(() {
@@ -233,33 +251,69 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!quiet) setState(() => (_planning = true, _routeMsg = null, _banner = null));
+    setState(() => (_planning = true, _routeMsg = null, _banner = null));
+    try {
+      final a = await _resolve(o, _fromPt);
+      final b = await _resolve(d, _toPt);
+      _lastO = '${a.latitude.toStringAsFixed(6)},${a.longitude.toStringAsFixed(6)}';
+      _lastD = '${b.latitude.toStringAsFixed(6)},${b.longitude.toStringAsFixed(6)}';
+      await _runPlan(quiet: false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _planning = false;
+        _routeErr = true;
+        _routeMsg = _friendly(e);
+      });
+    }
+  }
+
+  /// Fetches the plan for the last resolved start and end. [quiet] refreshes in place after a live map event.
+  Future<void> _runPlan({required bool quiet}) async {
+    final o = _lastO, d = _lastD;
+    if (o == null || d == null) return;
     try {
       final j = await api.routePlan(o, d);
       if (!mounted) return;
       final before = _plan?['recommended'];
+      final oldRoutes = (_plan?['routes'] as List? ?? []);
+      final oldCount = (before is num && before.toInt() < oldRoutes.length)
+          ? (oldRoutes[before.toInt()] as Map)['defect_count']
+          : null;
       final routes = (j['routes'] as List? ?? []);
       if (routes.isEmpty) throw ApiException('No drivable route found between those places.');
+      final rec = (j['recommended'] as num?)?.toInt() ?? 0;
+      final recRoute = Map<String, dynamic>.from(routes[rec.clamp(0, routes.length - 1)] as Map);
       setState(() {
         _plan = j;
+        _planVer++;
         _planning = false;
         _routeErr = false;
-        _routeMsg = '${j['advice'] ?? ''}';
+        _routeMsg = null;
         if (quiet) {
           if (before != null && before != j['recommended']) {
             _banner = 'A new report changed the best route';
-            _sel = (j['recommended'] as num?)?.toInt() ?? 0;
+            _sel = rec;
           } else if (_sel >= routes.length) {
             _sel = 0;
           }
         } else {
-          _sel = (j['recommended'] as num?)?.toInt() ?? 0;
+          _sel = rec;
+          _stepsOpen = false;
         }
       });
+      if (quiet && before != null) {
+        final nowCount = recRoute['defect_count'];
+        if (before != j['recommended']) {
+          notifs.routeChanged('The best route is now Route ${rec + 1}: ${recRoute['duration_min']} min, '
+              '${recRoute['defect_count'] ?? 0} reported potholes.');
+        } else if (oldCount != null && oldCount != nowCount) {
+          notifs.routeChanged('Road damage on your recommended route changed: now ${nowCount ?? 0} reported potholes.');
+        }
+      }
       if (!quiet) _fitRoute();
     } catch (e) {
-      if (!mounted) return;
-      if (quiet) return;
+      if (!mounted || quiet) return;
       setState(() {
         _planning = false;
         _routeErr = true;
@@ -275,6 +329,17 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     final rs = _plan?['routes'] as List?;
     if (rs == null || rs.isEmpty) return null;
     return Map<String, dynamic>.from(rs[_sel.clamp(0, rs.length - 1)] as Map);
+  }
+
+  _RouteInfo? get _info {
+    final r = _selRoute;
+    if (r == null) return null;
+    final key = '$_planVer:$_sel';
+    if (_anKey != key) {
+      _an = _RouteInfo.of(_geom(r), [for (final h in (r['defects'] as List? ?? [])) Map<String, dynamic>.from(h as Map)]);
+      _anKey = key;
+    }
+    return _an;
   }
 
   void _fitRoute() {
@@ -357,13 +422,12 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
                 for (var i = 0; i < routes.length; i++)
                   if (i != _sel)
                     Polyline(points: _geom(routes[i] as Map), color: const Color(0x998A9097), strokeWidth: 6, borderColor: Colors.white, borderStrokeWidth: 1),
-                if (route != null)
-                  Polyline(
-                      points: _geom(route),
-                      color: ((route['labels'] as List?) ?? []).contains('recommended') ? _zoneGreen : const Color(0xFF1F5FBF),
-                      strokeWidth: 7,
-                      borderColor: Colors.white,
-                      borderStrokeWidth: 1.5),
+                if (route != null) ...[
+                  Polyline(points: _geom(route), color: Colors.white, strokeWidth: 11),
+                  if (_info != null)
+                    for (var k = 0; k < _info!.runs.length; k++)
+                      Polyline(points: _info!.runs[k], color: _info!.colors[k], strokeWidth: 7),
+                ],
               ]),
             if (plannerHasRoute(routes))
               MarkerLayer(markers: [
@@ -583,7 +647,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (_, i) {
           final it = items[i];
           return Semantics(
@@ -725,29 +789,38 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     ];
   }
 
+  static String _eta(num min) {
+    final t = DateTime.now().add(Duration(minutes: min.round()));
+    final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
+    return '$h:${t.minute.toString().padLeft(2, '0')} ${t.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  static String _meters(num m) => m >= 1000 ? '${(m / 1000).toStringAsFixed(1)} km' : '${m.round()} m';
+
   List<Widget> _plannerView(BuildContext context) {
     final c = AppColors.of(context);
-    InputDecoration dec(String hint, IconData ic) => InputDecoration(
-          hintText: hint,
-          prefixIcon: Icon(ic, size: 18),
-          filled: true,
-          fillColor: c.cardAlt,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        );
     final routes = (_plan?['routes'] as List? ?? []);
+    final route = _selRoute;
+    final info = _info;
+    final advice = '${_plan?['advice'] ?? ''}'.trim();
     return [
-      TextField(
-          controller: _from,
-          textInputAction: TextInputAction.next,
-          decoration: dec('From (place or latitude, longitude)', CupertinoIcons.circle_fill)),
+      PlaceField(
+        controller: _from,
+        hint: 'From (place or latitude, longitude)',
+        icon: CupertinoIcons.circle_fill,
+        onPicked: (p) => _fromPt = p.point,
+        onEdited: () => _fromPt = null,
+      ),
       const SizedBox(height: 8),
-      TextField(
-          controller: _to,
-          textInputAction: TextInputAction.go,
-          onSubmitted: (_) => _compare(),
-          decoration: dec('To (place or latitude, longitude)', CupertinoIcons.flag_fill)),
+      PlaceField(
+        controller: _to,
+        hint: 'To (place or latitude, longitude)',
+        icon: CupertinoIcons.flag_fill,
+        action: TextInputAction.go,
+        onSubmit: _compare,
+        onPicked: (p) => _toPt = p.point,
+        onEdited: () => _toPt = null,
+      ),
       const SizedBox(height: 8),
       Row(children: [
         Expanded(
@@ -757,33 +830,147 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
             icon: _locating
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(CupertinoIcons.location_fill, size: 16),
-            label: const Text('Use my location'),
+            label: const Text('My location'),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: _zoneYellow, foregroundColor: Colors.black),
-            onPressed: _planning ? null : () => _compare(),
+            onPressed: _planning ? null : _compare,
             child: _planning
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Compare routes', style: TextStyle(fontWeight: FontWeight.w800)),
+                : const Text('Get directions', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ),
       ]),
       if (_routeMsg != null && _routeMsg!.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 10),
-          child: Text(_routeMsg!, style: TextStyle(fontSize: 14, color: _routeErr ? _zoneRed : c.textSecondary, fontWeight: _routeErr ? FontWeight.w600 : FontWeight.w500)),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(_routeMsg!, style: TextStyle(fontSize: 14, color: _routeErr ? _zoneRed : c.textSecondary, fontWeight: FontWeight.w600)),
+          ),
         )
       else if (_plan == null)
         Padding(
           padding: const EdgeInsets.only(top: 10),
           child: Text('Routes are compared by driving time and by the road damage reported along them, updated live.', style: T.sub(context)),
         ),
+      if (_plan != null && advice.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _zoneGreen.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _zoneGreen, width: 1.5),
+          ),
+          child: Semantics(
+            liveRegion: true,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(CupertinoIcons.checkmark_shield_fill, color: _zoneGreen, size: 22),
+              const SizedBox(width: 10),
+              Expanded(child: Text(advice, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700))),
+            ]),
+          ),
+        ),
       const SizedBox(height: 10),
       for (var i = 0; i < routes.length; i++) _routeCard(context, Map<String, dynamic>.from(routes[i] as Map), i),
+      if (route != null && info != null) ...[
+        const SizedBox(height: 4),
+        Text('Road damage on this route', style: T.title(context).copyWith(fontSize: 17)),
+        const SizedBox(height: 8),
+        if (info.hits.isEmpty)
+          Text('No reported road damage on this route.', style: T.sub(context))
+        else
+          for (final h in info.hits) _hitTile(context, h),
+        const SizedBox(height: 10),
+        _stepsView(context, route),
+      ],
     ];
+  }
+
+  Widget _hitTile(BuildContext context, _Hit h) {
+    final c = AppColors.of(context);
+    final cls = '${h.d['class'] ?? 'pothole'}'.replaceAll('_', ' ');
+    final severe = h.risk >= 70;
+    final p = _pt(h.d);
+    return Semantics(
+      button: p != null,
+      label: '$cls number ${h.d['number']}, ${_meters(h.along)} from the start, risk ${h.risk.round()}',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: p == null ? null : () => _focus(p),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          constraints: const BoxConstraints(minHeight: 48),
+          decoration: BoxDecoration(color: c.cardAlt, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: severe ? _zoneRed : _routeAmber, shape: BoxShape.circle),
+              child: Text('${h.d['number'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(cls.isEmpty ? 'Pothole' : '${cls[0].toUpperCase()}${cls.substring(1)}',
+                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+                Text('${_meters(h.along)} from start${severe ? ', serious' : ''}',
+                    style: TextStyle(fontSize: 12.5, color: severe ? _zoneRed : c.textSecondary, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _stepsView(BuildContext context, Map<String, dynamic> route) {
+    final c = AppColors.of(context);
+    final steps = [for (final s in (route['steps'] as List? ?? [])) Map<String, dynamic>.from(s as Map)];
+    if (steps.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Semantics(
+        button: true,
+        expanded: _stepsOpen,
+        label: 'Step by step directions, ${steps.length} steps',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _stepsOpen = !_stepsOpen),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Row(children: [
+              Expanded(child: Text('Step by step (${steps.length})', style: T.title(context).copyWith(fontSize: 17))),
+              Icon(_stepsOpen ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down, size: 18, color: c.textSecondary),
+            ]),
+          ),
+        ),
+      ),
+      if (_stepsOpen)
+        for (var i = 0; i < steps.length; i++)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              final p = _pt(steps[i]);
+              if (p != null) _focus(p, zoom: 17);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 26, child: Text('${i + 1}.', style: TextStyle(fontWeight: FontWeight.w800, color: c.textSecondary))),
+                Expanded(child: Text('${steps[i]['text'] ?? ''}', style: const TextStyle(fontSize: 14.5))),
+                const SizedBox(width: 8),
+                if (steps[i]['distance_m'] is num && (steps[i]['distance_m'] as num) > 0)
+                  Text(_meters(steps[i]['distance_m'] as num), style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ),
+    ]);
   }
 
   Widget _routeCard(BuildContext context, Map<String, dynamic> r, int i) {
@@ -791,6 +978,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     final labels = [for (final l in (r['labels'] as List? ?? [])) '$l'];
     final defects = (r['defect_count'] as num?)?.toInt() ?? 0;
     final severe = (r['severe_count'] as num?)?.toInt() ?? 0;
+    final mins = (r['duration_min'] as num?) ?? 0;
     final sel = i == _sel;
     Widget chip(String l) => Container(
           margin: const EdgeInsets.only(left: 6),
@@ -801,7 +989,7 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
     return Semantics(
       button: true,
       selected: sel,
-      label: 'Route ${i + 1}, ${r['duration_min']} minutes, ${r['distance_km']} kilometres, $defects reported potholes, ${labels.join(', ')}',
+      label: 'Route ${i + 1}, ${r['duration_min']} minutes, arrive ${_eta(mins)}, ${r['distance_km']} kilometres, $defects reported potholes, ${labels.join(', ')}',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -821,8 +1009,9 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
             Wrap(crossAxisAlignment: WrapCrossAlignment.center, runSpacing: 4, children: [
               Text('${r['duration_min']} min', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
               const SizedBox(width: 8),
-              Text('${r['distance_km']} km', style: T.sub(context)),
+              Text('${r['distance_km']} km, arrive ${_eta(mins)}', style: T.sub(context)),
               for (final l in labels) chip(l),
+              if (r['detour'] == true) chip('detour'),
             ]),
             const SizedBox(height: 4),
             Text(defects == 0 ? 'No reported potholes on this route' : '$defects reported ${defects == 1 ? 'pothole' : 'potholes'}, $severe serious',
@@ -831,6 +1020,81 @@ class _PublicMapScreenState extends State<PublicMapScreen> {
         ),
       ),
     );
+  }
+}
+
+/// A reported defect near the route and how far along the route it is.
+class _Hit {
+  final Map<String, dynamic> d;
+  final double along, risk;
+  _Hit(this.d, this.along, this.risk);
+}
+
+const _hitMeters = 28.0;
+const _routeBlue = Color(0xFF1F5FBF);
+const _routeAmber = Color(0xFFE08A00);
+
+/// Route split into coloured runs: blue, amber near any defect, red near a defect with risk of 70 or more.
+class _RouteInfo {
+  final List<List<LatLng>> runs;
+  final List<Color> colors;
+  final List<_Hit> hits;
+  _RouteInfo(this.runs, this.colors, this.hits);
+
+  static double _m(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    double rad(double d) => d * math.pi / 180;
+    final h = math.pow(math.sin(rad(b.latitude - a.latitude) / 2), 2) +
+        math.cos(rad(a.latitude)) * math.cos(rad(b.latitude)) * math.pow(math.sin(rad(b.longitude - a.longitude) / 2), 2);
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
+  /// Distance in metres from p to segment a-b, and the fraction along the segment of the closest point.
+  static (double, double) _seg(LatLng p, LatLng a, LatLng b) {
+    final k = math.cos(p.latitude * math.pi / 180) * 111320, ky = 110574.0;
+    final ax = (a.longitude - p.longitude) * k, ay = (a.latitude - p.latitude) * ky;
+    final bx = (b.longitude - p.longitude) * k, by = (b.latitude - p.latitude) * ky;
+    final dx = bx - ax, dy = by - ay;
+    final len2 = dx * dx + dy * dy;
+    final t = len2 == 0 ? 0.0 : ((-ax * dx - ay * dy) / len2).clamp(0.0, 1.0);
+    final px = ax + t * dx, py = ay + t * dy;
+    return (math.sqrt(px * px + py * py), t);
+  }
+
+  static _RouteInfo of(List<LatLng> g, List<Map<String, dynamic>> defects) {
+    if (g.length < 2) return _RouteInfo([g], [_routeBlue], []);
+    final cum = <double>[0];
+    for (var i = 1; i < g.length; i++) {
+      cum.add(cum.last + _m(g[i - 1], g[i]));
+    }
+    final lvl = List<int>.filled(g.length - 1, 0);
+    final hits = <_Hit>[];
+    for (final d in defects) {
+      final p = _pt(d);
+      if (p == null) continue;
+      final risk = ((d['risk'] as num?) ?? 0).toDouble();
+      var best = double.infinity, along = 0.0;
+      for (var i = 0; i < g.length - 1; i++) {
+        final (dist, t) = _seg(p, g[i], g[i + 1]);
+        if (dist <= _hitMeters) lvl[i] = math.max(lvl[i], risk >= 70 ? 2 : 1);
+        if (dist < best) {
+          best = dist;
+          along = cum[i] + t * (cum[i + 1] - cum[i]);
+        }
+      }
+      hits.add(_Hit(d, along, risk));
+    }
+    hits.sort((a, b) => a.along.compareTo(b.along));
+    final runs = <List<LatLng>>[], colors = <Color>[];
+    var start = 0;
+    for (var i = 1; i <= lvl.length; i++) {
+      if (i == lvl.length || lvl[i] != lvl[start]) {
+        runs.add(g.sublist(start, i + 1));
+        colors.add(switch (lvl[start]) { 2 => _zoneRed, 1 => _routeAmber, _ => _routeBlue });
+        start = i;
+      }
+    }
+    return _RouteInfo(runs, colors, hits);
   }
 }
 

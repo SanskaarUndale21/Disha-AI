@@ -7,9 +7,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
 import 'location.dart';
+import 'notifications.dart';
 import 'realtime.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/report_screen.dart';
 import 'screens/reports_screen.dart';
@@ -46,7 +48,9 @@ Future<void> main() async {
       refreshTick.value++;
     }
   });
+  await notifs.init();
   realtime = Realtime(prefs, onEvent: _onEvent)..start();
+  notifs.startPolling();
   if (Api.supabaseReady) {
     Supabase.instance.client.auth.onAuthStateChange.listen((s) {
       if (s.event == AuthChangeEvent.tokenRefreshed || s.event == AuthChangeEvent.signedOut) realtime.restart();
@@ -85,6 +89,7 @@ Future<void> signOut() async {
 }
 
 void _onEvent(String type, Map<String, dynamic> data) {
+  notifs.handleEvent(type, data);
   if (!type.startsWith('complaint.')) return;
   refreshTick.value++;
   if (type != 'complaint.updated') return;
@@ -191,10 +196,13 @@ class _ShellState extends State<Shell> {
       value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         extendBody: true,
-        body: IndexedStack(index: _tab, children: [
-          HomeScreen(onSeeAll: () => go(1)),
-          const ReportsScreen(),
-          const ProfileScreen(),
+        body: Stack(children: [
+          IndexedStack(index: _tab, children: [
+            HomeScreen(onSeeAll: () => go(1)),
+            const ReportsScreen(),
+            const ProfileScreen(),
+          ]),
+          const EmergencyBanner(),
         ]),
         bottomNavigationBar: Glass(
           child: Container(

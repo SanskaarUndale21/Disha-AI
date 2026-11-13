@@ -7,7 +7,9 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'auth_screen.dart';
+import '../notifications.dart';
 import 'drive_screen.dart';
+import 'notifications_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    notifs.removeListener(_rebuild);
     _name.dispose();
     _phone.dispose();
     _server.dispose();
@@ -62,6 +65,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       });
+
+  @override
+  void initState() {
+    super.initState();
+    notifs.addListener(_rebuild);
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +120,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _group('YOUR DETAILS', [
             _field(_name, 'Name', CupertinoIcons.person_fill, AppColors.blue, TextInputType.name),
             _field(_phone, 'Mobile', CupertinoIcons.phone_fill, AppColors.green, TextInputType.phone),
+          ]),
+          _group('NOTIFICATIONS', [
+            Pressable(
+              onTap: () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const NotificationsScreen())),
+              child: _row(CupertinoIcons.bell_fill, AppColors.orange, 'Notification centre',
+                  notifs.unread == 0 ? '' : '${notifs.unread} new', chevron: true),
+            ),
+            _switch(CupertinoIcons.exclamationmark_triangle_fill, AppColors.red, 'Emergency alerts', notifs.emergencyOn,
+                notifs.setEmergency),
+            _switch(CupertinoIcons.location_fill, AppColors.green, 'Nearby damage and repairs', notifs.nearbyOn,
+                notifs.setNearby),
+            _switch(CupertinoIcons.doc_text_fill, AppColors.blue, 'My reports', notifs.mineOn, notifs.setMine),
           ]),
           _group('DRIVE MODE', [
             Pressable(
@@ -162,6 +187,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     ]);
   }
+
+  Widget _switch(IconData icon, Color color, String title, bool value, Future<void> Function(bool) onChanged) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          IconBadge(icon, color, size: 30),
+          const SizedBox(width: 14),
+          Expanded(child: Text(title, style: T.body(context))),
+          Switch.adaptive(value: value, onChanged: (v) async {
+            await onChanged(v);
+            if (v) await notifs.requestPermission();
+          }),
+        ]),
+      );
 
   Widget _row(IconData icon, Color color, String title, String value, {bool chevron = false}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),

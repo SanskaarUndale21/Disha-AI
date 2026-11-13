@@ -324,6 +324,39 @@ class DefectPatch(BaseModel):
     lon: Optional[float] = None
 
 
+class BulkDefects(BaseModel):
+    ids: list[int]
+    status: str  # repaired | active
+
+
+@app.post("/api/defects/bulk-status")
+def bulk_defect_status(body: BulkDefects, s: Session = Depends(get_session), user=Depends(auth.require_officer)):
+    """Officer action: mark many defects (for example every defect on a road or route) repaired or active again."""
+    if body.status not in ("repaired", "active"):
+        raise HTTPException(400, "status must be repaired or active")
+    if not body.ids or len(body.ids) > 500:
+        raise HTTPException(400, "send between 1 and 500 defect ids")
+    done = []
+    for d in s.query(Defect).filter(Defect.id.in_(body.ids)).all():
+        if d.status == body.status:
+            continue
+        d.status = body.status
+        if body.status == "repaired":
+            d.trend, d.risk_score, d.risk_level = "repaired", 0.0, "Low"
+            s.add(DefectHistory(defect_id=d.id, observed_at=now(), present=False, trend="repaired", risk_score=0))
+        else:
+            d.trend = "stable"
+            pipeline.refresh_defect_risk(d)
+        done.append(d)
+    s.commit()
+    for d in done:
+        events.publish("defect.updated", ser_defect(d))
+        if body.status == "repaired" and d.lat is not None:
+            events.publish("repair.verified", {"uid": d.uid, "defect_id": d.id, "lat": d.lat, "lon": d.lon, "passes": 0,
+                                               "message": f"{d.uid} marked repaired by an officer."})
+    return {"updated": len(done), "status": body.status}
+
+
 @app.patch("/api/defects/{did}")
 def patch_defect(did: int, body: DefectPatch, s: Session = Depends(get_session), _u=Depends(auth.require_officer)):
     d = s.get(Defect, did)
@@ -395,7 +428,7 @@ def verify(det_id: int, body: Verify, s: Session = Depends(get_session), officer
     return out
 
 
-@app.get("/api/verification/queue")
+@app.get("/api/verification/queue", dependencies=[Depends(auth.require_officer)])
 def verification_queue(status: str = "pending", limit: int = 200, s: Session = Depends(get_session)):
     q = s.query(Detection)
     if status != "all":
@@ -470,13 +503,13 @@ def progress(lat: float, lon: float, radius_m: float = 50, s: Session = Depends(
     return {"verdict": verdict, "snapshots": snaps, "defects": defects}
 
 
-@app.get("/api/reports/defects.csv")
+@app.get("/api/reports/defects.csv", dependencies=[Depends(auth.require_officer)])
 def report_csv(s: Session = Depends(get_session)):
     return Response(reports.defects_csv(s), media_type="text/csv",
                     headers={"Content-Disposition": "attachment; filename=road_damage_report.csv"})
 
 
-@app.get("/api/reports/summary.pdf")
+@app.get("/api/reports/summary.pdf", dependencies=[Depends(auth.require_officer)])
 def report_pdf(s: Session = Depends(get_session)):
     return Response(reports.summary_pdf(s, stats(s)), media_type="application/pdf",
                     headers={"Content-Disposition": "attachment; filename=road_damage_report.pdf"})
