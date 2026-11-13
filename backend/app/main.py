@@ -357,7 +357,18 @@ def list_defects(status: Optional[str] = None, risk: Optional[str] = None, cls: 
         q = q.filter(Defect.risk_level == risk)
     if cls:
         q = q.filter(Defect.class_name == cls)
-    return [ser_defect(d) for d in q.order_by(Defect.risk_score.desc()).all()]
+    rows = q.order_by(Defect.risk_score.desc()).all()
+    from sqlalchemy import func
+    best = dict(s.query(Detection.defect_id, func.max(Detection.confidence)).filter(Detection.defect_id.isnot(None))
+                .group_by(Detection.defect_id).all())
+    out = []
+    for d in rows:
+        o = ser_defect(d)
+        c = best.get(d.id)
+        o["confidence"] = round(float(c), 3) if c is not None else None
+        o["tier"] = None if c is None else ("high" if c >= detector.HIGH_CONF else "possible")
+        out.append(o)
+    return out
 
 
 @app.get("/api/defects/{did}")
@@ -427,6 +438,8 @@ def patch_defect(did: int, body: DefectPatch, s: Session = Depends(get_session),
         s.add(DefectHistory(defect_id=d.id, observed_at=now(), present=False, trend="repaired", risk_score=0))
         d.risk_score, d.risk_level = 0.0, "Low"
     else:
+        if body.status == "active" and d.trend == "repaired":
+            d.trend = "stable"
         pipeline.refresh_defect_risk(d)
     s.commit()
     out = ser_defect(d)

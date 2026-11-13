@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch('/api/auth/config')
       .then((r) => r.json())
       .then(async (cfg) => {
-        if (!cfg.supabase_url) {
+        if (!cfg.supabase_url || cfg.auth_required === false) {
           setReady(true)
           return
         }

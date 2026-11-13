@@ -8,7 +8,7 @@ export default function LiveMap() {
   const { isOfficer } = useAuth()
   const send = () => {
     const w = ref.current?.contentWindow
-    if (w) w.postMessage({ type: 'rw-auth', token: isOfficer ? authToken() : null }, '*')
+    if (w) w.postMessage({ type: 'rw-auth', officer: !!isOfficer, token: isOfficer ? authToken() : null }, '*')
   }
   useEffect(() => {
     send()
