@@ -312,7 +312,13 @@ class _ReportScreenState extends State<ReportScreen> {
             border: Border.all(color: sel ? AppColors.blue : Colors.transparent, width: 2.5),
           ),
           child: Stack(fit: StackFit.expand, children: [
-            PhotoTile(asset: cat.thumb, label: cat.label, radius: sel ? 16 : 20, labelSize: 13.5),
+            PhotoTile(
+                asset: cat.thumb,
+                label: cat.label,
+                radius: sel ? 16 : 20,
+                labelSize: 13.5,
+                icon: cat.icon,
+                color: cat.color),
             Positioned(
               right: 6,
               top: 6,

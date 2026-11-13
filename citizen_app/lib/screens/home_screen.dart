@@ -96,10 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 2),
               Row(children: [
                 Expanded(child: Text('RoadWatch', style: T.largeTitle(context))),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: Image.asset('assets/icon/icon.png', width: 38, height: 38),
-                ),
+                const IconBadge(CupertinoIcons.location_north_fill, AppColors.blue, size: 38),
               ]),
               const SizedBox(height: 20),
               _HeroCard(onTap: () => _report()),
@@ -125,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     final cat = categories[i];
                     return Pressable(
                       onTap: () => _report(cat.key),
-                      child: SizedBox(width: 118, child: PhotoTile(asset: cat.thumb, label: cat.label)),
+                      child: SizedBox(width: 118, child: PhotoTile(asset: cat.thumb, label: cat.label, icon: cat.icon, color: cat.color)),
                     );
                   },
                 ),

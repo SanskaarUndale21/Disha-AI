@@ -164,9 +164,12 @@ class IconBadge extends StatelessWidget {
 
 /// Real photo tile with a soft scrim and a label, used for issue types.
 class PhotoTile extends StatelessWidget {
-  const PhotoTile({super.key, required this.asset, required this.label, this.radius = 20, this.labelSize = 14});
+  const PhotoTile(
+      {super.key, required this.asset, required this.label, this.radius = 20, this.labelSize = 14, this.icon, this.color});
   final String asset, label;
   final double radius, labelSize;
+  final IconData? icon;
+  final Color? color;
   @override
   Widget build(BuildContext context) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
@@ -182,6 +185,7 @@ class PhotoTile extends StatelessWidget {
               ),
             ),
           ),
+          if (icon != null) Positioned(left: 8, top: 8, child: IconBadge(icon!, color ?? AppColors.blue, size: 30)),
           Positioned(
             left: 10,
             right: 10,
