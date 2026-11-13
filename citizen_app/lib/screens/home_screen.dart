@@ -194,11 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 22,
                       child: MapPin(
                         size: 22,
-                        color: switch (d['risk_level']) {
-                          'High' => AppColors.red,
-                          'Medium' => AppColors.orange,
-                          _ => AppColors.yellow,
-                        },
+                        color: riskColor(d['risk_level'] as String?),
                       ),
                     ),
                   for (final x in items)

@@ -104,3 +104,11 @@ class T {
   static TextStyle caption(BuildContext c) => TextStyle(
       fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: AppColors.of(c).textSecondary);
 }
+
+/// Colour for a risk level or severity label (old High/Medium/Low and new Minor/Moderate/Severe/Critical).
+Color riskColor(String? level) => switch (level) {
+      'High' || 'Critical' || 'Severe' => AppColors.red,
+      'Medium' || 'Moderate' => AppColors.orange,
+      'Low' || 'Minor' => AppColors.green,
+      _ => AppColors.yellow,
+    };

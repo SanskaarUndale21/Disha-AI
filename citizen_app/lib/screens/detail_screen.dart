@@ -265,11 +265,7 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _finding(Finding f) {
-    final color = switch (f.riskLevel ?? f.severity) {
-      'High' => AppColors.red,
-      'Medium' => AppColors.orange,
-      _ => AppColors.green,
-    };
+    final color = riskColor(f.riskLevel ?? f.severity);
     return Row(children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(10),
