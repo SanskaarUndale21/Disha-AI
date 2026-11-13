@@ -17,7 +17,7 @@ import numpy as np
 
 from . import config, scoring, severity as sevmod
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 _infer_lock = threading.Lock()
 _models = None
 
@@ -27,15 +27,22 @@ COLORS = {
     "alligator_crack": (10, 159, 255),
     "transverse_crack": (255, 132, 10),
     "longitudinal_crack": (242, 90, 191),
+    "manhole": (199, 140, 20),
+    "speed_breaker": (5, 183, 242),
+    "debris": (60, 120, 140),
+    "barricade": (200, 200, 200),
 }
-SEV_THICK = {"Low": 1.0, "Medium": 1.5, "High": 2.2}
-PREFIX = {"pothole": "PH", "alligator_crack": "AC", "transverse_crack": "TC", "longitudinal_crack": "LC"}
+SEV_THICK = {"Low": 1.0, "Medium": 1.5, "High": 2.2, "Minor": 1.0, "Moderate": 1.4, "Severe": 1.9, "Critical": 2.5}
+PREFIX = {"pothole": "PH", "alligator_crack": "AC", "transverse_crack": "TC", "longitudinal_crack": "LC",
+          "manhole": "MH", "speed_breaker": "SB", "debris": "DB", "barricade": "BR"}
 CLS_ID = {c: i for i, c in enumerate(config.CLASSES)}
 
 POTHOLE_WEIGHTS = [os.getenv("RD_POTHOLE_WEIGHTS", ""), str(config.ROOT / "models" / "pothole_best.pt"),
                    str(config.ROOT / "models" / "potholenet_yolo11m.pt")]
 CRACK_WEIGHTS = [os.getenv("RD_WEIGHTS", ""), str(config.ROOT / "models" / "best.pt"),
                  str(config.ROOT / "models" / "rdd2022_yolov8m.pt")]
+FEATURE_WEIGHTS = [os.getenv("RD_FEATURE_WEIGHTS", ""), str(config.ROOT / "models" / "features_best.pt")]
+FEATURE_CONF = float(os.getenv("RD_FEATURE_CONF", "0.5"))
 POTHOLE_CONF = float(os.getenv("RD_POTHOLE_CONF", "0.25"))
 CRACK_CONF = float(os.getenv("RD_CRACK_CONF", "0.30"))
 USE_CRACKS = os.getenv("RD_CRACKS", "1") != "0"
@@ -65,6 +72,13 @@ def _load():
                 cmap = {k: config.canonical_class(v) for k, v in m.names.items()
                         if config.canonical_class(v) in CLS_ID and (not pw or config.canonical_class(v) != "pothole")}
                 roles.append(SimpleNamespace(role="cracks", model=m, path=cw, cmap=cmap, conf=CRACK_CONF))
+            fw = _first(FEATURE_WEIGHTS)
+            if fw:
+                m = YOLO(fw)
+                cmap = {k: config.canonical_class(v) for k, v in m.names.items()
+                        if config.canonical_class(v) in CLS_ID and config.canonical_class(v) not in
+                        ("pothole", "longitudinal_crack", "transverse_crack", "alligator_crack")}
+                roles.append(SimpleNamespace(role="features", model=m, path=fw, cmap=cmap, conf=FEATURE_CONF))
             if not roles:
                 raise RuntimeError("No weights in models/. Run ml/download_data.py")
             _models = roles
@@ -136,7 +150,7 @@ def infer(img, cracks=None, conf_floor=None):
     boxes, confs, clss = [], [], []
     with _infer_lock:
         for r in roles:
-            if r.role == "cracks" and not cracks:
+            if r.role in ("cracks", "features") and not cracks:
                 continue
             c = r.conf if conf_floor is None else min(r.conf, conf_floor)
             res = r.model.predict(img, conf=c, iou=config.IOU_THRESHOLD, imgsz=config.IMG_SIZE, quantize=16,
@@ -220,10 +234,63 @@ def crop(img, r, pad=0.15):
     return c if c.size else img
 
 
+_extra = None
+
+
+def _extra_pothole_models():
+    """Second-opinion pothole models for the accurate (upload) mode."""
+    global _extra
+    with _lock:
+        if _extra is None:
+            from ultralytics import YOLO
+            paths = [config.ROOT / "models" / "potholenet_yolo11m.pt"]
+            primary = next((r.path for r in _load() if r.role == "pothole"), None)
+            _extra = [YOLO(str(p)) for p in paths if p.exists() and str(p) != primary]
+    return _extra
+
+
+def infer_accurate(img):
+    """Upload mode: pothole ensemble (fine-tuned + PotholeNet, each with a horizontal-flip pass) fused with
+    Weighted Boxes Fusion, as used by the CRDDC2022 winners; cracks / features from the normal ensemble."""
+    try:
+        from ensemble_boxes import weighted_boxes_fusion
+    except ImportError:
+        return infer(img)
+    base = infer(img)
+    keep = base.cls != CLS_ID["pothole"]
+    h, w = img.shape[:2]
+    pmodels = [r.model for r in _load() if r.role == "pothole"] + _extra_pothole_models()
+    B, S, L = [], [], []
+    with _infer_lock:
+        for m in pmodels:
+            pot_ids = {k for k, v in m.names.items() if config.canonical_class(v) == "pothole"}
+            for flipped in (False, True):
+                v = img[:, ::-1].copy() if flipped else img
+                r = m.predict(v, conf=0.05, iou=0.6, imgsz=config.IMG_SIZE, quantize=16, verbose=False)[0].boxes
+                sel = [i for i, c in enumerate(r.cls.cpu().numpy().astype(int)) if c in pot_ids]
+                xy = r.xyxy.cpu().numpy()[sel].copy()
+                if flipped and len(xy):
+                    xy[:, [0, 2]] = w - xy[:, [2, 0]]
+                xy[:, [0, 2]] /= w
+                xy[:, [1, 3]] /= h
+                B.append(np.clip(xy, 0, 1).tolist())
+                S.append(r.conf.cpu().numpy()[sel].tolist())
+                L.append([0] * len(sel))
+    fb, fs, _ = weighted_boxes_fusion(B, S, L, iou_thr=0.55, skip_box_thr=0.05, conf_type="avg")
+    fb, fs = np.array(fb).reshape(-1, 4) * [w, h, w, h], np.array(fs)
+    ok = fs >= POTHOLE_CONF
+    pot = Dets(fb[ok], fs[ok], [CLS_ID["pothole"]] * int(ok.sum()))
+    return Dets(np.vstack([base.xyxy[keep], pot.xyxy]), np.concatenate([base.conf[keep], pot.conf]),
+                np.concatenate([base.cls[keep], pot.cls]))
+
+
+ACCURATE_UPLOADS = os.getenv("RD_ACCURATE", "1") != "0"
+
+
 def detect_image(img):
     proc, enhanced = preprocess(img)
     t0 = time.time()
-    d = infer(proc)
+    d = infer_accurate(proc) if ACCURATE_UPLOADS else infer(proc)
     rows = rows_from(img, d)
     return rows, {"enhanced": enhanced, "ms": int((time.time() - t0) * 1000)}
 
@@ -273,7 +340,7 @@ class Tracker:
                 # unconfirmed flicker: skip the OpenCV analysis, it is only drawn as a dashed box
                 r = {"class_name": cls, "confidence": round(float(score), 4), "x1": x1, "y1": y1, "x2": x2, "y2": y2,
                      "track_id": tid, "lane": scoring.lane_factor(((x1 + x2) / 2) / self.w), "polygon": [],
-                     "severity": "Low", "severity_score": 0.0, "size_index": 0.0, "depth_index": 0.0,
+                     "severity": "Minor", "severity_score": 0.0, "water": False, "size_index": 0.0, "depth_index": 0.0,
                      "roughness_index": 0.0, "area_ratio": 0.0, "perspective": 1.0, "damage_fill": 0.0}
             elif cache is not None and self.frame_idx - cache["at"] < 3 and cache["cls"] == cls:
                 # reuse the analysis from up to 2 frames ago, shifting the outline with the tracked box

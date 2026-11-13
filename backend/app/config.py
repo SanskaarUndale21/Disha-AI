@@ -22,6 +22,7 @@ DB_URL = os.getenv("RD_DB_URL") or f"sqlite:///{(STORAGE / 'roadwatch.db').as_po
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("RD_ADMIN_EMAILS", "").split(",") if e.strip()}
+OFFICER_EMAILS = {e.strip().lower() for e in os.getenv("RD_OFFICER_EMAILS", "").split(",") if e.strip()}
 AUTH_REQUIRED = os.getenv("RD_AUTH_REQUIRED", "1" if SUPABASE_URL else "0") == "1"
 
 # weights: first existing wins (fine-tuned > pretrained baseline)
@@ -56,13 +57,20 @@ CLASS_ALIASES = {
     "d10": "transverse_crack", "transverse": "transverse_crack", "transverse crack": "transverse_crack",
     "d20": "alligator_crack", "alligator": "alligator_crack", "alligator crack": "alligator_crack",
     "d40": "pothole", "pothole": "pothole", "potholes": "pothole",
+    "manhole": "manhole", "speed_breaker": "speed_breaker", "speedbump": "speed_breaker", "speed bump": "speed_breaker",
+    "debris": "debris", "barricade": "barricade", "road_barricade": "barricade", "road barricade": "barricade",
 }
-CLASSES = ["longitudinal_crack", "transverse_crack", "alligator_crack", "pothole"]
+CLASSES = ["longitudinal_crack", "transverse_crack", "alligator_crack", "pothole",
+           "manhole", "speed_breaker", "debris", "barricade"]
 CLASS_LABELS = {
     "longitudinal_crack": "Longitudinal Crack (D00)",
     "transverse_crack": "Transverse Crack (D10)",
     "alligator_crack": "Alligator Crack (D20)",
     "pothole": "Pothole (D40)",
+    "manhole": "Manhole / drain cover",
+    "speed_breaker": "Speed breaker",
+    "debris": "Debris / loose gravel",
+    "barricade": "Barricade / work zone",
 }
 
 

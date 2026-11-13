@@ -37,6 +37,11 @@ function describe(e: RtEvent): Omit<Toast, 'id'> | null {
       return { title: `New ${d.risk_level ?? ''} risk defect ${d.uid}`, body: `${(d.class_name ?? '').replace('_', ' ')}, severity ${d.severity}, risk ${Math.round(d.risk_score ?? 0)}`, tone: d.risk_level === 'High' ? 'high' : 'med', to: '/defects' }
     case 'detection.verified':
       return { title: `${d.uid} ${d.verification}`, body: `by ${d.by ?? 'officer'}`, tone: 'ok' }
+    case 'screening.checked':
+      if (d.verdict === 'pass') return null
+      return d.verdict === 'rate_limited'
+        ? { title: 'Device blocked for fake reports', body: d.reason ?? '', tone: 'high', to: '/complaints' }
+        : { title: 'Photo refused: no road damage', body: `device ${d.device ?? 'unknown'}`, tone: 'med', to: '/complaints' }
     case 'live.saved':
       return { title: 'Live patrol saved', body: `${d.defects} defects (${d.new} new) from inspection #${d.inspection_id}`, tone: 'ok', to: '/inspections' }
     default:

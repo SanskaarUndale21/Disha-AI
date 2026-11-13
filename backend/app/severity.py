@@ -89,15 +89,35 @@ def analyze(frame, cls, x1, y1, x2, y2, conf=1.0):
     top_down = (bw * bh) / float(w * h) > 0.18
     pf = perspective_factor(y2, h, top_down)
     dmg_px = fill * bw * bh
-    return _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw, bh)
+    # standing water: a smooth (low texture), low-saturation, brighter-than-road region inside the hole
+    water = False
+    if cls == "pothole" and inside.any():
+        hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+        sat = float(hsv[:, :, 1][inside].mean())
+        smooth = float(texture[inside].mean()) < 0.6 * (tex_ref + 1e-6) + 2
+        water = smooth and sat < 60 and float(L[inside].mean()) > float(ref[0]) + 12
+    return _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw, bh, water)
 
 
 # calibrated on ground-truth pothole boxes (ml/calibrate_severity.py): ~90th percentile of each raw measure
 CAL = {"size_ref": {"pothole": 0.20, "alligator_crack": 0.30, "linear": 0.9}, "depth_ref": 0.29, "rough_ref": 0.40,
-       "low_max": 0.34, "med_max": 0.62}
+       "low_max": 0.34, "med_max": 0.62,
+       # 4-level scale, cut at the 35th / 70th / 90th percentile of 2,400 ground-truth potholes
+       "levels": [(0.315, "Minor"), (0.534, "Moderate"), (0.745, "Severe"), (9.0, "Critical")]}
+
+LEVELS = ["Minor", "Moderate", "Severe", "Critical"]
+LEVEL_RANK = {"Minor": 0, "Moderate": 1, "Severe": 2, "Critical": 3, "Low": 0, "Medium": 1, "High": 2}
+LEVEL_SCORE = {"Minor": 0.2, "Moderate": 0.42, "Severe": 0.64, "Critical": 0.85, "Low": 0.2, "Medium": 0.5, "High": 0.8}
 
 
-def _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw, bh):
+def level_for(score):
+    for cut, name in CAL["levels"]:
+        if score < cut:
+            return name
+    return "Critical"
+
+
+def _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw, bh, water=False):
     diag = float(np.hypot(w, h))
     if cls in ("pothole", "alligator_crack"):
         # equivalent diameter of the damaged region relative to the image diagonal, perspective corrected
@@ -116,7 +136,9 @@ def _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw,
     else:
         score = 0.70 * size_n + 0.20 * depth_n + 0.10 * rough_n
     score = float(np.clip(score * (0.85 + 0.15 * float(conf)), 0, 1))
-    label = "High" if score >= CAL["med_max"] else "Medium" if score >= CAL["low_max"] else "Low"
+    if water and cls == "pothole":
+        score = max(score, 0.55)  # standing water hides the true depth: never rate below Severe-adjacent
+    label = level_for(score)
     return {
         "area_ratio": round(dmg_px / float(w * h), 6),
         "damage_fill": round(fill, 3),
@@ -127,6 +149,7 @@ def _result(cls, fill, contrast, edge_density, dmg_px, poly, conf, pf, w, h, bw,
         "severity": label,
         "severity_score": round(score, 4),
         "polygon": poly,
+        "water": bool(water),
         "raw": {"size": round(float(size), 4), "contrast": round(contrast, 4), "edges": round(edge_density, 4)},
     }
 
@@ -139,6 +162,7 @@ METHOD = {
     "depth_index": "|mean L(damage) - median L(surrounding road ring)| / 0.22",
     "roughness_index": "Canny edge density inside damage / 0.25",
     "score": "pothole 0.55 size + 0.30 depth + 0.15 roughness; alligator 0.60/0.15/0.25; linear cracks 0.70/0.20/0.10",
-    "bands": {"Low": "< 0.34", "Medium": "0.34 - 0.62", "High": ">= 0.62"},
-    "calibration": "normalisers = 90th percentile and cut points = 40th/80th percentile over 2400 ground-truth pothole boxes (ml/calibrate_severity.py): 40% Low, 40% Medium, 20% High",
+    "levels": {"Minor": "< 0.315", "Moderate": "0.315 - 0.534", "Severe": "0.534 - 0.745", "Critical": ">= 0.745"},
+    "water": "smooth, low-saturation region brighter than the road inside a pothole = standing water (rated at least 0.55)",
+    "calibration": "normalisers = 90th percentile and cut points = 40th/80th percentile over 2400 ground-truth pothole boxes (ml/calibrate_severity.py): 35% Minor, 35% Moderate, 20% Severe, 10% Critical",
 }

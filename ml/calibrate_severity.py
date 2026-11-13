@@ -33,7 +33,7 @@ raw = np.array(raw)
 for i, n in enumerate(["size", "contrast", "edges"]):
     print(n, "p10/50/90:", np.percentile(raw[:, i], [10, 50, 90]).round(4))
 s = np.array(scores)
-print("n", len(s), "score p40/p80:", np.percentile(s, [40, 80]).round(3))
+print("n", len(s), "score p35/p70/p90:", np.percentile(s, [35, 70, 90]).round(3))
 print("share Low/Med/High with current CAL:", [round(float(x), 3) for x in (
     (s < severity.CAL["low_max"]).mean(), ((s >= severity.CAL["low_max"]) & (s < severity.CAL["med_max"])).mean(),
     (s >= severity.CAL["med_max"]).mean())])

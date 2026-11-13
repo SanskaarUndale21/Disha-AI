@@ -149,9 +149,127 @@ export const CLASS_LABEL: Record<string, string> = {
   alligator_crack: 'Alligator crack',
   transverse_crack: 'Transverse crack',
   longitudinal_crack: 'Longitudinal crack',
+  manhole: 'Manhole',
+  speed_breaker: 'Speed breaker',
+  debris: 'Debris',
+  barricade: 'Barricade',
 }
 export const CLASSES = Object.keys(CLASS_LABEL)
 export const label = (c: string) => CLASS_LABEL[c] ?? c.replace(/_/g, ' ')
 export const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleString() : '-')
 export const fmtDay = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : '-')
 export const RISK_COLOR: Record<string, string> = { High: 'var(--high)', Medium: 'var(--med)', Low: 'var(--low)' }
+
+/* ---------- operations: repair costs, budget, alerts, reports ---------- */
+
+export type CostRow = {
+  defect_id: number
+  uid: string
+  class_name: string
+  severity: string
+  risk_score: number
+  risk_level: string
+  area_m2: number
+  depth_cm: number
+  volume_m3: number
+  material: string
+  material_cost: number
+  labour_cost: number
+  traffic_cost: number
+  total_cost: number
+  lat: number | null
+  lon: number | null
+  crop_url: string | null
+  road_type: string
+}
+
+export type BudgetPlan = {
+  budget: number
+  selected: CostRow[]
+  total_cost: number
+  risk_covered: number
+  risk_total: number
+  left: number
+}
+
+export type Alert = {
+  id: number
+  type: string
+  level: 'critical' | 'warning' | 'info'
+  defect_id: number | null
+  uid: string | null
+  message: string
+  status: string
+  lat: number | null
+  lon: number | null
+  created_at: string
+}
+
+export type AlertSummary = { open: number; critical: number; warning: number; info: number }
+
+export const ops = {
+  costs: (status = 'active') => req<CostRow[]>(`/api/ops/costs?status=${status}`),
+  rates: () => req<Record<string, any>>('/api/ops/rates'),
+  budget: (budget: number) => req<BudgetPlan>('/api/ops/budget', json({ budget })),
+  weather: (lat: number, lon: number) =>
+    req<{ rain_mm_24h: number; max_precip_probability: number; risk: string }>(`/api/ops/weather?lat=${lat}&lon=${lon}`),
+  enrichRoads: () => req<any>('/api/ops/enrich-roads', { method: 'POST' }),
+  complaintText: (id: number) => req<{ text: string }>(`/api/ops/complaint-text/${id}`),
+  send: (id: number) => req<{ mock: boolean; to: string; subject: string; body: string }>(`/api/ops/send/${id}`, { method: 'POST' }),
+  alerts: (status = 'open') => req<Alert[]>(`/api/alerts?status=${status}`),
+  alertSummary: () => req<AlertSummary>('/api/alerts/summary'),
+  setAlert: (id: number, status: 'acknowledged' | 'resolved') => req<any>(`/api/alerts/${id}`, json({ status })),
+  scanAlerts: () => req<AlertSummary>('/api/alerts/scan', { method: 'POST' }),
+}
+
+export const reportUrl = (kind: 'complaint' | 'authority', defectId: number) => `/api/reports/${kind}/${defectId}.pdf`
+
+/** Indian rupees with en-IN digit grouping, e.g. "Rs 1,23,450". */
+export const inr = (n: number | null | undefined) =>
+  n == null || !isFinite(n) ? '-' : `Rs ${Math.round(n).toLocaleString('en-IN')}`
+
+/** Short relative time, e.g. "5 min ago". */
+export const timeAgo = (s?: string | null) => {
+  if (!s) return '-'
+  const sec = Math.max(0, (Date.now() - new Date(s).getTime()) / 1000)
+  if (!isFinite(sec)) return '-'
+  if (sec < 60) return 'just now'
+  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`
+  if (sec < 86400) return `${Math.floor(sec / 3600)} h ago`
+  return `${Math.floor(sec / 86400)} d ago`
+}
+
+/* ---------- phone complaints: voice intake and verification ladder ---------- */
+
+export type PhoneComplaint = {
+  complaint_id: number
+  ticket: string
+  created_at: string
+  caller_name: string | null
+  caller_phone: string | null
+  location_text: string | null
+  landmark: string | null
+  address: string | null
+  lat: number | null
+  lon: number | null
+  issue_type: string | null
+  category: string
+  description: string | null
+  urgency: 'high' | 'normal'
+  verification: 'unverified' | 'corroborated' | 'photo_verified' | 'field_verified'
+  evidence: string[]
+  status: string
+  upload_url: string
+  media_count: number
+  geocode_source: string
+  summary: string | null
+  updated_at: string
+}
+
+export const voice = {
+  queue: (filter: 'needs_check' | 'all' = 'needs_check') => req<PhoneComplaint[]>(`/api/voice/queue?filter=${filter}`),
+  count: () => req<{ needs_check: number }>('/api/voice/queue/count'),
+  verify: (id: number, note = '') => req<any>(`/api/voice/verify/${id}`, json({ level: 'field_verified', note })),
+  importCalls: (calls: unknown[]) => req<{ created: number; results: any[] }>('/api/voice/import', json({ calls })),
+  link: (ticket: string) => req<{ upload_url: string; sms_text: string }>(`/api/voice/link/${ticket}`),
+}

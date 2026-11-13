@@ -15,6 +15,7 @@ const EVENT_UI: Record<string, { icon: any; color: string; title: (d: any) => st
   'defect.updated': { icon: MapPin, color: '#5856d6', title: (d) => `${d.uid} updated`, sub: (d) => (d.status ? `Status ${d.status}` : 'Seen again by a new inspection') },
   'detection.verified': { icon: SealCheck, color: '#34c759', title: (d) => `${d.uid} ${d.verification}`, sub: (d) => `By ${d.by ?? 'officer'}` },
   'inspection.processed': { icon: Images, color: '#30b0c7', title: (d) => `Inspection ${d.id} analysed`, sub: (d) => `${d.summary?.total ?? 0} findings` },
+  'screening.checked': { icon: SealCheck, color: '#dd7a07', title: (d) => (d.verdict === 'pass' ? 'Citizen photo passed AI check' : d.verdict === 'rate_limited' ? 'Device blocked for fake reports' : 'Citizen photo refused'), sub: (d) => d.reason ?? '' },
   'live.saved': { icon: VideoCamera, color: '#ff3b30', title: () => 'Live patrol saved', sub: (d) => `${d.defects} defects, ${d.new} new` },
 }
 

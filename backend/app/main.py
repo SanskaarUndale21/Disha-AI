@@ -17,9 +17,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import auth, config, detector, events, live, pipeline, reports, scoring, similarity
+from . import severity as severity_mod
+from . import screening
 from .db import (Complaint, ComplaintMedia, Defect, DefectHistory, Detection, Inspection, SessionLocal, get_session,
                  init_db, now)
 from .geo import GpxTrack, haversine_m, read_exif
+from . import ops
+from . import voice
 
 app = FastAPI(title="RoadWatch AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -354,8 +358,8 @@ def verify(det_id: int, body: Verify, s: Session = Depends(get_session), officer
         raise HTTPException(400, "correction needs a class or severity")
     if body.corrected_class and body.corrected_class not in config.CLASSES:
         raise HTTPException(400, f"class must be one of {config.CLASSES}")
-    if body.corrected_severity and body.corrected_severity not in ("Low", "Medium", "High"):
-        raise HTTPException(400, "severity must be Low | Medium | High")
+    if body.corrected_severity and body.corrected_severity not in severity_mod.LEVEL_RANK:
+        raise HTTPException(400, f"severity must be one of {severity_mod.LEVELS}")
     d.verification = {"confirm": "confirmed", "reject": "rejected", "correct": "corrected", "reset": "pending"}[body.action]
     d.corrected_class = body.corrected_class if body.action == "correct" else None
     d.corrected_severity = body.corrected_severity if body.action == "correct" else None
@@ -374,7 +378,7 @@ def verify(det_id: int, body: Verify, s: Session = Depends(get_session), officer
             defect.class_name = latest.final_class
             if latest.corrected_severity:
                 defect.severity = latest.corrected_severity
-                defect.severity_score = {"Low": 0.2, "Medium": 0.5, "High": 0.85}[latest.corrected_severity]
+                defect.severity_score = severity_mod.LEVEL_SCORE[latest.corrected_severity]
             pipeline.refresh_defect_risk(defect)
             d.risk_score, d.risk_level = scoring.risk(d.final_class, defect.severity_score, defect.road_type,
                                                       defect.traffic_level, defect.report_count, defect.trend)
@@ -551,9 +555,10 @@ async def create_complaint(
     citizen_phone: Optional[str] = Form(None), device_id: Optional[str] = Form(None), lat: Optional[str] = Form(None),
     lon: Optional[str] = Form(None), address: Optional[str] = Form(None),
     files: list[UploadFile] = File(default=[]), s: Session = Depends(get_session),
-    user: Optional[dict] = Depends(auth.optional_user),
+    user: Optional[dict] = Depends(auth.optional_user), screening_tokens: Optional[str] = Form(None),
 ):
-    """Anonymous filing works; when signed in the complaint is linked to the citizen's account."""
+    """Anonymous filing works; when signed in the complaint is linked to the citizen's account.
+    Every photo/video must show road damage (pre-checked via /api/screening/check, or screened here)."""
     if category not in COMPLAINT_CATEGORIES:
         raise HTTPException(400, f"category must be one of {COMPLAINT_CATEGORIES}")
     files = [f for f in files if f is not None and f.filename]
@@ -561,9 +566,35 @@ async def create_complaint(
         raise HTTPException(400, "add a description or at least one photo/video")
     if len(files) > MAX_COMPLAINT_FILES:
         raise HTTPException(400, f"max {MAX_COMPLAINT_FILES} files per complaint")
+    # Phones send odd names (no extension, .heic, content:// leftovers). Infer the extension from the
+    # content type when missing; skip formats we cannot decode instead of rejecting the whole complaint.
+    usable, skipped = [], []
     for f in files:
-        if Path(f.filename).suffix.lower() not in IMAGE_EXT | VIDEO_EXT:
-            raise HTTPException(400, f"Unsupported file type {f.filename}")
+        ext = Path(f.filename).suffix.lower()
+        ctype = (f.content_type or "").lower()
+        if not ext:
+            ext = ".mp4" if ctype.startswith("video/") else (".jpg" if ctype.startswith("image/") else "")
+            f.filename = f"{f.filename}{ext}"
+        if ext in IMAGE_EXT | VIDEO_EXT:
+            usable.append(f)
+        else:
+            skipped.append(f.filename)
+    if skipped:
+        print(f"complaint upload: skipped unsupported files {skipped}")
+    files = usable
+    if not description.strip() and not files:
+        raise HTTPException(400, "These files can't be read. Use JPG or PNG photos, or MP4 / MOV videos.")
+    # screening gate: refuse media without visible road damage before anything is stored
+    blobs = []
+    for f in files:
+        blobs.append((f.filename, await f.read()))
+        await f.seek(0)
+    check_ids = []
+    if blobs:
+        import asyncio
+        toks = [t.strip() for t in (screening_tokens or "").split(",") if t.strip()]
+        check_ids = await asyncio.to_thread(screening.enforce, blobs, toks, device_id,
+                                            citizen_phone or (user or {}).get("phone"), (user or {}).get("id"))
     la, lo = _f(lat), _f(lon)
     if user:
         citizen_name = citizen_name or user.get("full_name")
@@ -589,6 +620,7 @@ async def create_complaint(
                              media_type=insp.media_type))
         s.commit()
     s.refresh(c)
+    screening.link(check_ids, c.id)
     out = ser_complaint(c)
     events.publish("complaint.created", out)
     return out
@@ -674,6 +706,9 @@ def citizen_config():
 live.register_ws(app)
 auth.register_routes(app)
 events.register(app)
+screening.register(app)
+voice.register(app)
+ops.register(app)
 
 # serve built frontend if present
 _dist = config.ROOT / "frontend" / "dist"

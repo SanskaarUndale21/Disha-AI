@@ -18,6 +18,10 @@ CLASS_HAZARD = {
     "alligator_crack": 0.75,
     "transverse_crack": 0.5,
     "longitudinal_crack": 0.4,
+    "manhole": 0.8,        # sunken or open covers are a serious two-wheeler hazard
+    "debris": 0.6,
+    "speed_breaker": 0.35,  # hazardous mainly when unmarked
+    "barricade": 0.2,       # marks an active work zone rather than damage
 }
 ROAD_TYPE_W = {"highway": 1.0, "arterial": 0.8, "collector": 0.6, "local": 0.4, "unknown": 0.5}
 TRAFFIC_W = {"high": 1.0, "medium": 0.6, "low": 0.3, "unknown": 0.5}

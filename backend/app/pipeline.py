@@ -9,7 +9,8 @@ from . import config, scoring, similarity
 from .db import Defect, DefectHistory, Detection, Inspection, now
 from .geo import haversine_m
 
-UID_PREFIX = {"pothole": "PH", "alligator_crack": "AC", "transverse_crack": "TC", "longitudinal_crack": "LC"}
+UID_PREFIX = {"pothole": "PH", "alligator_crack": "AC", "transverse_crack": "TC", "longitudinal_crack": "LC",
+              "manhole": "MH", "speed_breaker": "SB", "debris": "DB", "barricade": "BR"}
 CRACK_FAMILY = {"alligator_crack", "transverse_crack", "longitudinal_crack"}
 
 
@@ -64,7 +65,7 @@ def find_match(s, cls, lat, lon, loc_src, emb, exclude_ids, before: datetime):
 
 
 def trend_between(prev_score, new_score, prev_sev, new_sev):
-    order = {"Low": 0, "Medium": 1, "High": 2}
+    from .severity import LEVEL_RANK as order
     if prev_score is None:
         return "new"
     if order.get(new_sev, 0) > order.get(prev_sev, 0) or new_score > prev_score * 1.15 + 0.02:

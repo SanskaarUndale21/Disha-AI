@@ -21,3 +21,4 @@ citizen_app/.flutter-plugins*
 samples/*.mp4
 Road_Damage_Detection_Repos_and_GPS_Guide.pdf
 *.apk
+tools/

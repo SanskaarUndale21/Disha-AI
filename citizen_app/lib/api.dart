@@ -118,6 +118,39 @@ class Complaint {
         findings = [for (final f in (j['findings'] as List? ?? [])) Finding.fromJson(f)];
 }
 
+/// Result of the AI pre-check that every photo or video must pass before a report can be sent.
+class ScreenResult {
+  final String verdict, reason, mediaType;
+  final String? token, previewUrl, warning;
+  final DateTime? blockedUntil;
+  final double maxConfidence;
+  final List<Map<String, dynamic>> damage;
+
+  ScreenResult.fromJson(Map<String, dynamic> j)
+      : verdict = '${j['verdict'] ?? 'fail'}',
+        reason = '${j['reason'] ?? ''}',
+        mediaType = '${j['media_type'] ?? 'image'}',
+        token = j['token'] as String?,
+        previewUrl = j['preview_url'] as String?,
+        warning = (j['warning'] as String?)?.trim().isEmpty == true ? null : j['warning'] as String?,
+        blockedUntil = j['blocked_until'] == null ? null : DateTime.tryParse('${j['blocked_until']}')?.toLocal(),
+        maxConfidence = ((j['max_confidence'] ?? 0) as num).toDouble(),
+        damage = [for (final d in (j['damage'] as List? ?? [])) Map<String, dynamic>.from(d)];
+
+  bool get passed => verdict == 'pass';
+  bool get rateLimited => verdict == 'rate_limited';
+
+  /// e.g. "Pothole found, 82% sure"
+  String get headline {
+    if (!passed || damage.isEmpty) return reason;
+    final top = damage.reduce((a, b) => ((a['confidence'] ?? 0) as num) >= ((b['confidence'] ?? 0) as num) ? a : b);
+    final name = '${top['class'] ?? 'damage'}'.replaceAll('_', ' ');
+    final pct = (((top['confidence'] ?? maxConfidence) as num) * 100).round();
+    final more = damage.length > 1 ? ' and ${damage.length - 1} more' : '';
+    return '${name[0].toUpperCase()}${name.substring(1)} found, $pct% sure$more';
+  }
+}
+
 class ApiException implements Exception {
   final String message;
   ApiException(this.message);
@@ -227,7 +260,46 @@ class Api {
 
   Future<Complaint> complaint(int id) async => Complaint.fromJson(await _get('/api/complaints/$id?$_dev'));
 
+  /// Uploads one photo or video for the AI damage check. Retries once on a moved server.
+  Future<ScreenResult> screen(XFile file, int index) async {
+    final bytes = await file.readAsBytes();
+    final name = _fileName(file, index);
+
+    Future<ScreenResult> send() async {
+      final req = http.MultipartRequest('POST', Uri.parse('${prefs.server}/api/screening/check'))
+        ..headers.addAll(_headers)
+        ..fields['device_id'] = prefs.deviceId;
+      if (prefs.phone.isNotEmpty) req.fields['phone'] = prefs.phone;
+      req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: name));
+      final streamed = await req.send().timeout(const Duration(seconds: 120));
+      final body = await streamed.stream.bytesToString();
+      Map<String, dynamic>? j;
+      try {
+        j = Map<String, dynamic>.from(jsonDecode(body));
+      } catch (_) {}
+      if (j != null && j['verdict'] != null) return ScreenResult.fromJson(j);
+      throw ApiException(_err(body, streamed.statusCode));
+    }
+
+    try {
+      return await send();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      final before = prefs.server;
+      if (await ensureServer() && prefs.server != before) {
+        try {
+          return await send();
+        } on ApiException {
+          rethrow;
+        } catch (_) {}
+      }
+      throw ApiException("Couldn't reach the server to check this file. Check your internet and tap Retry.");
+    }
+  }
+
   Future<Complaint> submit({
+    List<String> screeningTokens = const [],
     required String category,
     required String description,
     required List<XFile> files,
@@ -245,6 +317,7 @@ class Api {
       if (lat != null) 'lat': '$lat',
       if (lon != null) 'lon': '$lon',
       if (address != null && address.isNotEmpty) 'address': address,
+      if (screeningTokens.isNotEmpty) 'screening_tokens': screeningTokens.join(','),
     };
     final parts = <(List<int>, String)>[];
     for (var i = 0; i < files.length; i++) {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { Moon, SignIn, SignOut, Sun } from '@phosphor-icons/react'
-import { api } from './api'
+import { api, ops, voice } from './api'
 import { useAuth } from './auth'
 import { useLiveRefresh, useRealtime } from './events'
 import { NAV_GROUPS, Tile } from './icons'
@@ -16,6 +16,9 @@ import Model from './pages/Model'
 import Complaints from './pages/Complaints'
 import Login from './pages/Login'
 import Users from './pages/Users'
+import Repairs from './pages/Repairs'
+import Alerts from './pages/Alerts'
+import PhoneQueue from './pages/PhoneQueue'
 
 function Officer({ children }: { children: ReactNode }) {
   const { isOfficer, ready } = useAuth()
@@ -67,9 +70,11 @@ export default function App() {
     api.stats().then((s) => setBadges((b) => ({ ...b, pending: s.pending_verification }))).catch(() => {})
     if (isOfficer)
       api.complaints('?status=submitted').then((r) => setBadges((b) => ({ ...b, complaints: r.length }))).catch(() => {})
+    ops.alertSummary().then((s) => setBadges((b) => ({ ...b, alerts: (s?.critical ?? 0) + (s?.warning ?? 0) }))).catch(() => {})
+    voice.count().then((r) => setBadges((b) => ({ ...b, phone: r?.needs_check ?? 0 }))).catch(() => {})
   }
   useEffect(loadBadges, [isOfficer])
-  useLiveRefresh(['complaint.', 'detection.', 'inspection.'], loadBadges)
+  useLiveRefresh(['complaint.', 'detection.', 'inspection.', 'alert.'], loadBadges)
   const initials = (profile?.full_name || profile?.email || '?').split(/[\s@.]/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
   const flush = loc.pathname === '/'
 
@@ -125,7 +130,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/live" element={<Live />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/repairs" element={<Repairs />} />
           <Route path="/complaints" element={<Officer><Complaints /></Officer>} />
+          <Route path="/phone" element={<Officer><PhoneQueue /></Officer>} />
           <Route path="/analyze" element={<Analyze />} />
           <Route path="/defects" element={<Defects />} />
           <Route path="/verify" element={<Officer><Verify /></Officer>} />

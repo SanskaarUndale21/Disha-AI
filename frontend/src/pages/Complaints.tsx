@@ -3,6 +3,7 @@ import { api, fmtDate, label } from '../api'
 import { DefectMap, Pill } from '../components'
 import { useLiveRefresh } from '../events'
 import { useAuth } from '../auth'
+import { ScreeningPanel } from '../screening'
 
 const STATUSES = ['submitted', 'in_review', 'in_progress', 'resolved', 'rejected']
 const STATUS_COL: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function Complaints() {
           </div>
         ))}
       </div>
+      <div style={{ marginBottom: 14 }}><ScreeningPanel /></div>
       {err && <div className="err" style={{ marginBottom: 10 }}>{err}</div>}
       <div className="grid g-wide">
         <div className="card scroll-x">

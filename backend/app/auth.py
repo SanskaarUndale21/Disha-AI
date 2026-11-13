@@ -56,10 +56,13 @@ def _profile_for(user: dict) -> dict:
         if p is None:
             p = Profile(id=user["id"], email=email, full_name=meta.get("full_name") or meta.get("name"),
                         phone=user.get("phone") or meta.get("phone"),
-                        role="admin" if email in config.ADMIN_EMAILS else "citizen")
+                        role="admin" if email in config.ADMIN_EMAILS
+                        else "officer" if email in config.OFFICER_EMAILS else "citizen")
             s.add(p)
         elif email in config.ADMIN_EMAILS and p.role != "admin":
             p.role = "admin"
+        elif email in config.OFFICER_EMAILS and p.role == "citizen":
+            p.role = "officer"
         p.last_seen = now()
         s.commit()
         return ser_profile(p)

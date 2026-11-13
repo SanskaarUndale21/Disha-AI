@@ -24,6 +24,31 @@ and monitor how each location changes over time.
 | 5. Progress monitoring | Each defect keeps a timeline; re-sightings are classified worsening / improving / stable by severity change; defects not seen again by a later geotagged inspection at the same spot are flagged repaired. Location compare view shows first vs latest inspection verdict |
 | Evaluation | `ml/evaluate.py`: precision, recall, F1, mAP@50, mAP@50-95 per class + confusion matrix, shown on the `Model` page |
 
+## Accuracy work (models)
+
+| Component | Model | Notes |
+|---|---|---|
+| Pothole specialist | YOLO11m, fine-tuned here from PotholeNet | trained on RDD2022 potholes + 5 public pothole sets (about 9,400 pothole images); near duplicates of test images removed by perceptual hash |
+| Cracks | YOLOv8m RDD2022 (D00, D10, D20) | public checkpoint |
+| Road features | YOLO11s trained here | manhole, speed breaker, debris, barricade (only used at confidence 0.5 and above) |
+| Upload mode | Weighted Boxes Fusion of two pothole models + horizontal-flip test-time augmentation | approach used by the CRDDC2022 winners |
+
+Held-out pothole tests (mAP50): public RDD2022 model 2%, PotholeNet 74%, fine-tuned 77% on the external set; on hard RDD2022 potholes 18% (PotholeNet) to 46% (fine-tuned).
+
+**All-weather robustness.** `ml/add_conditions.py` makes photometric copies with night, fog (atmospheric scattering model), smoke, dust, rain streaks and motion blur. Training mixes them in, and `ml/eval_conditions.py` scores each model per condition on held-out copies of the test set.
+
+**Severity scale.** Minor / Moderate / Severe / Critical, cut at the 35th / 70th / 90th percentile of 2,400 real potholes measured by the OpenCV analyser (size corrected for distance, depth contrast, edge roughness), plus a water-filled flag.
+
+**Thermal guard.** `ml/thermal_guard.py` pauses training when the laptop GPU reaches 80 C and resumes after a 3 minute cool-down.
+
+## Operations
+
+- Repair cost estimate per defect (area, depth by severity, cold or hot mix, labour, traffic management, 10% contingency; all rates are configurable assumptions) and a budget planner (0/1 knapsack maximising risk removed within a budget).
+- Alerts: high risk, new defect, repeat report, getting worse, repaired, needs review, problem road, overdue repair, rain risk (Open-Meteo forecast).
+- Road type from OpenStreetMap (Overpass), cached; feeds the risk score.
+- Citizen complaint PDF and authority report PDF with QR tracking codes; mock "send to roads department".
+- Voice helpline (Sarvam): 11 Indian languages, collects issue, road, landmark, city, danger and duration, ends silent calls after 8 seconds. Phone complaints are geocoded and move up a verification ladder: unverified, corroborated (AI detection nearby or a second caller), photo verified (citizen opens the upload link, GPS captured automatically), field verified (patrol or officer).
+
 ## Research notes / choices
 
 * **Dataset**: RDD2022 (CRDDC 2022, 6 countries incl. India) in YOLO format, 4 main damage classes. Extra

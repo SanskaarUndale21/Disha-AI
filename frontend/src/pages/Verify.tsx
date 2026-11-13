@@ -60,7 +60,7 @@ function Item({ d, onDone }: { d: Detection; onDone: () => void }) {
             {CLASSES.map((c) => <option key={c} value={c}>{label(c)}</option>)}
           </select>
           <select value={sev} onChange={(e) => setSev(e.target.value)}>
-            {['Low', 'Medium', 'High'].map((x) => <option key={x}>{x}</option>)}
+            {['Minor', 'Moderate', 'Severe', 'Critical'].map((x) => <option key={x}>{x}</option>)}
           </select>
           <input style={{ flex: 1, minWidth: 120 }} placeholder="note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>

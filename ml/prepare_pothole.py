@@ -16,7 +16,7 @@ import cv2
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
-OUT = ROOT / "data" / "pothole"
+OUT = ROOT / "data" / ("pothole_v3" if "--v3" in sys.argv else "pothole")
 IMG = {".jpg", ".jpeg", ".png"}
 
 
@@ -80,6 +80,33 @@ def main():
     mk = RAW / "pot_muskan"
     sets["train"] += [(i, read_labels(l, {0}), "mk") for i, l in pairs(mk / "train/images", mk / "train/labels")]
     sets["val"] += [(i, read_labels(l, {0}), "mk") for i, l in pairs(mk / "valid/images", mk / "valid/labels")]
+    if "--v3" in sys.argv:
+        # v3 extra sources: Roboflow/Chitholian potholes (VOC), road-anomaly potholes, 6-class road set potholes
+        import xml.etree.ElementTree as ET
+        rf = RAW / "rf_pothole"
+        rf_items = []
+        for x in sorted((rf / "annotations").glob("*.xml")):
+            r = ET.parse(x).getroot()
+            img = rf / "images" / r.find("filename").text
+            w, h = float(r.find("size/width").text), float(r.find("size/height").text)
+            L = []
+            for o in r.findall("object"):
+                b = o.find("bndbox")
+                x1, y1, x2, y2 = (float(b.find(k).text) for k in ("xmin", "ymin", "xmax", "ymax"))
+                L.append(f"0 {(x1 + x2) / 2 / w:.6f} {(y1 + y2) / 2 / h:.6f} {(x2 - x1) / w:.6f} {(y2 - y1) / h:.6f}")
+            rf_items.append((img, L, "rf"))
+        random.shuffle(rf_items)
+        k = int(len(rf_items) * 0.9)
+        sets["train"] += rf_items[:k]
+        sets["val"] += rf_items[k:]
+        ra = RAW / "road_anomaly"
+        sets["train"] += [(i, read_labels(l, {0}), "ra") for i, l in pairs(ra / "train/images", ra / "train/labels")]
+        sets["val"] += [(i, read_labels(l, {0}), "ra") for i, l in pairs(ra / "val/images", ra / "val/labels")]
+        rd6 = RAW / "rd6"
+        if (rd6 / "images" / "train").exists():
+            sets["train"] += [(i, read_labels(l, {0}), "r6") for i, l in pairs(rd6 / "images/train", rd6 / "labels/train")]
+            sets["val"] += [(i, read_labels(l, {0}), "r6") for i, l in pairs(rd6 / "images/valid", rd6 / "labels/valid")]
+
     lz = list(pairs(RAW / "pot_lorenzo/data/images", RAW / "pot_lorenzo/data/labels-YOLO"))
     random.shuffle(lz)
     k = int(len(lz) * 0.85)

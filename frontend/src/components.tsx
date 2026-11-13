@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { api, fmtDate, fmtDay, label, type Defect } from './api'
+import { api, fmtDate, fmtDay, inr, label, ops, reportUrl, type CostRow, type Defect } from './api'
 
 const RISK_HEX: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
 
@@ -156,6 +156,30 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
     await load()
     onChanged?.()
   }
+  const [cost, setCost] = useState<CostRow | null>(null)
+  const [mail, setMail] = useState<{ to: string; subject: string; body: string } | null>(null)
+  const [mailErr, setMailErr] = useState('')
+  const [sending, setSending] = useState(false)
+  useEffect(() => {
+    setCost(null)
+    setMail(null)
+    setMailErr('')
+    ops
+      .costs('active')
+      .then((rows) => setCost((Array.isArray(rows) ? rows : []).find((r) => r.defect_id === id) ?? null))
+      .catch(() => {})
+  }, [id])
+  const sendMail = async () => {
+    setSending(true)
+    setMailErr('')
+    try {
+      setMail(await ops.send(id))
+    } catch (e: any) {
+      setMailErr(e?.message || 'Could not prepare the message')
+    } finally {
+      setSending(false)
+    }
+  }
   return (
     <div className="drawer-bg" onClick={onClose}>
       <div className="drawer" onClick={(e) => e.stopPropagation()}>
@@ -175,6 +199,41 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
               <div className="card kpi"><div className="l">Severity</div><Pill v={d.severity} /></div>
               <div className="card kpi"><div className="l">Trend</div><Trend t={d.trend} /></div>
             </div>
+            {cost && (
+              <div className="card dd-cost">
+                <div>
+                  <div className="note">Estimated repair cost</div>
+                  <div className="dd-cost-v">{inr(cost.total_cost)}</div>
+                </div>
+                <div className="dd-cost-parts note">
+                  <span>Material {inr(cost.material_cost)}</span>
+                  <span>Labour {inr(cost.labour_cost)}</span>
+                  <span>Traffic {inr(cost.traffic_cost)}</span>
+                  {cost.material && <span>{cost.material}</span>}
+                </div>
+              </div>
+            )}
+            <div className="dd-actions">
+              <a className="btn sm" href={reportUrl('complaint', d.id)} target="_blank" rel="noreferrer">Complaint PDF</a>
+              <a className="btn sm" href={reportUrl('authority', d.id)} target="_blank" rel="noreferrer">Authority report</a>
+              <span className="spacer" />
+              <button className="btn sm primary" disabled={sending} onClick={sendMail}>{sending ? 'Preparing...' : 'Send to roads department'}</button>
+            </div>
+            {mailErr && <div className="err">Could not send. {mailErr}</div>}
+            {mail && (
+              <div className="dd-mail">
+                <div className="row">
+                  <b>Message preview</b>
+                  <span className="pill">Mock</span>
+                  <span className="spacer" />
+                  <button className="btn sm" onClick={() => setMail(null)}>Hide</button>
+                </div>
+                <div className="note">This is a mock. No real email is sent.</div>
+                <div className="dd-mail-h"><span className="muted">To</span> {mail.to}</div>
+                <div className="dd-mail-h"><span className="muted">Subject</span> {mail.subject}</div>
+                <pre className="dd-mail-b">{mail.body}</pre>
+              </div>
+            )}
             <div className="card">
               <table className="t">
                 <tbody>

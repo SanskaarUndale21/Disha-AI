@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowCounterClockwise, Camera, Crosshair, FileVideo, FilmStrip, FloppyDisk, Lightning, MapPin, Pause, Play } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, Camera, Crosshair, FileVideo, FilmStrip, FloppyDisk, Lightning, MapPin, Pause, Play, SpeakerHigh, SpeakerSlash, Warning } from '@phosphor-icons/react'
 import { label } from '../api'
 
 type Track = {
@@ -36,9 +36,14 @@ export const CLASS_COLOR: Record<string, string> = {
   alligator_crack: '#ff9500',
   transverse_crack: '#0a84ff',
   longitudinal_crack: '#bf5af2',
+  manhole: '#1f8cc7',
+  speed_breaker: '#f2b705',
+  debris: '#8c7a3c',
+  barricade: '#c8c8c8',
 }
-export const PREFIX: Record<string, string> = { pothole: 'PH', alligator_crack: 'AC', transverse_crack: 'TC', longitudinal_crack: 'LC' }
-const SEV_W: Record<string, number> = { Low: 2, Medium: 3, High: 4.5 }
+export const PREFIX: Record<string, string> = { pothole: 'PH', alligator_crack: 'AC', transverse_crack: 'TC', longitudinal_crack: 'LC', manhole: 'MH', speed_breaker: 'SB', debris: 'DB', barricade: 'BR' }
+const SEV_W: Record<string, number> = { Low: 2, Medium: 3, High: 4.5, Minor: 2, Moderate: 2.8, Severe: 3.8, Critical: 5 }
+const SEV_COL: Record<string, string> = { Minor: '#2e9a57', Moderate: '#f2b705', Severe: '#dd7a07', Critical: '#d92d20', Low: '#2e9a57', Medium: '#dd7a07', High: '#d92d20' }
 const RISK_COL: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
 const SEND_W = 640
 const IN_FLIGHT = 2
@@ -164,6 +169,59 @@ export default function Live() {
   const [seen, setSeen] = useState<Record<number, Track>>({})
   const [cracks, setCracks] = useState(true)
   const fileIn = useRef<HTMLInputElement>(null)
+  // "pothole ahead" warning: banner for 2 s plus a short beep, at most once every 3 s per track
+  const [ahead, setAhead] = useState<string | null>(null)
+  const [sound, setSound] = useState(true)
+  const soundRef = useRef(true)
+  soundRef.current = sound
+  const lastWarn = useRef<Map<number, number>>(new Map())
+  const aheadTimer = useRef<any>(null)
+  const audio = useRef<AudioContext | null>(null)
+
+  const beep = () => {
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext
+      if (!AC) return
+      const ctx = audio.current ?? (audio.current = new AC())
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = 880
+      const t0 = ctx.currentTime
+      gain.gain.setValueAtTime(0.0001, t0)
+      gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t0)
+      osc.stop(t0 + 0.16)
+    } catch {
+      /* audio unavailable */
+    }
+  }
+
+  const checkAhead = (m: FrameMsg) => {
+    const now = performance.now()
+    for (const tr of m.tracks) {
+      if (!tr.confirmed || tr.cls !== 'pothole') continue
+      if (!(tr.severity === 'Severe' || tr.severity === 'Critical' || tr.risk === 'High')) continue
+      const cx = (tr.box[0] + tr.box[2]) / 2, cy = (tr.box[1] + tr.box[3]) / 2
+      if (cy < m.h * 0.55 || cx < m.w * 0.25 || cx > m.w * 0.75) continue
+      const key = tr.id ?? -tr.tid - 1
+      if (now - (lastWarn.current.get(key) ?? -1e9) < 3000) continue
+      lastWarn.current.set(key, now)
+      setAhead(`${PREFIX.pothole} ${tr.id ?? tr.tid}`)
+      clearTimeout(aheadTimer.current)
+      aheadTimer.current = setTimeout(() => setAhead(null), 2000)
+      if (soundRef.current) beep()
+      break
+    }
+  }
+
+  useEffect(() => () => {
+    clearTimeout(aheadTimer.current)
+    audio.current?.close().catch(() => {})
+  }, [])
 
   useEffect(() => {
     let raf = 0
@@ -204,6 +262,7 @@ export default function Live() {
             trails.current.set(tr.tid, arr)
           }
           setMsg(m)
+          checkAhead(m)
           const now = performance.now()
           times.current = [...times.current.filter((x) => now - x < 1000), now]
           setFps(times.current.length)
@@ -378,6 +437,13 @@ export default function Live() {
               <div>Or play the demo drive to see detection on real dashcam footage.</div>
             </div>
           )}
+          {ahead && (
+            <div className="ahead-banner" role="alert">
+              <Warning size={22} weight="fill" />
+              <span>Pothole ahead</span>
+              <b>{ahead}</b>
+            </div>
+          )}
           <div className="hud">
             <div><b>{fps}</b><span>fps</span></div>
             <div><b>{msg?.infer_ms ?? '-'}</b><span>ms</span></div>
@@ -392,6 +458,9 @@ export default function Live() {
             <button className={!cracks ? 'on' : ''} onClick={() => setMode(false)}><Lightning size={14} weight="fill" /> Potholes only</button>
             <button className={cracks ? 'on' : ''} onClick={() => setMode(true)}>All damage</button>
           </div>
+          <button className="btn" onClick={() => setSound((x) => !x)} aria-pressed={sound} title="Warning sound for potholes ahead">
+            {sound ? <SpeakerHigh size={15} weight="fill" /> : <SpeakerSlash size={15} weight="fill" />} {sound ? 'Sound on' : 'Sound off'}
+          </button>
           <span className="spacer" />
           <div className="legend">
             {Object.entries(CLASS_COLOR).map(([k, c]) => (
@@ -416,7 +485,7 @@ export default function Live() {
                 <span className="spacer" />
                 <span className="riskbadge" style={{ background: RISK_COL[t.risk] }}>{Math.round(t.risk_score)}</span>
               </div>
-              <div className="meter"><div style={{ width: `${Math.round(t.sev * 100)}%`, background: RISK_COL[t.severity === 'High' ? 'High' : t.severity === 'Medium' ? 'Medium' : 'Low'] }} /></div>
+              <div className="meter"><div style={{ width: `${Math.round(t.sev * 100)}%`, background: SEV_COL[t.severity] ?? '#8a9097' }} /></div>
               <div className="dmeta">
                 <span>{t.severity} severity</span>
                 <span>size {Math.round(t.size * 100)}</span>
