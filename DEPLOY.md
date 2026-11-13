@@ -36,3 +36,10 @@ Starts the API (8000), admin panel (5173), citizen portal (5174) and feed panel 
 - Admin panel: https://disha-ai-admin.vercel.app (folder `frontend`, built with `VITE_API_BASE`, rewrite rules in `frontend/public/vercel.json`)
 - Redeploy: `cd citizen_web && vercel deploy --prod --yes`; admin: `cd frontend && VITE_API_BASE=<api> npx vite build && vercel deploy dist --prod --yes`
 - The backend is not on Vercel. When the Cloudflare tunnel address changes, update `config.js`, `frontend/public/vercel.json`, rebuild and redeploy both.
+
+## Free SMS from your own phone
+1. On the Android phone that has the SIM, install the open source app "SMS Gateway for Android" (https://sms-gate.app).
+2. Open it, turn on **Cloud server** (or Local server). The app shows a username and password.
+3. Put them in `backend/.env`: `SMSGATE_USER=...` and `SMSGATE_PASS=...` (local server mode: also `SMSGATE_URL=http://PHONE_IP:8080`).
+4. Restart the API. Check `GET /api/sms/status` (officer), then `POST /api/sms/test {"to": "+91...", "body": "hi"}`.
+The phone sends the text with its own SIM, so there is no provider fee and no DLT template. Keep the phone powered, online and with the app allowed to run in the background. Twilio is used only when the phone gateway is not set.
