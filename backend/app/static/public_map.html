@@ -29,6 +29,7 @@ button{font:inherit;color:inherit}
 .i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .i.s{width:18px;height:18px}.i.f{fill:currentColor;stroke:none}
 .ser{font-family:var(--serif);font-weight:400}
+[hidden]{display:none!important}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* panel */
@@ -112,8 +113,8 @@ body.app .ext{display:none!important}
 .rc .mid{display:flex;align-items:center;gap:12px;margin-top:10px}
 .stats{flex:1;font-size:13px;color:var(--muted);font-weight:600}.stats b{color:var(--ink)}
 .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--field);color:var(--muted);text-transform:capitalize}
-.chip.recommended{background:var(--sage);color:#22332b}.chip.smoothest{background:var(--sage-bg);color:var(--sage-d)}.chip.fastest{background:var(--amber-bg);color:var(--ink)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:var(--field);color:var(--muted)}
+.chip.recommended,.chip.smoothest,.chip.fastest{text-transform:capitalize}.chip.recommended{background:var(--sage);color:#22332b}.chip.smoothest{background:var(--sage-bg);color:var(--sage-d)}.chip.fastest{background:var(--amber-bg);color:var(--ink)}
 .chip.sev{background:var(--terra-bg);color:var(--terra-d);text-transform:none}.chip.ok{background:var(--sage-bg);color:var(--sage-d);text-transform:none}
 .cmp{margin-top:8px;font-size:13px;font-weight:700;padding:7px 10px;border-radius:12px;background:var(--field)}
 .cmp.good{background:var(--sage-bg);color:var(--sage-d)}.cmp.bad{background:var(--terra-bg);color:var(--terra-d)}
@@ -223,6 +224,76 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   body.navmode #toasts{bottom:120px}
 }
 @media (max-width:760px) and (max-height:600px){#nv-top .ico{width:54px;height:54px}}
+
+/* second pass */
+.cats{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding:8px 2px 2px;margin:0 -2px;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.cats::-webkit-scrollbar{display:none}
+.cats button{flex:none;display:flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--line);background:var(--solid);border-radius:999px;font-weight:700;font-size:12.5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.cats button:hover{background:var(--hover)}.cats button .i{color:var(--sage-d);width:16px;height:16px}
+.cats button.on{background:var(--sage-d);color:#fff;border-color:transparent}.cats button.on .i{color:#fff}
+:root[data-theme=dark] .cats button.on{background:var(--sage);color:#1d2a24}:root[data-theme=dark] .cats button.on .i{color:#1d2a24}
+.rowb.hi{background:var(--hover);box-shadow:inset 3px 0 0 var(--sage-d)}
+.rd{flex:none;font-size:12px;font-weight:700;color:var(--muted)}
+.hs{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;text-align:left;padding:8px 14px;min-height:56px;cursor:pointer}
+.hs:hover{background:var(--hover)}
+.hs .bar{width:6px;height:34px;border-radius:3px;flex:none}
+.cmpt{margin:6px 12px 4px;border:1px solid var(--line);border-radius:16px;background:var(--solid);overflow:hidden;font-size:12.5px}
+.cmpt table{width:100%;border-collapse:collapse}
+.cmpt th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:800;text-align:right;padding:7px 8px 4px}
+.cmpt th:first-child,.cmpt td:first-child{text-align:left;padding-left:12px}
+.cmpt td{text-align:right;padding:8px 8px;border-top:1px solid var(--line);font-weight:600;cursor:pointer}
+.cmpt tr.sel td{background:var(--sage-bg)}.cmpt td.best{color:var(--sage-d);font-weight:800}
+.cmpt td i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--muted)}
+.cmpt tr.sel td i{background:var(--sage-d)}
+#lay{position:absolute;z-index:8;right:72px;bottom:36px;width:250px;background:var(--glass);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:12px;display:none;animation:rise .25s}
+#lay.on{display:block}
+#lay h4{margin:2px 4px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.bases{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.bases button{border:2px solid transparent;background:none;border-radius:14px;padding:0;cursor:pointer;font-weight:700;font-size:12px;color:var(--ink)}
+.bases button i{display:block;height:46px;border-radius:11px;margin-bottom:4px;border:1px solid var(--line)}
+.bases button.on{border-color:var(--sage-d)}
+.ov{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;border:0;background:none;padding:0 4px;font-weight:700;font-size:13.5px;cursor:pointer;border-radius:10px}
+.ov:hover{background:var(--hover)}
+.ov .tr{width:38px;height:22px;border-radius:11px;background:var(--line);position:relative;transition:background .2s;filter:contrast(1.6)}
+.ov .tr::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.ov[aria-checked=true] .tr{background:var(--sage-d);filter:none}.ov[aria-checked=true] .tr::after{transform:translateX(16px)}
+#pcol{position:absolute;z-index:7;left:412px;top:50%;width:22px;height:56px;margin-top:-28px;border:1px solid var(--line);border-left:0;border-radius:0 12px 12px 0;background:var(--glass);cursor:pointer;display:grid;place-items:center;color:var(--muted);padding:0;transition:left .35s cubic-bezier(.2,.8,.2,1)}
+#pcol:hover{color:var(--ink)}#pcol .i{width:16px;height:16px;transition:transform .3s}
+body.pcol #pcol{left:0}body.pcol #pcol .i{transform:rotate(180deg)}
+#panel{transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+body.pcol #panel{transform:translateX(calc(-100% - 24px))}
+body.pcol #top{left:36px}body.pcol .maplibregl-ctrl-bottom-left{left:36px}
+#top{transition:left .35s cubic-bezier(.2,.8,.2,1)}
+.catpin{display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.catpin b{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#3F7A60;border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.4);display:grid;place-items:center;animation:drop .35s cubic-bezier(.3,1.6,.5,1)}
+.catpin b svg{transform:rotate(45deg);width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.catpin span{margin-top:3px;max-width:110px;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.94);color:#3D405B;font:700 11px/1.2 "Plus Jakarta Sans",sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.actions .btn.ic{flex:none;width:52px;padding:0}
+#pills{-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent);padding-right:18px}
+@media (max-width:760px){
+  #pcol{display:none}
+  #top{left:0;right:0;top:calc(8px + env(safe-area-inset-top));padding:0 0 0 10px;gap:6px}
+  #pills{gap:6px}
+  .pill{min-height:40px;padding:0 13px}
+  .live{margin-right:10px}
+  #head{padding:0 12px 6px}
+  .searchbar{height:48px}
+  .cats{padding-top:7px}
+  .cats button{min-height:38px}
+  #body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+  #ctrls{right:10px;gap:8px;z-index:5;transition:bottom .38s cubic-bezier(.2,.9,.25,1),opacity .2s}
+  body.sh-half #ctrls,body.sh-full #ctrls{opacity:0;pointer-events:none}
+  body.sh-full #top{opacity:0;pointer-events:none}
+  #lay{right:70px;bottom:calc(var(--sheet-h) + 14px)}
+  .maplibregl-ctrl-bottom-left{bottom:calc(var(--sheet-h) - 4px)}
+  .maplibregl-ctrl-bottom-right{bottom:calc(var(--sheet-h) - 6px)}
+}
+@media (max-width:760px){
+  .mt{margin-bottom:6px}.modes button{height:38px}.fi>div{height:40px}.opts{margin-top:2px}.sw{min-height:40px}
+  .msg{margin:6px 12px;padding:9px 12px;font-size:13px}
+  .dep{display:none}
+}
+@media (max-width:760px) and (max-height:760px){#ctrls #b3d{display:none}.zm button{height:42px}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -231,14 +302,16 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
 
 <div id="top">
   <div id="pills">
-    <button class="pill on" data-l="zones" aria-pressed="true"><i></i>Damage zones</button>
-    <button class="pill on" data-l="defects" aria-pressed="true"><i></i>Potholes</button>
-    <button class="pill hot" id="hot" hidden><i></i><span>Red zones: 0</span></button>
+    <button class="pill on" data-l="heat" aria-pressed="true" title="Damage heatmap"><i></i>Heatmap</button>
+    <button class="pill on" data-l="defects" aria-pressed="true" title="Pothole pins at street level"><i></i>Potholes</button>
+    <button class="pill" data-l="zones" aria-pressed="false" title="Damage zones"><i></i>Zones</button>
+    <button class="pill hot" id="hot" hidden title="Jump to the next red zone"><i></i><span>Red zones: 0</span></button>
   </div>
   <div class="live" id="live" role="status"><i></i><span>Connecting</span></div>
 </div>
 
 <div id="ctrls">
+  <button class="cb" id="blay" aria-label="Map layers" title="Map layers"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5M3 17.5l9 5 9-5" opacity=".6"/></svg></button>
   <button class="cb" id="b3d" aria-label="Toggle 3D view" title="3D view"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg></button>
   <button class="cb" id="bcomp" aria-label="Compass, reset north" title="Reset north"><svg class="i" id="cmp-i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></button>
   <button class="cb" id="bloc" aria-label="Show my location" title="My location"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></button>
@@ -252,6 +325,16 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   <div class="brand ext"><span>Road data from citizen reports</span><a href="/" target="_top">Disha AI</a></div>
 </aside>
 
+<div id="lay" role="dialog" aria-label="Map layers">
+  <h4>Map type</h4>
+  <div class="bases"><button data-b="default" class="on"><i style="background:linear-gradient(135deg,#f4efe0,#e9dfc0 50%,#cfe3d6)"></i>Default</button><button data-b="satellite"><i style="background:linear-gradient(135deg,#3b5a3a,#6b7a52 50%,#2d4a5e)"></i>Satellite</button><button data-b="dark"><i style="background:linear-gradient(135deg,#1d1f2c,#34374d 60%,#242636)"></i>Dark</button></div>
+  <h4>Overlays</h4>
+  <button class="ov" role="switch" data-ov="heat" aria-checked="true">Damage heatmap<span class="tr"></span></button>
+  <button class="ov" role="switch" data-ov="defects" aria-checked="true">Potholes<span class="tr"></span></button>
+  <button class="ov" role="switch" data-ov="zones" aria-checked="false">Damage zones<span class="tr"></span></button>
+  <button class="ov" role="switch" data-ov="b3d" aria-checked="true">3D buildings<span class="tr"></span></button>
+</div>
+<button id="pcol" aria-label="Collapse panel" title="Collapse panel"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
 <div id="pick"><span>Tap the map to choose a point</span><button id="pick-x">Cancel</button></div>
 
 <div id="nav" aria-live="polite">
@@ -312,7 +395,9 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     vol: '<path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/>', mute: '<path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6"/>',
     warn: '<path d="M12 3L2 20h20zM12 10v5M12 17.5v.5"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', chev: '<path d="M9 6l6 6-6 6"/>',
     flag: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>', navi: '<path d="M12 3l7 17-7-4-7 4z"/>', crosshair: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>',
-    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'
+    trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+    share: '<path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/>', police: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    atm: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9h.01M18 15h.01"/>', pharm: '<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="M10.5 8l3 8" transform="rotate(-35 12 12)"/>'
   };
   function ic(n, c) { return '<svg class="i ' + (c || "") + '" viewBox="0 0 24 24">' + (IC[n] || "") + "</svg>"; }
   var MAN = { // valhalla maneuver type -> icon paths
@@ -375,7 +460,7 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   /* ---------- state ---------- */
   var S = {
     view: "home", headKind: "", mode: ["car", "bike", "walk"].indexOf(Q.get("mode")) >= 0 ? Q.get("mode") : lsGet("dm_mode", "car"), avoid: lsGet("dm_avoid", true),
-    from: null, to: null, sugg: null, results: null, place: null, defect: null, res: null, sel: 0, loading: false, err: null, pick: null, saveTarget: null, layers: { zones: true, defects: true }
+    from: null, to: null, sugg: null, results: null, place: null, defect: null, res: null, sel: 0, loading: false, err: null, pick: null, saveTarget: null, layers: { heat: true, defects: true, zones: false, b3d: true }, base: "default", cat: null
   };
   if (["car", "bike", "walk"].indexOf(S.mode) < 0) S.mode = "car";
   var D = { defects: [], zones: [], fcDef: { type: "FeatureCollection", features: [] }, fcZones: { type: "FeatureCollection", features: [] }, fcRoute: { type: "FeatureCollection", features: [] }, fcAlts: { type: "FeatureCollection", features: [] }, fcRD: { type: "FeatureCollection", features: [] } };
@@ -396,12 +481,16 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   /* ---------- map ---------- */
   var map = new maplibregl.Map({ container: "map", style: STYLE[curTheme()], center: [77.5946, 12.9716], zoom: 12, attributionControl: { compact: true }, maxPitch: 75, pitchWithRotate: true });
   map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
-  var styleReady = false;
+  var styleReady = false, poiLayers = [];
   function fcOf(feats) { return { type: "FeatureCollection", features: feats }; }
   function defectFC() {
-    return fcOf(D.defects.filter(function (d) { return d.lat != null; }).map(function (d) {
-      return { type: "Feature", geometry: { type: "Point", coordinates: [d.lon, d.lat] }, properties: { uid: d.uid, c: d.status === "repaired" ? CLR.sage : sevOf(d) ? CLR.terra : CLR.amber } };
-    }));
+    var pts = [], heat = [];
+    D.defects.forEach(function (d) {
+      if (d.lat == null) return; var sv = sevOf(d), rep = d.status === "repaired";
+      pts.push({ type: "Feature", geometry: { type: "Point", coordinates: [d.lon, d.lat] }, properties: { uid: d.uid, c: rep ? CLR.sage : sv ? CLR.terra : CLR.amber } });
+      if (!rep) heat.push({ type: "Feature", geometry: { type: "Point", coordinates: [d.lon, d.lat] }, properties: { w: sv ? 1 : /med/i.test(d.severity || "") ? 0.6 : 0.4 } });
+    });
+    D.fcHeat = fcOf(heat); return fcOf(pts);
   }
   function circlePoly(lat, lon, r) { var pts = [], k = 28, dLat = r / 110540, dLon = r / (111320 * Math.cos(lat * Math.PI / 180)); for (var i = 0; i <= k; i++) { var a = i / k * 2 * Math.PI; pts.push([lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)]); } return [pts]; }
   function setSrc(id, data) { var s = map.getSource(id); if (s) s.setData(data); }
@@ -410,34 +499,45 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     styleReady = true;
     var rl = { "line-cap": "round", "line-join": "round" };
     map.addSource("zones", { type: "geojson", data: D.fcZones });
-    map.addSource("defects", { type: "geojson", data: D.fcDef, cluster: true, clusterRadius: 38, clusterMaxZoom: 14 });
+    map.addSource("defects", { type: "geojson", data: D.fcDef });
+    map.addSource("heat", { type: "geojson", data: D.fcHeat || fcOf([]) });
     map.addSource("route", { type: "geojson", data: D.fcRoute });
     map.addSource("alts", { type: "geojson", data: D.fcAlts });
     map.addSource("rd", { type: "geojson", data: D.fcRD });
-    var zv = S.layers.zones ? "visible" : "none", dv = S.layers.defects ? "visible" : "none";
-    map.addLayer({ id: "zones-fill", type: "fill", source: "zones", layout: { visibility: zv }, paint: { "fill-color": ["get", "c"], "fill-opacity": 0.26 } });
-    map.addLayer({ id: "zones-line", type: "line", source: "zones", layout: { visibility: zv }, paint: { "line-color": ["get", "c"], "line-width": 1.4, "line-opacity": 0.8 } });
+    var zv = S.layers.zones ? "visible" : "none", dv = S.layers.defects ? "visible" : "none", hv = S.layers.heat ? "visible" : "none";
+    map.addLayer({ id: "zones-fill", type: "fill", source: "zones", layout: { visibility: zv }, paint: { "fill-color": ["get", "c"], "fill-opacity": 0.2 } });
+    map.addLayer({ id: "zones-line", type: "line", source: "zones", layout: { visibility: zv }, paint: { "line-color": ["get", "c"], "line-width": 1.2, "line-opacity": 0.7 } });
+    map.addLayer({ id: "heat", type: "heatmap", source: "heat", maxzoom: 17, layout: { visibility: hv }, paint: {
+      "heatmap-weight": ["get", "w"], "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 12, 1.1, 15, 2],
+      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 8, 9, 11, 18, 14, 34, 17, 54],
+      "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(129,178,154,0)", 0.15, "rgba(129,178,154,0.35)", 0.4, "rgba(190,196,140,0.6)", 0.6, "rgba(242,204,143,0.78)", 0.8, "rgba(236,150,110,0.86)", 1, "rgba(224,122,95,0.92)"],
+      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.9, 14, 0.8, 16.5, 0.25] } });
     map.addLayer({ id: "alts-case", type: "line", source: "alts", layout: rl, paint: { "line-color": "#fff", "line-width": 10, "line-opacity": 0.9 } });
     map.addLayer({ id: "alts", type: "line", source: "alts", layout: rl, paint: { "line-color": "#8e93a8", "line-width": 6 } });
     map.addLayer({ id: "route-edge", type: "line", source: "route", layout: rl, paint: { "line-color": "#3D405B", "line-opacity": 0.35, "line-width": 14 } });
     map.addLayer({ id: "route-casing", type: "line", source: "route", layout: rl, paint: { "line-color": "#fff", "line-width": 11 } });
     map.addLayer({ id: "route", type: "line", source: "route", layout: rl, paint: { "line-color": ["get", "c"], "line-width": 7 } });
-    map.addLayer({ id: "clusters", type: "circle", source: "defects", filter: ["has", "point_count"], layout: { visibility: dv }, paint: { "circle-color": CLR.terra, "circle-opacity": 0.9, "circle-stroke-color": "#fff", "circle-stroke-width": 2, "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 24] } });
-    map.addLayer({ id: "cluster-n", type: "symbol", source: "defects", filter: ["has", "point_count"], layout: { visibility: dv, "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] }, paint: { "text-color": "#fff" } });
-    map.addLayer({ id: "pts", type: "circle", source: "defects", filter: ["!", ["has", "point_count"]], layout: { visibility: dv }, paint: { "circle-color": ["get", "c"], "circle-radius": 6.5, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    map.addLayer({ id: "pts", type: "circle", source: "defects", minzoom: 12.5, layout: { visibility: dv }, paint: {
+      "circle-color": "#FBF9F0", "circle-radius": ["interpolate", ["linear"], ["zoom"], 12.5, 2.5, 15, 5, 18, 8], "circle-stroke-color": ["get", "c"],
+      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12.5, 1.5, 15, 2.5, 18, 3.5], "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12.5, 0, 14, 1], "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 12.5, 0, 14, 1] } });
     map.addLayer({ id: "rd-halo", type: "circle", source: "rd", paint: { "circle-radius": 13, "circle-color": ["get", "c"], "circle-opacity": 0.28 } });
     map.addLayer({ id: "rd-pts", type: "circle", source: "rd", paint: { "circle-radius": 7.5, "circle-color": ["get", "c"], "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
-    ["clusters", "pts", "rd-pts", "alts"].forEach(function (l) {
+    poiLayers = (map.getStyle().layers || []).filter(function (l) { return /^poi/.test(l.id); }).map(function (l) { return l.id; });
+    ["pts", "rd-pts", "alts"].concat(poiLayers).forEach(function (l) {
       map.on("mouseenter", l, function () { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", l, function () { map.getCanvas().style.cursor = ""; });
     });
-    apply3d();
+    apply3d(); applyBase();
   }
   map.on("style.load", function () { initLayers(); });
   map.on("error", function () {});
+  var SAT = { version: 8, sources: { sat: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 19, attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics" } }, layers: [{ id: "sat", type: "raster", source: "sat" }] };
+  function baseStyle() { return S.base === "satellite" ? SAT : S.base === "dark" ? STYLE.dark : STYLE[curTheme()]; }
+  function applyBase() { }
+  function setBase(b) { S.base = b; styleReady = false; map.setStyle(baseStyle(), { diff: false }); Array.prototype.forEach.call(document.querySelectorAll(".bases button"), function (x) { x.classList.toggle("on", x.dataset.b === b); }); }
   function setTheme() {
     var t = curTheme(); document.documentElement.setAttribute("data-theme", t);
-    styleReady = false; map.setStyle(STYLE[t], { diff: false });
+    if (S.base === "default") { styleReady = false; map.setStyle(STYLE[t], { diff: false }); }
   }
   if (mq && !themeParam) { var mqh = function () { setTheme(); }; if (mq.addEventListener) mq.addEventListener("change", mqh); else if (mq.addListener) mq.addListener(mqh); }
 
@@ -455,27 +555,45 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     if (Date.now() - lpFired < 500) return;
     if (S.pick) { var f = S.pick; endPick(); reverse(e.lngLat.lat, e.lngLat.lng).then(function (p) { choose(f, p); }); return; }
     if (S.sugg) { S.sugg = null; renderBody(); }
-    var ls = ["rd-pts", "pts", "clusters", "alts"].filter(function (l) { return map.getLayer(l); });
+    var ls = ["rd-pts", "pts", "alts"].filter(function (l) { return map.getLayer(l); });
     var fs = ls.length ? map.queryRenderedFeatures(e.point, { layers: ls }) : [], f0 = fs[0];
-    if (!f0) return;
-    if (f0.layer.id === "rd-pts") routeDefectPopup(f0.properties.uid, f0.geometry.coordinates);
-    else if (f0.layer.id === "pts") showDefect(f0.properties.uid, false);
-    else if (f0.layer.id === "clusters") map.getSource("defects").getClusterExpansionZoom(f0.properties.cluster_id).then(function (z) { map.easeTo({ center: f0.geometry.coordinates, zoom: z + 0.5 }); });
-    else if (f0.layer.id === "alts" && S.res && !NAV) selectRoute(f0.properties.idx);
+    if (f0) {
+      if (f0.layer.id === "rd-pts") routeDefectPopup(f0.properties.uid, f0.geometry.coordinates);
+      else if (f0.layer.id === "pts") showDefect(f0.properties.uid, false);
+      else if (f0.layer.id === "alts" && S.res && !NAV) selectRoute(f0.properties.idx);
+      return;
+    }
+    if (NAV) return;
+    var pl = poiLayers.filter(function (l) { return map.getLayer(l); }), pf = pl.length ? map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: pl }) : [];
+    pf = pf.filter(function (x) { return x.properties && (x.properties.name || x.properties["name:latin"]); })[0];
+    if (pf) {
+      var c = pf.geometry.type === "Point" ? pf.geometry.coordinates : [e.lngLat.lng, e.lngLat.lat], cls = (pf.properties.class || pf.properties.subclass || "");
+      var p = { name: pf.properties.name || pf.properties["name:latin"], address: "", lat: c[1], lon: c[0], type: cls };
+      showPlace(p, true); reverse(c[1], c[0]).then(function (r) { if (S.place === p) { p.address = r.address; renderBody(); } });
+    }
   });
   var is3d = false;
-  function apply3d() { try { if (map.getLayer("building-3d")) map.setLayoutProperty("building-3d", "visibility", "visible"); } catch (e) {} }
+  function apply3d() { apply3dVis(); }
+  function apply3dVis() { try { if (map.getLayer("building-3d")) map.setLayoutProperty("building-3d", "visibility", S.layers.b3d ? "visible" : "none"); } catch (e) {} }
   $("b3d").onclick = function () { is3d = !is3d; $("b3d").classList.toggle("on", is3d); map.easeTo({ pitch: is3d ? 58 : 0, bearing: is3d ? map.getBearing() || -17 : map.getBearing(), duration: 800 }); };
   $("bcomp").onclick = function () { map.easeTo({ bearing: 0, pitch: is3d ? 58 : 0, duration: 600 }); };
   map.on("rotate", function () { $("cmp-i").style.transform = "rotate(" + (-map.getBearing()) + "deg)"; });
   $("zin").onclick = function () { map.zoomIn(); }; $("zout").onclick = function () { map.zoomOut(); };
   $("bloc").onclick = function () { locate(true); };
-  document.querySelectorAll("#pills .pill[data-l]").forEach(function (b) {
-    b.onclick = function () {
-      var k = b.dataset.l, on = !b.classList.contains("on"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); S.layers[k] = on;
-      (k === "zones" ? ["zones-fill", "zones-line"] : ["clusters", "cluster-n", "pts"]).forEach(function (id) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
-    };
-  });
+  var LV = { heat: ["heat"], defects: ["pts"], zones: ["zones-fill", "zones-line"] };
+  function setLayer(k, on) {
+    S.layers[k] = on;
+    (LV[k] || []).forEach(function (id) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
+    if (k === "b3d") apply3dVis();
+    Array.prototype.forEach.call(document.querySelectorAll('#pills .pill[data-l="' + k + '"]'), function (b) { b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+    Array.prototype.forEach.call(document.querySelectorAll('.ov[data-ov="' + k + '"]'), function (b) { b.setAttribute("aria-checked", on); });
+  }
+  document.querySelectorAll("#pills .pill[data-l]").forEach(function (b) { b.onclick = function () { setLayer(b.dataset.l, !S.layers[b.dataset.l]); }; });
+  document.querySelectorAll(".ov").forEach(function (b) { b.onclick = function () { setLayer(b.dataset.ov, !S.layers[b.dataset.ov]); }; });
+  document.querySelectorAll(".bases button").forEach(function (b) { b.onclick = function () { setBase(b.dataset.b); }; });
+  $("blay").onclick = function (e) { e.stopPropagation(); $("lay").classList.toggle("on"); };
+  document.addEventListener("click", function (e) { if (!$("lay").contains(e.target) && e.target !== $("blay")) $("lay").classList.remove("on"); });
+  $("pcol").onclick = function () { var c = document.body.classList.toggle("pcol"); $("pcol").setAttribute("aria-label", c ? "Expand panel" : "Collapse panel"); $("pcol").title = c ? "Expand panel" : "Collapse panel"; };
 
   /* ---------- data ---------- */
   function loadZones() {
@@ -484,17 +602,17 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
       D.fcZones = fcOf(D.zones.map(function (c) { return { type: "Feature", geometry: { type: "Polygon", coordinates: circlePoly(c.lat, c.lon, c.size_m * 0.62) }, properties: { c: ZC[c.level] || ZC.green, label: c.label } }; }));
       setSrc("zones", D.fcZones);
       var reds = D.zones.filter(function (c) { return c.level === "red"; });
-      $("hot").hidden = !reds.length; $("hot").querySelector("span").textContent = "Red zones: " + reds.length; D.reds = reds; D.redIdx = 0;
+      $("hot").hidden = !reds.length; $("hot").querySelector("span").textContent = "Red zones: " + reds.length; D.reds = reds; D.redIdx = 0; renderBodyIfHome(); if (D.pendingView) { D.pendingView = false; zoneView(); }
     }).catch(function () {});
   }
   $("hot").onclick = function () { if (!D.reds || !D.reds.length) return; var c = D.reds[D.redIdx++ % D.reds.length]; map.flyTo({ center: [c.lon, c.lat], zoom: 15.2, pitch: is3d ? 58 : 0 }); toast(c.label || "Red zone"); };
   function loadDefects() {
     fetch("/api/public/defects").then(function (r) { return r.json(); }).then(function (l) {
-      D.defects = Array.isArray(l) ? l : []; D.fcDef = defectFC(); setSrc("defects", D.fcDef); renderBodyIfHome();
+      D.defects = Array.isArray(l) ? l : []; refreshDefects(); renderBodyIfHome();
       var h = (location.hash || "").replace("#", ""); if (h) showDefect(h, true);
     }).catch(function () { toast("Could not load road damage data. Pull to refresh."); });
   }
-  function refreshDefects() { D.fcDef = defectFC(); setSrc("defects", D.fcDef); }
+  function refreshDefects() { D.fcDef = defectFC(); setSrc("defects", D.fcDef); setSrc("heat", D.fcHeat); }
   function openCount() { return D.defects.filter(function (d) { return d.status !== "repaired"; }).length; }
 
   /* ---------- network helpers ---------- */
@@ -552,8 +670,11 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   /* ---------- views ---------- */
   function searchHead() {
     return '<div class="searchbar"><span style="color:var(--muted);display:flex" id="qi">' + ic("search") + '</span><input id="q" type="search" enterkeyhint="search" placeholder="Search places, hospitals, bus stops" autocomplete="off" aria-label="Search places" spellcheck="false">' +
-      '<button class="ib sm" id="qx" aria-label="Clear" hidden>' + ic("close", "s") + '</button><button class="dirbtn" id="godir" aria-label="Directions">' + ic("dir") + "</button></div>";
+      '<button class="ib sm" id="qx" aria-label="Clear" hidden>' + ic("close", "s") + '</button><button class="dirbtn" id="godir" aria-label="Directions" title="Directions">' + ic("dir") + "</button></div>" +
+      '<div class="cats" id="cats">' + CATS.map(function (c) { return '<button data-cat="' + c.k + '" title="' + c.l + ' near the map centre">' + ic(c.i) + c.l + "</button>"; }).join("") + "</div>";
   }
+  var CATS = [{ k: "hospital", l: "Hospitals", q: "hospital", i: "hosp" }, { k: "fuel", l: "Petrol pumps", q: "petrol pump", i: "fuel" }, { k: "police", l: "Police", q: "police station", i: "police" },
+    { k: "bus", l: "Bus stops", q: "bus stop", i: "bus" }, { k: "atm", l: "ATMs", q: "atm", i: "atm" }, { k: "food", l: "Food", q: "restaurant", i: "food" }, { k: "pharm", l: "Pharmacy", q: "pharmacy", i: "pharm" }];
   function dirHead() {
     var mb = function (m, n, i) { return '<button data-m="' + m + '" class="' + (S.mode === m ? "on" : "") + '" aria-pressed="' + (S.mode === m) + '">' + ic(i) + "<span>" + n + "</span></button>"; };
     return '<div class="mt"><button class="ib" id="dback" aria-label="Close directions">' + ic("back") + '</button><div class="modes">' + mb("car", "Car", "car") + mb("bike", "Two-wheeler", "bike") + mb("walk", "Walk", "walk") + "</div></div>" +
@@ -566,7 +687,8 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     if (S.headKind !== kind) {
       S.headKind = kind; $("head").innerHTML = kind === "dir" ? dirHead() : searchHead(); wireHead();
     }
-    if (kind === "search") { var q = $("q"); if (q && document.activeElement !== q) { q.value = S.view === "place" && S.place ? S.place.name : S.view === "defect" && S.defect ? nameOf(S.defect["class"]) + " " + S.defect.number : ""; $("qx").hidden = !q.value; } }
+    if (kind === "search") { var q = $("q"); Array.prototype.forEach.call(document.querySelectorAll("#cats button"), function (b) { b.classList.toggle("on", !!(S.cat && S.cat.k === b.dataset.cat && (S.view === "cat" || S.view === "place"))); });
+      if (q && document.activeElement !== q) { q.value = S.view === "place" && S.place ? S.place.name : S.view === "defect" && S.defect ? nameOf(S.defect["class"]) + " " + S.defect.number : ""; $("qx").hidden = !q.value; } }
     if (kind === "dir") { $("from").value = S.from ? S.from.name : $("from").value; $("to").value = S.to ? S.to.name : $("to").value; updDep(); }
   }
   function updDep() { var d = $("dep"); if (!d) return; var r = S.res && S.res.routes[S.sel]; d.textContent = r ? "Leave now, arrive " + fmtTime(Date.now() + r.duration_min * 60000) : "Leave now"; }
@@ -578,6 +700,7 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
       q.addEventListener("keydown", function (e) { onKey(e, "q"); });
       $("qx").onclick = function () { q.value = ""; $("qx").hidden = true; if (S.view !== "home") goHome(); q.focus(); doSearch("q"); };
       $("godir").onclick = function () { openDir(S.view === "place" ? { to: S.place } : null); };
+      Array.prototype.forEach.call($("cats").querySelectorAll("button"), function (b) { b.onclick = function () { if (S.cat && S.cat.k === b.dataset.cat && S.view === "cat") goHome(); else catSearch(b.dataset.cat); }; });
     } else {
       ["from", "to"].forEach(function (f) {
         var el = $(f);
@@ -594,11 +717,19 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     }
   }
   function onKey(e, f) {
+    var rows = Array.prototype.slice.call($("body").querySelectorAll(".rowb:not([disabled])"));
     if (e.key === "Escape") { S.sugg = null; e.target.blur(); renderBody(); }
-    else if (e.key === "Enter") { var r = S.results && S.results.items && S.results.items[0]; if (r && S.sugg === f) { e.preventDefault(); choose(f, r); } }
+    else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && S.sugg === f && rows.length) {
+      e.preventDefault(); S.hi = e.key === "ArrowDown" ? (S.hi + 1) % rows.length : (S.hi - 1 + rows.length) % rows.length;
+      rows.forEach(function (r, i) { r.classList.toggle("hi", i === S.hi); }); rows[S.hi].scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      if (S.sugg === f && S.hi >= 0 && rows[S.hi]) { e.preventDefault(); rows[S.hi].click(); return; }
+      var r = S.results && S.results.items && S.results.items[0]; if (r && S.sugg === f) { e.preventDefault(); choose(f, r); }
+    }
   }
+  S.hi = -1;
 
-  function renderBodyIfHome() { if (S.view === "home" && !S.sugg) renderBody(); }
+    function renderBodyIfHome() { if (S.view === "home" && !S.sugg) renderBody(); }
   function rowHtml(ic1, cls, title, sub, attrs) { return '<button class="rowb" ' + attrs + '><span class="ric ' + (cls || "") + '">' + ic(ic1, "s") + '</span><span class="rt"><b>' + esc(title) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</span></button>"; }
   function placeRows(list, kind, prefix) { return list.map(function (p, i) { return rowHtml(kind === "hist" ? "hist" : kind || placeIcon(p), "", p.name, p.address, 'data-pl="' + prefix + i + '"'); }).join(""); }
   var rowIndex = {};
@@ -652,23 +783,43 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
 
   function renderBody() {
     var b = $("body"), h = "";
-    if (S.sugg) { b.innerHTML = suggBody(); wireRows(b); return; }
+    if (S.sugg) { S.hi = -1; b.innerHTML = suggBody(); wireRows(b); return; }
     if (S.view === "home") h = homeBody();
     else if (S.view === "place") h = placeBody();
     else if (S.view === "defect") h = defectBody();
     else if (S.view === "dir") h = dirBody();
+    else if (S.view === "cat") h = catBody();
     b.innerHTML = h; wireBody(b);
+    var rc = b.querySelector("[data-act=retrycat]"); if (rc) rc.onclick = function () { catSearch(S.cat.k); };
   }
   function homeBody() {
     var h = '<div class="qc"><button data-slot="home">' + ic("home", "s") + "Home" + (saved.home ? "" : " <small>Set</small>") + '</button><button data-slot="work">' + ic("work", "s") + "Work" + (saved.work ? "" : " <small>Set</small>") + '</button><button data-slot="star">' + ic("star", "s") + "Starred" + (saved.stars.length ? " <small>" + saved.stars.length + "</small>" : "") + "</button></div>";
-    var n = openCount(); rowIndex = {};
-    h += '<div class="hero"><div class="n">' + n + "</div><span>open road defects mapped by citizens. Plan a trip and Disha AI steers you around the worst of them.</span></div>";
-    h += '<div class="row pad"><button class="btn p big" data-act="plan">' + ic("dir", "s") + "Plan a trip</button></div>";
+    rowIndex = {}; h += hotspotsHtml();
+    h += '<div class="row pad" style="margin-top:6px"><button class="btn p big" data-act="plan">' + ic("dir", "s") + "Plan a trip</button></div>";
     if (recents.length) { h += '<div class="sec">Recent</div>'; recents.slice(0, 4).forEach(function (p, i) { rowIndex["r" + i] = p; h += rowHtml("hist", "", p.name, p.address, 'data-pl="r' + i + '"'); }); }
     h += '<div class="tip">' + ic("pin", "s") + "<span>Press and hold anywhere on the map to drop a pin.</span></div>";
     return h;
   }
+  var ZN = {};
+  function zoneName(c) {
+    var k = c.lat.toFixed(3) + "," + c.lon.toFixed(3); if (ZN[k]) return ZN[k].name || "";
+    ZN[k] = { name: "", pending: true };
+    reverse(c.lat, c.lon).then(function (r) { ZN[k] = { name: /^[\d.]+, ?[\d.]+$/.test(r.name) ? "Damage hotspot" : r.name }; renderBodyIfHome(); });
+    return "";
+  }
+  function hotspotsHtml() {
+    var ref = refPt(), z = (D.zones || []).filter(function (c) { return c.level !== "green"; });
+    var near = z.filter(function (c) { return distM(ref.lat, ref.lon, c.lat, c.lon) < 40000; }); if (near.length) z = near;
+    z = z.slice().sort(function (a, b) { return (b.severe * 2 + b.count) - (a.severe * 2 + a.count); }).slice(0, 5);
+    var h = '<div class="sec">Hotspots ' + (lastMe ? "near you" : "nearby") + "</div>";
+    if (!D.zones.length) return h + '<div style="padding:0 14px"><div class="sk" style="height:44px;margin:6px 0"></div><div class="sk" style="height:44px;margin:6px 0"></div></div>';
+    if (!z.length) return h + '<div class="msg good">No damage hotspots around here. Smooth roads.</div>';
+    D.hot5 = z;
+    z.forEach(function (c, i) { var nm = zoneName(c); h += '<button class="hs" data-hot="' + i + '"><span class="bar" style="background:' + (c.level === "red" ? CLR.terra : CLR.amber) + '"></span><span class="rt"><b>' + (nm ? esc(nm) : '<span class="sk" style="display:inline-block;width:120px;height:12px;vertical-align:middle"></span>') + "</b><small>" + c.count + " defects, " + c.severe + ' serious</small></span><span class="rd">' + fmtDist(distM(ref.lat, ref.lon, c.lat, c.lon)) + "</span></button>"; });
+    return h;
+  }
   function wireBody(b) {
+    Array.prototype.forEach.call(b.querySelectorAll("[data-hot]"), function (x) { x.onclick = function () { var c = D.hot5[+x.dataset.hot]; map.flyTo({ center: [c.lon, c.lat], zoom: 15.2, pitch: is3d ? 58 : 0, padding: padFor(), duration: 1400, essential: true }); if (isMobile()) sheetTo("peek"); }; });
     Array.prototype.forEach.call(b.querySelectorAll("[data-pl]"), function (x) { x.onclick = function () { var p = rowIndex[x.dataset.pl]; if (p) { addRecent(p); showPlace(p, true); } }; });
     Array.prototype.forEach.call(b.querySelectorAll("[data-slot]"), function (x) {
       x.onclick = function () {
@@ -690,6 +841,7 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   function showPlace(p, fly) {
     S.view = "place"; S.place = p; S.sugg = null; S.defect = null; history.replaceState(null, "", location.pathname + location.search);
     showPlaceMarker(p); if (fly) map.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 15.5), pitch: is3d ? 58 : 0, padding: padFor() }); renderHead(); renderBody(); sheetTo("half");
+    if (!p.address && !p.pending) reverse(p.lat, p.lon).then(function (r) { if (S.place === p && !p.address) { p.address = r.address; renderBody(); } });
   }
   function dropPin(lat, lon) {
     var p = { name: "Dropped pin", address: "Looking up address...", lat: lat, lon: lon, type: "pin", pending: true };
@@ -701,21 +853,89 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     var p = S.place; if (!p) return "";
     var near = D.defects.filter(function (d) { return d.lat != null && d.status !== "repaired" && distM(d.lat, d.lon, p.lat, p.lon) < 300; });
     var sev = near.filter(sevOf).length;
+    var dm = lastMe ? '<span class="chip">' + fmtDist(distM(lastMe.lat, lastMe.lon, p.lat, p.lon)) + " from you</span>" : "";
     var h = '<div class="card flat"><h3 class="cap">' + esc(p.name) + '</h3><div style="color:var(--muted);font-weight:500;margin-top:2px">' + esc(p.address || "") + "</div>" +
-      '<div class="chips">' + (near.length ? '<span class="chip sev">' + near.length + " road defects within 300 m" + (sev ? ", " + sev + " serious" : "") + "</span>" : '<span class="chip ok">No reported road damage nearby</span>') + "</div></div>" +
-      '<div class="actions"><button class="btn p big" data-act="to">' + ic("dir", "s") + 'Directions</button><button class="btn big" data-act="from" style="flex:none;padding:0 16px">From here</button></div>' +
-      '<div class="qc"><button data-save="home">' + ic("home", "s") + 'Save as Home</button><button data-save="work">' + ic("work", "s") + 'Save as Work</button><button data-save="star">' + ic("star", "s") + "Star</button></div>" +
-      '<div class="row pad"><button class="btn" data-act="closeplace">' + ic("close", "s") + "Close</button></div>";
+      '<div class="chips">' + dm + (near.length ? '<span class="chip sev">' + near.length + " reported road defects within 300 m" + (sev ? ", " + sev + " serious" : "") + "</span>" : '<span class="chip ok">No reported road damage within 300 m</span>') + "</div></div>" +
+      '<div class="actions"><button class="btn p big" data-act="to">' + ic("dir", "s") + 'Directions</button><button class="btn big" data-act="pstart">' + ic("navi", "s f") + 'Start</button></div>' +
+      '<div class="qc"><button data-act="pshare">' + ic("share", "s") + 'Share</button><button data-act="from">From here</button><button data-save="home">' + ic("home", "s") + 'Home</button><button data-save="work">' + ic("work", "s") + 'Work</button><button data-save="star">' + ic("star", "s") + "Star</button></div>" +
+      '<div class="row pad"><button class="btn" data-act="closeplace">' + ic("close", "s") + (S.cat ? "Back to results" : "Close") + "</button></div>";
     return h;
   }
   function wirePlace(b) {
     var p = S.place;
     b.querySelector("[data-act=to]").onclick = function () { openDir({ to: p }); };
     b.querySelector("[data-act=from]").onclick = function () { openDir({ from: p }); };
-    b.querySelector("[data-act=closeplace]").onclick = function () { goHome(); };
+    b.querySelector("[data-act=closeplace]").onclick = function () { if (S.cat && S.cat.items) { S.view = "cat"; S.place = null; clearPlaceMarker(); renderHead(); renderBody(); } else goHome(); };
+    b.querySelector("[data-act=pstart]").onclick = function () { S.autoStart = true; openDir({ to: p }); };
+    b.querySelector("[data-act=pshare]").onclick = function () { shareLink(placeLink(p), p.name); };
     Array.prototype.forEach.call(b.querySelectorAll("[data-save]"), function (x) { x.onclick = function () { saveSlot(x.dataset.save, p); toast(x.dataset.save === "star" ? "Saved to Starred" : "Saved as " + x.dataset.save); }; });
   }
+  var catMarkers = [];
+  function clearCat() { catMarkers.forEach(function (m) { m.remove(); }); catMarkers = []; S.cat = null; }
+  function refPt() { var c = map.getCenter(); return lastMe && Date.now() - lastMe.t < 600000 ? lastMe : { lat: c.lat, lon: c.lng }; }
+  function catSearch(k) {
+    var c = CATS.filter(function (x) { return x.k === k; })[0]; if (!c) return;
+    catMarkers.forEach(function (m) { m.remove(); }); catMarkers = []; clearPlaceMarker();
+    var seq = ++catSeq, ctr = map.getCenter(); S.cat = { k: k, l: c.l, loading: true, items: [] }; S.view = "cat"; S.sugg = null; renderHead(); renderBody(); sheetTo("half");
+    var cc = map.getCenter(), cref = lastMe && distM(lastMe.lat, lastMe.lon, cc.lat, cc.lng) < 8000 ? lastMe : { lat: cc.lat, lon: cc.lng };
+    ensureTiles(cref).then(function () {
+      if (seq !== catSeq || !S.cat) return; var items = tilePois(c, cref);
+      if (items.length) return items;
+      return fetch("/api/nav/search?q=" + encodeURIComponent(c.q) + "&lat=" + cref.lat.toFixed(4) + "&lon=" + cref.lon.toFixed(4)).then(function (r) { if (!r.ok) throw new Error(); return r.json(); }).then(function (it) {
+        var seen = {}; it = (Array.isArray(it) ? it : []).filter(function (p) { if (/construction|street|tertiary|secondary|primary|residential|living_street|service/.test(p.type || "")) return false; var key = p.name + keyOf(p); if (seen[key]) return false; seen[key] = 1; return distM(cref.lat, cref.lon, p.lat, p.lon) < 15000; });
+        it.forEach(function (p) { p.d = distM(refPt().lat, refPt().lon, p.lat, p.lon); }); return it.sort(function (a, b) { return a.d - b.d; }).slice(0, 10);
+      });
+    }).then(function (items) {
+      if (!items || seq !== catSeq || !S.cat) return; S.cat = { k: k, l: c.l, items: items, i: c.i }; renderBody();
+      var bn = new maplibregl.LngLatBounds();
+      items.forEach(function (p) { bn.extend([p.lon, p.lat]); var el = document.createElement("div"); el.className = "catpin"; el.innerHTML = "<b>" + ic(c.i) + "</b><span>" + esc(p.name) + "</span>"; el.onclick = function (e) { e.stopPropagation(); showPlace(p, true); };
+        catMarkers.push(new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([p.lon, p.lat]).addTo(map)); });
+      if (items.length) map.fitBounds(bn, { padding: padFor(), maxZoom: 16, duration: 900 });
+    }).catch(function () { if (seq !== catSeq || !S.cat) return; S.cat.loading = false; S.cat.error = true; renderBody(); });
+  }
+  var CATF = { hospital: function (p) { return p["class"] === "hospital"; }, fuel: function (p) { return p["class"] === "fuel"; }, police: function (p) { return p["class"] === "police"; }, bus: function (p) { return p["class"] === "bus"; },
+    atm: function (p) { return p.subclass === "atm" || p["class"] === "atm"; }, food: function (p) { return /^(restaurant|fast_food|cafe)$/.test(p["class"]); }, pharm: function (p) { return p["class"] === "pharmacy" || p.subclass === "chemist" || p.subclass === "pharmacy"; } };
+  var CATR = { bus: 1200, atm: 2000, food: 1500, pharm: 3000, hospital: 5000, fuel: 5000, police: 6000 };
+  function ensureTiles(ref) {
+    return new Promise(function (res) {
+      var c = map.getCenter(); if (map.getZoom() >= 13.8 && distM(c.lat, c.lng, ref.lat, ref.lon) < 1500 && map.areTilesLoaded()) return res();
+      var done = false, fin = function () { if (!done) { done = true; setTimeout(res, 200); } }; map.once("idle", fin); setTimeout(fin, 7000);
+      map.jumpTo({ center: [ref.lon, ref.lat], zoom: Math.max(14, Math.min(map.getZoom(), 14.4)) });
+    });
+  }
+  function tilePois(c, ref) {
+    var l = map.getLayer("poi_r20"); if (!l) return []; var fs = []; try { fs = map.querySourceFeatures(l.source, { sourceLayer: l.sourceLayer }); } catch (e) { return []; }
+    var f = CATF[c.k], seen = {}, out = [];
+    fs.forEach(function (x) {
+      var p = x.properties || {}; if (!f(p) || x.geometry.type !== "Point") return; var co = x.geometry.coordinates, nm = p.name || p["name:latin"] || p["name_en"] || "", key = (nm || c.l) + co[0].toFixed(5) + co[1].toFixed(5);
+      if (seen[key]) return; seen[key] = 1; var d = distM(ref.lat, ref.lon, co[1], co[0]); if (d > (CATR[c.k] || 3000)) return;
+      out.push({ name: nm || c.l.replace(/s$/, ""), address: "", lat: co[1], lon: co[0], type: c.k, d: d, named: !!nm });
+    });
+    out.sort(function (a, b) { return (b.named - a.named) * 800 + (a.d - b.d); }); return out.slice(0, 10).sort(function (a, b) { return a.d - b.d; });
+  }
+  var catSeq = 0;
+  function catBody() {
+    var c = S.cat; if (!c) return ""; rowIndex = {};
+    var h = '<div class="sec">' + esc(c.l) + " near " + (lastMe ? "you" : "the map centre") + "</div>";
+    if (c.loading) return h + [1, 2, 3, 4].map(function () { return '<div style="display:flex;gap:12px;align-items:center;padding:8px 14px"><div class="sk" style="width:38px;height:38px;border-radius:50%"></div><div style="flex:1"><div class="sk" style="height:13px;width:60%;margin-bottom:7px"></div><div class="sk" style="height:10px;width:85%"></div></div></div>'; }).join("");
+    if (c.error) return h + '<div class="msg warn"><p>Could not load places right now.</p><button class="btn" data-act="retrycat">Try again</button></div>';
+    if (!c.items.length) return h + '<div class="msg">No ' + esc(c.l.toLowerCase()) + " found here. Pan the map to another area and try again.</div>";
+    return h + c.items.map(function (p, i) { rowIndex["c" + i] = p; return '<button class="rowb" data-pl="c' + i + '"><span class="ric g">' + ic(c.i, "s") + '</span><span class="rt"><b>' + esc(p.name) + "</b><small>" + esc(p.address) + '</small></span><span class="rd">' + fmtDist(p.d) + "</span></button>"; }).join("");
+  }
+  function baseUrl() { return location.origin + location.pathname; }
+  function placeLink(p) { return baseUrl() + "?to=" + p.lat.toFixed(5) + "," + p.lon.toFixed(5) + "&name=" + encodeURIComponent(p.name || "Place"); }
+  function tripLink() {
+    var u = baseUrl() + "?dir=1&to=" + S.to.lat.toFixed(5) + "," + S.to.lon.toFixed(5) + "&name=" + encodeURIComponent(S.to.name || "Destination") + "&mode=" + S.mode;
+    if (S.from && !S.from.me) u += "&from=" + S.from.lat.toFixed(5) + "," + S.from.lon.toFixed(5); return u;
+  }
+  function shareLink(url, title) {
+    if (navigator.share && isMobile()) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
+    var done = function () { toast("Link copied"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt("Copy this link", url); });
+    else window.prompt("Copy this link", url);
+  }
   function goHome() {
+    clearCat();
     S.view = "home"; S.place = null; S.defect = null; S.sugg = null; S.saveTarget = null; clearPlaceMarker(); history.replaceState(null, "", location.pathname + location.search); renderHead(); renderBody(); sheetTo(isMobile() ? "peek" : "half");
   }
 
@@ -743,7 +963,7 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
 
   /* ---------- directions ---------- */
   function openDir(opt) {
-    opt = opt || {}; S.view = "dir"; S.sugg = null; S.place = null; S.defect = null; clearPlaceMarker();
+    opt = opt || {}; clearCat(); S.view = "dir"; S.sugg = null; S.place = null; S.defect = null; clearPlaceMarker();
     if (opt.to) S.to = opt.to; if (opt.from) S.from = opt.from;
     renderHead(); renderBody(); sheetTo(S.res ? "half" : "full");
     var needFrom = !S.from;
@@ -752,7 +972,7 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
         if (st.state === "granted" && !S.from) getMe().then(function (m) { if (!S.from) { S.from = { name: "Your location", address: "", lat: m.lat, lon: m.lon, me: true }; renderHead(); maybeRoute(); } }).catch(function () {});
       }).catch(function () {});
     }
-    if (!S.from && !isMobile()) setTimeout(function () { var f = $("from"); if (f && !S.to) f.focus(); else if (f && !S.from) f.focus(); }, 60);
+    if (!S.from && !isMobile()) setTimeout(function () { var f = $("from"); if (f && !S.to && !S.from) f.focus(); }, 60);
     maybeRoute();
   }
   function closeDir() { cancelRoute(); clearRoute(); S.res = null; S.err = null; S.from = null; S.to = null; S.headKind = ""; goHome(); S.headKind = ""; renderHead(); }
@@ -771,9 +991,9 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
       if (seq !== routeSeq) return; S.loading = false;
       if (!j.routes || !j.routes.length) { S.err = { kind: "none" }; S.res = null; renderBody(); return; }
       j.routes.forEach(function (r) { r._geo = mkGeo(r.geometry); r._segs = null; });
-      var prevRec = S.res ? S.res.recommended : null; S.res = j; S.sel = j.recommended != null ? j.recommended : 0; drawRoutes(!quiet); renderBody(); updDep();
+      var prevRec = S.res ? S.res.recommended : null; S.res = j; S.sel = j.recommended != null ? j.recommended : 0; if (S.sugg) { S.sugg = null; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } drawRoutes(!quiet); renderBody(); updDep();
       if (quiet && prevRec != null && prevRec !== j.recommended) toast("A new report changed the best route.");
-      if (!quiet) $("body").scrollTop = 0;
+      if (!quiet) $("body").scrollTop = 0; if (S.autoStart) { S.autoStart = false; startNav(false); }
     }).catch(function (e) {
       if (e && e.name === "AbortError") return; if (seq !== routeSeq) return; S.loading = false; S.res = null; clearRoute();
       S.err = { kind: e && e.status && e.status < 500 && e.status !== 429 ? "bad" : e && e.status ? "busy" : "net", msg: e && e.message }; renderBody();
@@ -821,13 +1041,22 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     }
     var res = S.res, fast = res.routes[res.fastest] || res.routes[0], r = res.routes[S.sel], h = "";
     if (res.advice) h += '<div class="msg ' + (r.severe_count ? "warn" : "good") + '">' + esc(res.advice) + "</div>";
+    if (res.routes.length > 1) h += cmpTable(res);
     res.routes.slice().sort(function (a, b) { return (a.index === res.recommended ? -1 : 0) - (b.index === res.recommended ? -1 : 0) || a.index - b.index; }).forEach(function (x) { h += routeCard(x, fast); });
-    h += '<div class="actions"><button class="btn p big" data-act="start">' + ic("navi", "s f") + 'Start</button><button class="btn big" data-act="sim">' + ic("car", "s") + "Simulate drive</button></div>";
+    h += '<div class="actions"><button class="btn p big" data-act="start">' + ic("navi", "s f") + 'Start</button><button class="btn big" data-act="sim">' + ic("car", "s") + 'Simulate drive</button><button class="btn ic" data-act="sharetrip" aria-label="Share trip" title="Share trip">' + ic("share", "s") + "</button></div>";
     h += '<div class="leg"><span><i style="background:' + CLR.sage + '"></i>Clear</span><span><i style="background:' + CLR.amber + '"></i>Damaged</span><span><i style="background:' + CLR.terra + '"></i>Severe</span></div>';
     var ids = r.defects.map(function (d) { return d.number; });
     if (officerMode && ids.length) h += '<div class="card"><h3>Officer actions</h3><button class="btn p" data-act="ofixall">Mark all ' + ids.length + " defects on this route repaired</button></div>";
     h += stepsHtml(r) + damageHtml(r);
     return h;
+  }
+  function cmpTable(res) {
+    var rs = res.routes, minT = Math.min.apply(null, rs.map(function (r) { return r.duration_min; })), minD = Math.min.apply(null, rs.map(function (r) { return r.distance_km; })),
+      minP = Math.min.apply(null, rs.map(function (r) { return r.potholes; })), maxC = Math.max.apply(null, rs.map(function (r) { return r.comfort; }));
+    return '<div class="cmpt"><table><thead><tr><th>Route</th><th>Time</th><th>Dist</th><th>Potholes</th><th>Smooth</th></tr></thead><tbody>' + rs.map(function (r) {
+      var nm = r.index === res.recommended ? "Best" : r.index === res.fastest ? "Fastest" : "Route " + (r.index + 1);
+      return '<tr data-i="' + r.index + '" class="' + (r.index === S.sel ? "sel" : "") + '"><td><i></i>' + nm + '</td><td class="' + (r.duration_min === minT ? "best" : "") + '">' + fmtMin(r.duration_min) + '</td><td class="' + (r.distance_km === minD ? "best" : "") + '">' + r.distance_km + ' km</td><td class="' + (r.potholes === minP ? "best" : "") + '">' + r.potholes + '</td><td class="' + (r.comfort === maxC && maxC > 0 ? "best" : "") + '">' + r.comfort + "</td></tr>";
+    }).join("") + "</tbody></table></div>";
   }
   function stepsHtml(r) {
     var m = r.maneuvers || []; if (!m.length) return "";
@@ -855,6 +1084,8 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
     if ((q = b.querySelector("[data-act=retry]"))) q.onclick = function () { fetchRoutes(); };
     if ((q = b.querySelector("[data-act=useme]"))) q.onclick = function () { q.disabled = true; getMe(true).then(function (m) { S.from = { name: "Your location", address: "", lat: m.lat, lon: m.lon, me: true }; renderHead(); maybeRoute(); }).catch(function (er) { q.disabled = false; toast(gpsMsg(er), 7000); }); };
     if ((q = b.querySelector("[data-act=start]"))) q.onclick = function () { startNav(false); };
+    if ((q = b.querySelector("[data-act=sharetrip]"))) q.onclick = function () { shareLink(tripLink(), "Trip to " + (S.to.name || "destination")); };
+    Array.prototype.forEach.call(b.querySelectorAll(".cmpt tr[data-i]"), function (tr) { tr.onclick = function () { selectRoute(+tr.dataset.i); }; });
     if ((q = b.querySelector("[data-act=sim]"))) q.onclick = function () { startNav(true); };
     if ((q = b.querySelector("[data-act=ofixall]"))) q.onclick = function () {
       var ids = S.res.routes[S.sel].defects.map(function (h) { return h.number; });
@@ -918,11 +1149,12 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   }
 
   /* ---------- bottom sheet ---------- */
-  var snaps = function () { var H = window.innerHeight; return { peek: 148, half: Math.round(H * 0.5), full: Math.round(H - 56) }; };
+  var safeB = 0; (function () { var p = document.createElement("div"); p.style.cssText = "position:fixed;left:0;bottom:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden"; document.body.appendChild(p); safeB = p.offsetHeight || 0; p.remove(); })();
+  var snaps = function () { var H = window.innerHeight; return { peek: 132 + safeB, half: Math.round(H * 0.5), full: Math.round(H - 56) }; };
   var sheetH = 148, sheetName = "peek";
   function setSheetPx(h) { sheetH = h; document.documentElement.style.setProperty("--sheet-h", h + "px"); }
   function sheetTo(n) {
-    if (!isMobile()) return; sheetName = n; var h = snaps()[n]; if (n === "peek" && S.view !== "home") h = 148; setSheetPx(h); $("panel").classList.remove("drag");
+    if (!isMobile()) return; sheetName = n; var h = snaps()[n]; setSheetPx(h); ["peek", "half", "full"].forEach(function (x) { document.body.classList.toggle("sh-" + x, x === n); }); $("panel").classList.remove("drag");
   }
   (function () {
     var g = $("grab"), y0 = 0, h0 = 0, t0 = 0, y1 = 0, t1 = 0, on = false;
@@ -1122,9 +1354,23 @@ body.navmode #panel,body.navmode #top,body.navmode #ctrls,body.navmode .maplibre
   /* ---------- boot ---------- */
   window.addEventListener("hashchange", function () { var h = location.hash.replace("#", ""); if (h) showDefect(h, true); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && S.pick) { endPick(); sheetTo("half"); } });
+  function zoneView() {
+    if (!D.zones.length) { D.pendingView = true; return; }
+    var best = D.zones.slice().sort(function (a, b) { return b.count - a.count; })[0]; if (best) map.flyTo({ center: [best.lon, best.lat], zoom: 12.6, duration: 1600, essential: true });
+  }
+  function initialView() {
+    var fallback = function () { zoneView(); };
+    if (!navigator.permissions || !navigator.permissions.query) return fallback();
+    navigator.permissions.query({ name: "geolocation" }).then(function (st) {
+      if (st.state !== "granted") return fallback();
+      getMe().then(function (m) { map.flyTo({ center: [m.lon, m.lat], zoom: 13.6, duration: 1600, essential: true }); renderBodyIfHome(); }).catch(fallback);
+    }).catch(fallback);
+  }
   map.on("load", function () {
     loadZones(); loadDefects(); connect();
-    var to = Q.get("to"), nm = Q.get("name");
+    var to = Q.get("to"), nm = Q.get("name"), fr = Q.get("from");
+    if (fr) { var pf = fr.split(",").map(parseFloat); if (pf.length === 2 && isFinite(pf[0]) && isFinite(pf[1])) S.from = { name: "Start point", address: "", lat: pf[0], lon: pf[1] }; }
+    if (!to && !Q.get("dir") && !location.hash) initialView();
     if (to) { var p = to.split(",").map(parseFloat); if (p.length === 2 && isFinite(p[0]) && isFinite(p[1])) { S.to = { name: nm || "Destination", address: "", lat: p[0], lon: p[1] }; if (!nm) reverse(p[0], p[1]).then(function (r) { if (S.to && S.to.lat === p[0]) { S.to.name = r.name; S.to.address = r.address; if (S.view === "dir") { var t = $("to"); if (t && document.activeElement !== t) t.value = r.name; } } }); } }
     if (Q.get("dir") === "1" || S.to) openDir(); else { renderHead(); renderBody(); sheetTo("peek"); }
   });
