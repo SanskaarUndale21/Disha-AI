@@ -44,6 +44,8 @@ function describe(e: RtEvent): Omit<Toast, 'id'> | null {
         : { title: 'Photo refused: no road damage', body: `device ${d.device ?? 'unknown'}`, tone: 'med', to: '/complaints' }
     case 'emergency.fall':
       return { title: 'Emergency: fall near pothole', body: d.message ?? `Fall near pothole PH ${d.pothole_id ?? ''}`, tone: 'high', to: '/alerts', sticky: true }
+    case 'repair.verified':
+      return { title: `${d.uid} looks repaired`, body: `${d.passes} separate drives saw clean road here`, tone: 'ok', to: '/defects' }
     case 'live.saved':
       return { title: 'Live patrol saved', body: `${d.defects} defects (${d.new} new) from inspection #${d.inspection_id}`, tone: 'ok', to: '/inspections' }
     default:

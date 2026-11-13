@@ -17,6 +17,7 @@ const EVENT_UI: Record<string, { icon: any; color: string; title: (d: any) => st
   'inspection.processed': { icon: Images, color: '#30b0c7', title: (d) => `Inspection ${d.id} analysed`, sub: (d) => `${d.summary?.total ?? 0} findings` },
   'screening.checked': { icon: SealCheck, color: '#dd7a07', title: (d) => (d.verdict === 'pass' ? 'Citizen photo passed AI check' : d.verdict === 'rate_limited' ? 'Device blocked for fake reports' : 'Citizen photo refused'), sub: (d) => d.reason ?? '' },
   'emergency.fall': { icon: Siren, color: '#d92d20', title: () => 'Emergency: fall near pothole', sub: (d) => d.message ?? `Pothole PH ${d.pothole_id ?? ''}` },
+  'repair.verified': { icon: CheckCircle, color: '#34c759', title: (d) => `${d.uid} repaired`, sub: (d) => `${d.passes} drives saw clean road` },
   'live.saved': { icon: VideoCamera, color: '#ff3b30', title: () => 'Live patrol saved', sub: (d) => `${d.defects} defects, ${d.new} new` },
 }
 

@@ -216,6 +216,7 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
             <div className="dd-actions">
               <a className="btn sm" href={reportUrl('complaint', d.id)} target="_blank" rel="noreferrer">Complaint PDF</a>
               <a className="btn sm" href={reportUrl('authority', d.id)} target="_blank" rel="noreferrer">Authority report</a>
+            <a className="btn sm" href={reportUrl('evidence', d.id)} target="_blank" rel="noreferrer">Evidence record</a>
               <span className="spacer" />
               <button className="btn sm primary" disabled={sending} onClick={sendMail}>{sending ? 'Preparing...' : 'Send to roads department'}</button>
             </div>

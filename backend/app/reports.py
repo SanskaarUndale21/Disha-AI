@@ -308,3 +308,58 @@ def authority_pdf(ctx, rates=None):
     el += [Spacer(1, 8), Paragraph("Complaint text", ss["Heading3"]), Paragraph(ctx["text"], ss["BodyText"])]
     doc.build(el)
     return buf.getvalue()
+
+
+def evidence_pdf(ctx):
+    """Evidence of notice for accident or damage claims: when the defect was first detected, how many times it was
+    seen and reported, how long it stayed unrepaired, with photos, location and a tracking QR code."""
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, Spacer
+    d, det, insp = ctx["defect"], ctx["detection"], ctx["inspection"]
+    buf = io.BytesIO()
+    doc = _doc(buf, f"Road defect evidence {d.uid}")
+    ss = getSampleStyleSheet()
+    first = d.first_seen or datetime.now()
+    end = d.last_seen if d.status == "repaired" else datetime.now()
+    days = max(0, (end - first).days)
+    loc = f"{d.lat:.6f}, {d.lon:.6f}" if d.lat is not None else "location not recorded"
+    maps = f"https://maps.google.com/?q={d.lat},{d.lon}" if d.lat is not None else "-"
+    seen = [h for h in ctx["history"] if h.present]
+    el = [_header(ctx, "Road Defect Evidence Record", ss), Spacer(1, 6),
+          Paragraph("This record documents when a road defect was first detected by RoadWatch, how often it was seen "
+                    "or reported afterwards, and whether it was repaired. It is a timestamped log of automated "
+                    "detections and citizen reports and is provided as supporting information only.", ss["Normal"]),
+          Spacer(1, 8)]
+    status_line = ("Repaired (verified)" if d.status == "repaired" else
+                   f"Still unrepaired as of {datetime.now():%d %b %Y}")
+    el += [_table([["Fact", "Record"],
+                   ["Defect", f"{d.uid}: {(d.class_name or '').replace('_', ' ')}, severity {d.severity or '-'}"],
+                   ["Location", f"{loc} ({d.location_source or 'unknown'}); map: {maps}"],
+                   ["First detected", _fmt_dt(first)],
+                   ["Last observed", _fmt_dt(d.last_seen)],
+                   ["Times seen by inspections", str(len(seen))],
+                   ["Independent reports merged", str(d.report_count or 1)],
+                   ["Days between first detection and " + ("repair" if d.status == "repaired" else "today"), str(days)],
+                   ["Current status", status_line]], widths=[170, 360]), Spacer(1, 8)]
+    imgs = _images_row(ctx)
+    if imgs:
+        el += [Paragraph("Photographic evidence (first and latest available detection)", ss["Heading3"]), imgs,
+               Spacer(1, 8)]
+    el.append(Paragraph("Timeline of observations", ss["Heading3"]))
+    rows = [["Date", "Observed", "Severity", "Risk", "Trend", "Inspection"]]
+    for h in ctx["history"]:
+        rows.append([_fmt_dt(h.observed_at), "yes" if h.present else "not found (repair check)",
+                     f"{h.severity_score:.2f}" if h.severity_score is not None else "-",
+                     f"{h.risk_score:.0f}" if h.risk_score is not None else "-", h.trend or "-",
+                     f"#{h.inspection_id}" if h.inspection_id else "-"])
+    el += [_table(rows, widths=[110, 120, 60, 50, 70, 120]), Spacer(1, 8)]
+    ver = [x for x in ctx["detections"] if x.verification in ("confirmed", "corrected")]
+    el += [Paragraph(f"Human verification: {len(ver)} of {len(ctx['detections'])} detections confirmed by an officer."
+                     if ctx["detections"] else "Human verification: none recorded.", ss["Normal"]), Spacer(1, 6),
+           Paragraph("Method and limits: detections come from computer-vision models and can contain errors; "
+                     "dates are the capture times stored with each photo or the time of upload when no capture time "
+                     "was available; locations come from photo GPS, a GPS track or a manual pin and are accurate to "
+                     "several metres. This record is not legal advice and has not been certified by any authority.",
+                     ss["Italic"])]
+    doc.build(el)
+    return buf.getvalue()

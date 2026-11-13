@@ -260,6 +260,46 @@ def _f(v):
         return None
 
 
+class CleanPass(Base):
+    """A drive-by frame that saw clean road at a spot where an open defect was recorded."""
+    __tablename__ = "clean_passes"
+    id = Column(Integer, primary_key=True)
+    defect_id = Column(Integer, index=True)
+    session_id = Column(String(40), index=True)
+    device_id = Column(String(64))
+    passed_at = Column(DateTime, default=now)
+
+
+REPAIR_RADIUS_M = float(os.getenv("RD_DRIVEBY_RADIUS_M", "8"))
+REPAIR_PASSES_NEEDED = int(os.getenv("RD_DRIVEBY_PASSES", "3"))
+
+
+def _record_clean_pass(s, session_id, device_id, lat, lon):
+    """Repairs verified by drive-by: when REPAIR_PASSES_NEEDED different drives each see clean road within
+    REPAIR_RADIUS_M of an open defect (after it was last seen), the defect is marked repaired automatically."""
+    from .db import Defect, DefectHistory
+    from . import events
+    dl = REPAIR_RADIUS_M / 111000.0
+    near = s.query(Defect).filter(Defect.status == "active", Defect.lat.between(lat - dl, lat + dl),
+                                  Defect.lon.between(lon - dl * 1.5, lon + dl * 1.5)).all()
+    for df in near:
+        if df.lat is None or haversine_m(lat, lon, df.lat, df.lon) > REPAIR_RADIUS_M:
+            continue
+        if s.query(CleanPass).filter(CleanPass.defect_id == df.id, CleanPass.session_id == session_id).first():
+            continue
+        s.add(CleanPass(defect_id=df.id, session_id=session_id, device_id=device_id))
+        s.flush()
+        since = df.last_seen or df.first_seen
+        passes = s.query(CleanPass).filter(CleanPass.defect_id == df.id, CleanPass.passed_at >= since).all()
+        sessions = {p_.session_id for p_ in passes}
+        if len(sessions) >= REPAIR_PASSES_NEEDED:
+            df.status, df.trend, df.severity_score = "repaired", "repaired", 0.0
+            df.risk_score, df.risk_level = 0.0, "Low"
+            s.add(DefectHistory(defect_id=df.id, observed_at=now(), present=False, trend="repaired", risk_score=0.0))
+            events.publish("repair.verified", {"uid": df.uid, "defect_id": df.id, "passes": len(sessions),
+                                                "message": f"{df.uid} looks repaired: {len(sessions)} separate drives saw clean road here."})
+
+
 def _session(s, sid):
     d = s.get(DriveSession, sid) if sid else None
     if d is None:
@@ -297,6 +337,8 @@ def _drive_frame_sync(data, sid, lat, lon, acc, captured_at):
                 if step <= DRIVE_MAX_JUMP_M:
                     d.distance_m = (d.distance_m or 0) + step
             d.last_lat, d.last_lon = lat, lon
+        if not damage and precise and not rows:
+            _record_clean_pass(s, sid, d.device_id, lat, lon)
         s.commit()
         if not damage:
             return {"detected": False, "canonical_count": len(d.unique_defect_ids or [])}
@@ -457,7 +499,7 @@ class DriveStop(BaseModel):
 
 # ---------------------------------------------------------------- routes
 def register(app):
-    Base.metadata.create_all(engine, tables=[DriveSession.__table__, ReverseGeocodeCache.__table__,
+    Base.metadata.create_all(engine, tables=[DriveSession.__table__, CleanPass.__table__, ReverseGeocodeCache.__table__,
                                              RoadOwnerCache.__table__])
 
     @app.post("/api/drive/start")

@@ -177,6 +177,9 @@ export type CostRow = {
   labour_cost: number
   traffic_cost: number
   total_cost: number
+  delay_weekly?: number
+  delay_30d?: number
+  delay_growth_pct_week?: number
   lat: number | null
   lon: number | null
   crop_url: string | null
@@ -190,6 +193,8 @@ export type BudgetPlan = {
   risk_covered: number
   risk_total: number
   left: number
+  objective?: string
+  delay_weekly_avoided?: number
 }
 
 export type Alert = {
@@ -210,7 +215,7 @@ export type AlertSummary = { open: number; critical: number; warning: number; in
 export const ops = {
   costs: (status = 'active') => req<CostRow[]>(`/api/ops/costs?status=${status}`),
   rates: () => req<Record<string, any>>('/api/ops/rates'),
-  budget: (budget: number) => req<BudgetPlan>('/api/ops/budget', json({ budget })),
+  budget: (budget: number, objective = 'risk') => req<BudgetPlan>('/api/ops/budget', json({ budget, objective })),
   weather: (lat: number, lon: number) =>
     req<{ rain_mm_24h: number; max_precip_probability: number; risk: string }>(`/api/ops/weather?lat=${lat}&lon=${lon}`),
   enrichRoads: () => req<any>('/api/ops/enrich-roads', { method: 'POST' }),
@@ -222,7 +227,7 @@ export const ops = {
   scanAlerts: () => req<AlertSummary>('/api/alerts/scan', { method: 'POST' }),
 }
 
-export const reportUrl = (kind: 'complaint' | 'authority', defectId: number) => `/api/reports/${kind}/${defectId}.pdf`
+export const reportUrl = (kind: 'complaint' | 'authority' | 'evidence', defectId: number) => `/api/reports/${kind}/${defectId}.pdf`
 
 /** Indian rupees with en-IN digit grouping, e.g. "Rs 1,23,450". */
 export const inr = (n: number | null | undefined) =>

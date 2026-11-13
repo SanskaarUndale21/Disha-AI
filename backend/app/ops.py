@@ -38,6 +38,12 @@ OVERPASS_URL = os.getenv("RD_OVERPASS_URL", "https://overpass-api.de/api/interpr
 OVERPASS_TIMEOUT = float(os.getenv("RD_OVERPASS_TIMEOUT", "45"))  # public Overpass is often slow
 
 # ---------------------------------------------------------------- rates (assumptions)
+# Cost of delay: assumed weekly growth of the repair bill if the defect is left alone (assumptions, not official data).
+DELAY_GROWTH_PER_WEEK = {"pothole": 0.06, "alligator_crack": 0.08, "transverse_crack": 0.04, "longitudinal_crack": 0.03,
+                         "manhole": 0.02, "debris": 0.0, "speed_breaker": 0.0, "barricade": 0.0}
+DELAY_ROAD_MULT = {"highway": 1.5, "arterial": 1.3, "collector": 1.1, "local": 1.0, "unknown": 1.0}
+DELAY_TREND_MULT = {"worsening": 1.5, "new": 1.0, "stable": 1.0, "improving": 0.7}
+
 RATES = {
     "currency": "INR",
     "cold_mix_per_m3": 9000,
@@ -211,7 +217,16 @@ def estimate(d: Defect) -> Optional[dict]:
         "labour_cost": round(labour), "traffic_cost": round(traffic_cost), "total_cost": round(total),
         "lat": d.lat, "lon": d.lon, "crop_url": f"/media/crops/{d.best_crop}" if d.best_crop else None,
         "road_type": d.road_type or "unknown", "status": d.status, "basis": basis,
+        **delay_fields(d, total),
     }
+
+
+def delay_fields(d, total):
+    """Weekly and 30-day cost of waiting: repair cost x weekly growth x road traffic x trend multiplier."""
+    g = DELAY_GROWTH_PER_WEEK.get(d.class_name, 0.04) * DELAY_ROAD_MULT.get(d.road_type or "unknown", 1.0)         * DELAY_TREND_MULT.get(d.trend or "new", 1.0)
+    week = total * g
+    return {"delay_weekly": round(week), "delay_30d": round(total * ((1 + g) ** (30 / 7.0) - 1)),
+            "delay_growth_pct_week": round(g * 100, 1)}
 
 
 def cost_rows(s, status: str = "active"):
@@ -224,22 +239,22 @@ def cost_rows(s, status: str = "active"):
     return rows
 
 
-def optimise(rows, budget: float):
+def optimise(rows, budget: float, value_key: str = "risk_score"):
     """0/1 knapsack on risk_score with costs in units of 100 INR; greedy by risk/cost above 2000 items."""
     budget = max(0.0, float(budget))
-    items = [r for r in rows if r["total_cost"] > 0 and r["risk_score"] > 0]
+    items = [r for r in rows if r["total_cost"] > 0 and r[value_key] > 0]
     if sum(r["total_cost"] for r in items) <= budget:
         chosen = items
     elif len(items) > 2000 or budget / 100 * len(items) > 6e7:
         chosen, spent = [], 0.0
-        for r in sorted(items, key=lambda r: r["risk_score"] / r["total_cost"], reverse=True):
+        for r in sorted(items, key=lambda r: r[value_key] / r["total_cost"], reverse=True):
             if spent + r["total_cost"] <= budget:
                 chosen.append(r)
                 spent += r["total_cost"]
     else:
         cap = int(budget // 100)
         w = [int(math.ceil(r["total_cost"] / 100.0)) for r in items]
-        v = np.array([r["risk_score"] for r in items], dtype=np.float64)
+        v = np.array([r[value_key] for r in items], dtype=np.float64)
         dp = np.zeros(cap + 1, dtype=np.float64)
         keep = np.zeros((len(items), cap + 1), dtype=bool)
         for k, wk in enumerate(w):
@@ -255,7 +270,7 @@ def optimise(rows, budget: float):
                 chosen.append(items[k])
                 c -= w[k]
         chosen.reverse()
-    chosen = sorted(chosen, key=lambda r: r["risk_score"], reverse=True)
+    chosen = sorted(chosen, key=lambda r: r[value_key], reverse=True)
     total = sum(r["total_cost"] for r in chosen)
     return {"budget": budget, "selected": chosen, "total_cost": round(total),
             "risk_covered": round(sum(r["risk_score"] for r in chosen), 1),
@@ -647,7 +662,12 @@ def register(app):
             raise HTTPException(422, "budget must be >= 0")
         s = SessionLocal()
         try:
-            return optimise(cost_rows(s, "active"), budget)
+            objective = str(body.get("objective", "risk"))
+            key = "delay_weekly" if objective == "delay" else "risk_score"
+            out = optimise(cost_rows(s, "active"), budget, key)
+            out["objective"] = "delay" if key == "delay_weekly" else "risk"
+            out["delay_weekly_avoided"] = sum(r["delay_weekly"] for r in out["selected"])
+            return out
         finally:
             s.close()
 
@@ -758,6 +778,17 @@ def register(app):
             s.close()
         return Response(pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'inline; filename="authority_{d.uid}.pdf"'})
+
+    @app.get("/api/reports/evidence/{defect_id}.pdf")
+    def evidence_pdf(defect_id: int, request: Request):
+        s = SessionLocal()
+        try:
+            d = _get_defect(s, defect_id)
+            pdf = reports.evidence_pdf(_report_ctx(s, d, request))
+        finally:
+            s.close()
+        return Response(pdf, media_type="application/pdf",
+                        headers={"Content-Disposition": f'inline; filename="evidence_{d.uid}.pdf"'})
 
     @app.get("/api/ops/complaint-text/{defect_id}")
     def get_complaint_text(defect_id: int):

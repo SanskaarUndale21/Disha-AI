@@ -3,37 +3,37 @@
 Method
 1. Detection. detector.detect_image gives each pothole a box and a traced damaged outline (polygon, OpenCV
    segmentation in severity.py). Every pothole row is measured. An explicit box can also be passed.
-2. Scale (metres per pixel). The best available source is used and reported with its uncertainty:
+2. Scale (metres per pixel), best available source, reported with its uncertainty:
    a. Reference object (A4 sheet, credit card, 500 ml bottle, shoe/foot or a custom length) marked with a box:
       m/px = real length / long side of the box in pixels. About plus or minus 10 percent.
-   b. Ground-plane geometry for dashcam and phone-at-chest shots: camera height 1.2 m (phone) or 1.4 m
-      (dashcam: landscape image with a visible horizon), horizontal field of view about 66 degrees across the long
-      side of the image, so f = (long side / 2) / tan(33 deg). The horizon row y_h is the vanishing point of road
-      edges and lane lines (Hough lines, median of pairwise intersections), fallback 40 percent of the height.
-      A ground point at row y lies at distance Z = H * f / (y - y_h) and lateral offset X = (x - cx) * Z / f.
-      Every polygon vertex is mapped onto the road plane this way (inverse perspective), which is the same as
-      summing per-row scaled strips, so the far edge of a hole is not under-measured. About plus or minus 30 percent.
-   c. Close-up top-down photos (pothole box covers more than 25 percent of the frame and no horizon found):
-      the frame width is assumed to show about 1.2 m of road. About plus or minus 40 percent.
-3. Width, length, area. cv2.minAreaRect of the outline (in road-plane metres for ground-plane mode, else in
-   pixels times m/px): width = shorter side, length = longer side. Area = shoelace area of the outline on the
-   road plane. Fallback outline: an ellipse inside the box.
-4. Depth. Depth Anything V2 Small (Apache-2.0, depth-anything/Depth-Anything-V2-Small-hf) runs on the image with
-   the long side resized to 518. It returns relative inverse depth D, affine in 1/Z. A plane D = p0 + p1 x + p2 y
-   is fitted by least squares with outlier rejection to a ring of road just outside the outline. Inside the hole
-   the floor lies below that plane. On a flat road 1/Z is linear in the row, so the fitted plane evaluated at the
-   horizon row gives the shift b of the model output (1/Z = 0 at the horizon) and the row gradient p2 gives its
-   scale (geometric change of 1/Z per row is 1 / (H f)). A hole floor seen through pixel (x, y) at depth d below
-   the road satisfies (D_plane - b) / (D - b) = (H + d) / H, so d = H * ((D_plane - b) / (D - b) - 1).
-   In close-up and reference mode the camera distance is Zc = m/px * f and the shift b is taken as 0, so
-   d = Zc * (D_plane / D - 1), then capped at 0.6 x the hole width and 30 cm. Max depth = 95th percentile of d
-   inside the outline, mean depth = mean of d inside the outline, both clamped to 1 to 30 cm. Confidence is high
-   with a reference object, medium for ground-plane and low for close-ups. Standing water reflects, so depth is
-   underestimated when water is detected.
+   b. Ground-plane geometry with a pitched camera: camera height 1.2 m (phone) or 1.4 m (dashcam), horizontal field
+      of view about 66 degrees across the long side of the image, f = (long side / 2) / tan(33 deg). The horizon
+      row y_h comes from the depth model itself (on a flat road inverse depth is linear in the image row and zero at
+      the horizon, so a line fit to the lower half of the central-column profile gives y_h, accepted when R2 is at
+      least 0.9), else from road-edge Hough lines, else 40 percent of the height. The camera pitch follows from
+      y_h: tan(pitch) = (cy - y_h) / f. A ground point at normalised row y_n has optical depth
+      Z = H / (y_n cos(pitch) + sin(pitch)) and road coordinates (X, F) = (x_n Z, Z (cos(pitch) - y_n sin(pitch))).
+      Every outline vertex is mapped onto the road plane, so far edges are not under-measured. Plus or minus 30
+      percent (45 percent when the horizon is only a fallback guess).
+   c. Close-up with no usable horizon (box above 25 percent of the frame): the frame width is assumed to show
+      about 2 m of road. Plus or minus 60 percent.
+3. Width, length, area. cv2.minAreaRect of the outline on the road plane (or pixels x m/px): width = shorter side,
+   length = longer side, area = shoelace area of the outline. Fallback outline: an ellipse inside the box.
+4. Depth. Depth Anything V2 Small (Apache-2.0, depth-anything/Depth-Anything-V2-Small-hf), long side 518, gives
+   relative inverse depth D. A plane is fitted (least squares with outlier rejection) to a ring of road just
+   outside the outline. A floor point below the road on the same camera ray satisfies D_plane / D = Z' / Z, so
+   depth below the road = H (D_plane / D - 1) in ground-plane mode and Zc (D_plane / D - 1) with Zc = m/px x f
+   otherwise. Capped at 0.35 x width and 30 cm. Max depth = 95th percentile inside the outline, mean = mean.
+   The result is only used when the drop is clearly above the road-ring noise (p90 of the drop above 3 sigma,
+   mean above 1 sigma, p90 at least 2 percent of the depth). The small model smooths away dents of a few cm, so this
+   often fails. Then depth is flagged not reliable and replaced by an estimate from typical proportions: 5 to 20
+   percent of width, scaled by the detector's dark-contrast depth index, with that range reported. Standing water
+   reflects, so depth is underestimated when water is detected.
 5. Volume = mean depth x area (litres = m3 x 1000). Cold mix kg = volume m3 x 2300 kg/m3 x 1.1 compaction.
 6. Annotated image: outline, minimum-area rectangle with width and length labels in cm and a small depth inset.
 """
 import hashlib
+import os
 import math
 import threading
 import time
@@ -52,15 +52,17 @@ DEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 DEPTH_LONG_SIDE = 518
 FOV_DEG = 66.0
 H_PHONE, H_DASH = 1.2, 1.4
-CLOSEUP_FRAME_M = 1.2
+CLOSEUP_FRAME_M = 2.0
+DEPTH_WIDTH_CAP = 0.35
+PRIOR_RATIO = (0.05, 0.20)
 REFERENCES_CM = {"a4": 29.7, "credit_card": 8.56, "bottle_500ml": 21.0, "foot": 27.0}
 REFERENCE_WORDS = {"a4": "A4 sheet", "credit_card": "credit card", "bottle_500ml": "500 ml bottle",
                    "foot": "shoe or foot", "custom": "custom reference"}
 MODE_WORDS = {"reference": "Measured against the reference object you marked",
               "ground_plane": "Estimated from camera height and perspective",
-              "closeup": "Close-up photo: assumes about 1.2 m of road across the frame",
+              "closeup": "Close-up photo: assumes about 2 m of road across the frame",
               "box": "Box supplied by the request"}
-SCALE_UNC = {"reference": 10, "ground_plane": 30, "closeup": 40}
+SCALE_UNC = {"reference": 10, "ground_plane": 30, "ground_fallback": 45, "closeup": 60}
 DEPTH_UNC = {"reference": 30, "ground_plane": 45, "closeup": 60}
 DEPTH_CONF = {"reference": "high", "ground_plane": "medium", "closeup": "low"}
 ASPHALT_KG_M3, COMPACTION = 2300.0, 1.1
@@ -85,10 +87,24 @@ def _load_depth():
                 dev, dt = "cuda", torch.float16
         except Exception:
             pass
-    try:
-        m = AutoModelForDepthEstimation.from_pretrained(DEPTH_MODEL_ID, dtype=dt)
-    except TypeError:  # older transformers
-        m = AutoModelForDepthEstimation.from_pretrained(DEPTH_MODEL_ID, torch_dtype=dt)
+    last = None
+    for kw in ({"local_files_only": True}, {}):  # cached weights load fast and without network
+        for dk in ("dtype", "torch_dtype"):
+            try:
+                m = AutoModelForDepthEstimation.from_pretrained(DEPTH_MODEL_ID, **{dk: dt}, **kw)
+                break
+            except TypeError as e:
+                last = e
+            except OSError as e:
+                last = e
+                m = None
+                break
+        else:
+            m = None
+        if m is not None:
+            break
+    if m is None:
+        raise RuntimeError(f"Could not load the depth model: {last}")
     m = m.to(dev).eval()
     _depth.update(model=m, device=dev, dtype=dt)
     return _depth
@@ -161,19 +177,55 @@ def focal_px(w, h):
     return (max(w, h) / 2.0) / math.tan(math.radians(FOV_DEG / 2))
 
 
-def to_ground(pts, cx, yh, f, H, h):
-    """Image points -> road-plane metres (X lateral, Z forward)."""
+def horizon_from_depth(D):
+    """Horizon row from the depth model: on a flat road inverse depth grows linearly with the image row and is
+    zero at the horizon. Fit the central-column median profile of the lower half. Returns (y_h, r2) or (None, r2)."""
+    h, w = D.shape
+    prof = np.median(D[:, int(0.25 * w):int(0.75 * w)], axis=1).astype(np.float64)
+    ys = np.arange(h, dtype=np.float64)
+    keep = ys >= 0.45 * h
+    p = None
+    for _ in range(4):
+        if keep.sum() < 10:
+            return None, 0.0
+        p = np.polyfit(ys[keep], prof[keep], 1)
+        r = prof - np.polyval(p, ys)
+        sd = 1.4826 * np.median(np.abs(r[keep] - np.median(r[keep]))) + 1e-6
+        keep = (ys >= 0.45 * h) & (np.abs(r) < 2.5 * sd)
+    sel = ys >= 0.45 * h
+    ss_res = float(np.sum((prof[sel] - np.polyval(p, ys[sel])) ** 2))
+    ss_tot = float(np.sum((prof[sel] - prof[sel].mean()) ** 2)) + 1e-9
+    r2 = 1 - ss_res / ss_tot
+    if p[0] <= 0:
+        return None, r2
+    yh = -p[1] / p[0]
+    if not (-1.5 * h <= yh <= 0.75 * h):
+        return None, r2
+    return float(yh), r2
+
+
+def _pitch(yh, h, f):
+    return math.atan2((h / 2.0) - yh, f)  # camera pitched down by this angle, radians
+
+
+def to_ground(pts, w, h, yh, f, H):
+    """Image points -> road-plane metres (X to the right, F forward) for a camera H metres above a flat road,
+    pitched down so that the horizon falls on row yh. Z along the optical axis is H / (y_n cos t + sin t)."""
     p = np.asarray(pts, np.float64)
-    dy = np.maximum(p[:, 1] - yh, 0.03 * h)
-    Z = H * f / dy
-    X = (p[:, 0] - cx) * Z / f
-    return np.stack([X, Z], 1)
+    t = _pitch(yh, h, f)
+    xn, yn = (p[:, 0] - w / 2.0) / f, (p[:, 1] - h / 2.0) / f
+    den = np.maximum(yn * math.cos(t) + math.sin(t), 0.02)
+    Z = H / den
+    return np.stack([xn * Z, Z * (math.cos(t) - yn * math.sin(t))], 1), Z
 
 
-def from_ground(g, cx, yh, f, H):
+def from_ground(g, w, h, yh, f, H):
+    t = _pitch(yh, h, f)
     g = np.asarray(g, np.float64)
-    Z = np.maximum(g[:, 1], 1e-3)
-    return np.stack([cx + g[:, 0] * f / Z, yh + H * f / Z], 1)
+    X, F = g[:, 0], g[:, 1]
+    Py = -F * math.sin(t) + H * math.cos(t)
+    Pz = np.maximum(F * math.cos(t) + H * math.sin(t), 1e-3)
+    return np.stack([w / 2.0 + f * X / Pz, h / 2.0 + f * Py / Pz], 1)
 
 
 def shoelace(p):
@@ -202,7 +254,7 @@ def _plane_fit(xs, ys, vs):
         r = vs - A @ coef
         mad = np.median(np.abs(r[keep] - np.median(r[keep]))) + 1e-9
         keep = np.abs(r) < 2.5 * 1.4826 * mad
-    return coef
+    return coef, keep
 
 
 # ---------------------------------------------------------------- core
@@ -214,99 +266,161 @@ def _measure_one(img, D, row, idx, scale, notes_common):
     notes = list(notes_common)
     if src != "traced outline":
         notes.append("Outline not traced, an ellipse inside the box was used.")
+    f, H, yh = scale["f"], scale["H"], scale["yh"]
 
-    def ground_measure():
-        g_polys = [to_ground(p, w / 2, scale["yh"], scale["f"], scale["H"], h) for p in polys]
+    # ---------- size
+    corners = None
+    size_ok = True
+    if mode == "ground_plane":
+        g_polys = [to_ground(p, w, h, yh, f, H)[0] for p in polys]
         gp = np.vstack(g_polys).astype(np.float32)
         (gcx, gcy), (a, b), ang = cv2.minAreaRect(gp)
-        corners_g = cv2.boxPoints(((gcx, gcy), (a, b), ang))
-        corners_i = from_ground(corners_g, w / 2, scale["yh"], scale["f"], scale["H"])
-        area = sum(shoelace(gpo) for gpo in g_polys)
-        return min(a, b), max(a, b), area, corners_i, corners_g
-
-    if mode == "ground_plane":
-        wid, lng, area, corners, corners_g = ground_measure()
-        dist = float(np.median(to_ground(pts, w / 2, scale["yh"], scale["f"], scale["H"], h)[:, 1]))
-        if not (0.04 <= wid and lng <= 3.0) or row["y1"] - scale["yh"] < 0.02 * h:
-            notes.append("Perspective geometry gave an implausible size here, used the close-up assumption.")
-            mode = "closeup_fallback"
+        wid, lng = min(a, b), max(a, b)
+        area = sum(shoelace(g) for g in g_polys)
+        ok = 0.04 <= wid <= 2.5 and lng <= 4.0 and float(pts[:, 1].min()) > yh + 0.02 * h
+        corners = from_ground(cv2.boxPoints(((gcx, gcy), (a, b), ang)), w, h, yh, f, H)
+        zc = float(np.median(to_ground(pts, w, h, yh, f, H)[1]))
+        if not ok:
+            size_ok = False
+            notes.append("Size not reliable: the outline is very far away or covers merged damage, so the "
+                         "perspective geometry gives an extreme value.")
     if mode != "ground_plane":
-        mpp = scale["mpp"] if scale["mode"] in ("reference", "closeup") else CLOSEUP_FRAME_M / w
+        mpp = scale["mpp"]
         (cx, cy), (a, b), ang = cv2.minAreaRect(pts.astype(np.float32))
         corners = cv2.boxPoints(((cx, cy), (a, b), ang))
         wid, lng = min(a, b) * mpp, max(a, b) * mpp
         area = sum(shoelace(p) for p in polys) * mpp * mpp
-        dist = mpp * scale["f"]
-    eff_mode = "closeup" if mode == "closeup_fallback" else mode
+        zc = mpp * f  # camera to road distance implied by the scale (road about normal to the view)
+    eff = mode
+    if eff == "ground_plane" and scale.get("horizon_src") == "fallback":
+        scale_unc = SCALE_UNC["ground_fallback"]
+    else:
+        scale_unc = SCALE_UNC[eff]
 
-    # ---------- depth from the relative inverse depth map
+    # ---------- depth from relative inverse depth: residual below a plane fitted to the road ring
     mask = np.zeros((h, w), np.uint8)
     cv2.fillPoly(mask, [p.astype(np.int32) for p in polys], 1)
     if mask.sum() < 20:
         x1, y1, x2, y2 = (int(v) for v in (row["x1"], row["y1"], row["x2"], row["y2"]))
         mask[y1:y2, x1:x2] = 1
-    r = max(4, int(0.35 * math.sqrt(max(mask.sum(), 1))))
-    m_in = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    r = max(5, int(0.5 * math.sqrt(max(mask.sum(), 1))))
+    m_in = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
     m_out = cv2.dilate(mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1)))
     ring = (m_out > 0) & (m_in == 0)
     ys_r, xs_r = np.nonzero(ring)
     ys_i, xs_i = np.nonzero(mask)
-    step = max(1, len(xs_r) // 6000)
-    xs_r, ys_r = xs_r[::step], ys_r[::step]
-    coef = _plane_fit(xs_r.astype(np.float64), ys_r.astype(np.float64), D[ys_r, xs_r].astype(np.float64))
-    plane_in = coef[0] + coef[1] * xs_i + coef[2] * ys_i
-    d_in = D[ys_i, xs_i].astype(np.float64)
-    if eff_mode == "ground_plane":
-        b = coef[0] + coef[1] * xs_i + coef[2] * scale["yh"]  # plane value at the horizon row: 1/Z = 0 there
-        num, den = plane_in - b, d_in - b
-        ok = (num > 0) & (den > 0)
-        if coef[2] <= 0 or ok.mean() < 0.5:
-            notes.append("Depth model output did not follow the road plane well, depth is a rough guess.")
-            ok = den > 0
-        dep = np.where(ok, scale["H"] * (num / np.maximum(den, 1e-6) - 1.0), 0.0)
+    reliable, reason, rel_in = True, "", np.zeros(len(xs_i))
+    if len(xs_r) < 40:
+        reliable, reason = False, "too little road around the hole"
+        dep = np.zeros(len(xs_i))
     else:
-        dep = dist * (plane_in / np.maximum(d_in, 1e-6) - 1.0)
+        step = max(1, len(xs_r) // 6000)
+        xs_r, ys_r = xs_r[::step], ys_r[::step]
+        vr = D[ys_r, xs_r].astype(np.float64)
+        coef, kept = _plane_fit(xs_r.astype(np.float64), ys_r.astype(np.float64), vr)
+        plane_r = coef[0] + coef[1] * xs_r + coef[2] * ys_r
+        plane_in = coef[0] + coef[1] * xs_i + coef[2] * ys_i
+        d_in = D[ys_i, xs_i].astype(np.float64)
+        pm = max(float(np.median(plane_r)), 1e-6)
+        sigma = float(np.std((vr - plane_r)[kept])) / pm  # relative noise of the road ring
+        rel_in = np.clip((plane_in - d_in) / np.maximum(plane_in, 1e-6), 0, 0.9)  # 1 - Z/Z' = relative deficit
+        # a floor at inverse depth d below the plane: D_plane / D = Z' / Z  ->  depth = Zc * (D_plane / D - 1)
+        ratio = np.maximum(plane_in, 1e-6) / np.maximum(d_in, 1e-6)
+        ratio = np.clip(ratio, 1.0, 3.0)
+        if eff == "ground_plane":
+            dep = H * (ratio - 1.0)  # point on the same ray, below the road: depth below plane = H (Z'/Z - 1)
+        else:
+            dep = zc * (ratio - 1.0)
+        mean_rel = float(rel_in.mean())
+        p90 = float(np.percentile(rel_in, 90))
+        if os.environ.get("MEASURE_DEBUG"):
+            print("DBG", idx, "sigma", round(sigma, 4), "mean_rel", round(mean_rel, 4), "p90", round(p90, 4),
+                  "wid", round(wid, 2), "depth_p95_cm", round(float(np.percentile(np.clip(dep, 0, None), 95)) * 100, 1))
+        if plane_in.mean() <= 0 or pm <= 0:
+            reliable, reason = False, "the road plane fit failed"
+        elif p90 < 3.0 * sigma or mean_rel < 1.0 * sigma:
+            reliable, reason = False, "the hole floor is not separable from road noise in the depth model"
+        elif p90 < 0.02:
+            reliable, reason = False, "the depth model sees almost no drop inside the outline"
     dep = np.clip(dep, 0, None)
-    cap = min(0.30, 0.6 * wid)
-    raw_max = float(np.percentile(dep, 95)) if dep.size else 0.0
-    raw_mean = float(dep.mean()) if dep.size else 0.0
-    if raw_max > cap:
-        notes.append(f"Raw depth {raw_max * 100:.0f} cm exceeded the sanity cap and was limited to {cap * 100:.0f} cm.")
-        k = cap / raw_max
-        raw_max, raw_mean = cap, raw_mean * k
-    dmax = float(np.clip(raw_max * 100, 1, 30))
-    dmean = float(np.clip(raw_mean * 100, 1, dmax))
+
+    ratio_cap = DEPTH_WIDTH_CAP
+    cap = min(0.30, ratio_cap * wid)
+    lo_r, hi_r = PRIOR_RATIO
+    dunc = DEPTH_UNC[eff] if eff != "ground_plane" or scale.get("horizon_src") != "fallback" else DEPTH_UNC["closeup"]
+    if reliable:
+        raw_max = float(np.percentile(dep, 95))
+        raw_mean = float(dep.mean())
+        if raw_max > cap:
+            notes.append(f"Raw depth {raw_max * 100:.0f} cm exceeded {ratio_cap:.2f} x width and was limited to "
+                         f"{cap * 100:.0f} cm.")
+            k = cap / raw_max
+            raw_max, raw_mean = cap, raw_mean * k
+        if raw_max < 0.01:
+            notes.append("Measured drop is under 1 cm, reported as 1 cm.")
+        dmax = float(np.clip(raw_max * 100, 1, 30))
+        dmean = float(np.clip(raw_mean * 100, 1, dmax))
+        d_lo, d_hi = dmax * (1 - dunc / 100), dmax * (1 + dunc / 100)
+        m_lo, m_hi = dmean * (1 - dunc / 100), dmean * (1 + dunc / 100)
+    else:
+        notes.append(f"Depth not reliable: {reason}. Showing an estimate from typical pothole proportions and the "
+                     f"photo's dark contrast, range {lo_r * 100:.0f} to {hi_r * 100:.0f} percent of width.")
+        frac = lo_r + (hi_r - lo_r) * 0.0 + 0.10 * float(np.clip(row.get("depth_index", 0.4), 0, 1))
+        frac = float(np.clip(frac, lo_r, hi_r))
+        dmax = float(np.clip(frac * wid * 100, 1, 30))
+        dmean = 0.6 * dmax
+        d_lo, d_hi = max(1.0, lo_r * wid * 100), min(30.0, hi_r * wid * 100)
+        d_hi = max(d_hi, d_lo)
+        m_lo, m_hi = d_lo * 0.6, d_hi * 0.6
     if row.get("water"):
         notes.append("Standing water detected: the water surface reflects, so depth is underestimated.")
 
-    unc = SCALE_UNC[eff_mode]
-    dunc = DEPTH_UNC[eff_mode]
-    vol_m3 = (dmean / 100.0) * area
-    rng = lambda v, p: [round(v * (1 - p / 100), 1), round(v * (1 + p / 100), 1)]
+    def v_l(depth_cm):  # litres
+        return depth_cm / 100.0 * area * 1000.0
+
+    r1 = lambda v: None if v is None else round(float(v), 1)
+    vol = v_l(dmean)
     res = {
         "index": idx, "confidence": round(float(row.get("confidence", 1.0)), 3),
         "box": [round(float(row[k]), 1) for k in ("x1", "y1", "x2", "y2")],
         "width_cm": round(wid * 100, 1), "length_cm": round(lng * 100, 1), "area_m2": round(area, 3),
-        "depth_max_cm": round(dmax, 1), "depth_mean_cm": round(dmean, 1),
-        "depth_max_range_cm": rng(dmax, dunc), "depth_mean_range_cm": rng(dmean, dunc),
-        "width_range_cm": rng(wid * 100, unc), "length_range_cm": rng(lng * 100, unc),
-        "volume_litres": round(vol_m3 * 1000, 1), "cold_mix_kg": round(vol_m3 * ASPHALT_KG_M3 * COMPACTION, 1),
-        "scale_mode": eff_mode, "scale_mode_label": MODE_WORDS[eff_mode],
-        "uncertainty_pct": unc, "depth_uncertainty_pct": dunc, "depth_confidence": DEPTH_CONF[eff_mode],
-        "distance_m": round(dist, 2), "water": bool(row.get("water")), "outline": src, "notes": notes,
+        "depth_reliable": bool(reliable), "size_reliable": bool(size_ok),
+        "depth_source": "depth model residual" if reliable else "typical proportions (estimate)",
+        "depth_max_cm": r1(dmax), "depth_mean_cm": r1(dmean),
+        "depth_max_range_cm": [r1(d_lo), r1(d_hi)], "depth_mean_range_cm": [r1(m_lo), r1(m_hi)],
+        "depth_width_ratio": round(dmax / (wid * 100), 3),
+        "width_range_cm": [r1(wid * 100 * (1 - scale_unc / 100)), r1(wid * 100 * (1 + scale_unc / 100))],
+        "length_range_cm": [r1(lng * 100 * (1 - scale_unc / 100)), r1(lng * 100 * (1 + scale_unc / 100))],
+        "volume_litres": r1(vol), "volume_range_litres": [r1(v_l(m_lo)), r1(v_l(m_hi))],
+        "cold_mix_kg": r1(vol / 1000.0 * ASPHALT_KG_M3 * COMPACTION),
+        "cold_mix_range_kg": [r1(v_l(m_lo) / 1000.0 * ASPHALT_KG_M3 * COMPACTION),
+                              r1(v_l(m_hi) / 1000.0 * ASPHALT_KG_M3 * COMPACTION)],
+        "scale_mode": eff, "scale_mode_label": MODE_WORDS[eff],
+        "uncertainty_pct": scale_unc, "depth_uncertainty_pct": dunc,
+        "depth_confidence": DEPTH_CONF[eff] if reliable else "estimate only",
+        "distance_m": round(zc, 2), "water": bool(row.get("water")), "outline": src, "notes": notes,
     }
-    viz = {"polys": polys, "corners": corners, "mask": mask, "dep": dep, "idx": (ys_i, xs_i)}
+    viz = {"polys": polys, "corners": corners, "mask": mask, "dep": rel_in, "idx": (ys_i, xs_i)}
     return res, viz
 
 
-def _scale_for(img, reference, ref_box, camera, rows):
+def _scale_for(img, D, reference, ref_box, camera, rows):
     h, w = img.shape[:2]
     f = focal_px(w, h)
-    yh, found = find_horizon(img)
+    y_dep, r2 = horizon_from_depth(D) if D is not None else (None, 0.0)
+    y_hough, hough_found = find_horizon(img)
     landscape = w >= h
-    cam = camera if camera in ("phone", "dashcam") else ("dashcam" if landscape and found else "phone")
+    if y_dep is not None and r2 >= 0.9:
+        yh, src = y_dep, "depth"
+    elif hough_found:
+        yh, src = y_hough, "hough"
+    else:
+        yh, src = 0.4 * h, "fallback"
+    cam = camera if camera in ("phone", "dashcam") else ("dashcam" if landscape and src != "fallback" and yh > 0.25 * h
+                                                         else "phone")
     H = H_DASH if cam == "dashcam" else H_PHONE
-    sc = {"f": f, "yh": yh, "horizon_found": found, "camera": cam, "H": H}
+    sc = {"f": f, "yh": yh, "horizon_src": src, "horizon_found": src != "fallback", "camera": cam, "H": H,
+          "r2": round(r2, 3), "hough_y": round(y_hough, 1) if hough_found else None}
     if reference and ref_box:
         rx1, ry1, rx2, ry2 = ref_box
         px = max(abs(rx2 - rx1), abs(ry2 - ry1))
@@ -314,7 +428,9 @@ def _scale_for(img, reference, ref_box, camera, rows):
             sc.update(mode="reference", mpp=(reference["length_cm"] / 100.0) / px)
             return sc
     big = max(((r["x2"] - r["x1"]) * (r["y2"] - r["y1"]) / float(w * h) for r in rows), default=0)
-    if big > 0.25 and not found:
+    if big > 0.25 and src != "depth":
+        sc.update(mode="closeup", mpp=CLOSEUP_FRAME_M / w)
+    elif src == "fallback" and big > 0.12:
         sc.update(mode="closeup", mpp=CLOSEUP_FRAME_M / w)
     else:
         sc.update(mode="ground_plane", mpp=None)
@@ -339,7 +455,9 @@ def _annotate(img, D, results, vizs, out_path):
             m = ((a + b) / 2).astype(int)
             _label(out, txt, (int(m[0]), int(m[1])), fs, th)
         x1, y1 = int(res["box"][0]), int(res["box"][1])
-        _label(out, f'#{res["index"] + 1} depth {res["depth_max_cm"]:.0f} cm max', (x1, max(20, y1 - 8)), fs, th)
+        dtxt = (f'depth {res["depth_max_cm"]:.0f} cm max' if res["depth_reliable"]
+                else f'depth ~{res["depth_max_range_cm"][0]:.0f} to {res["depth_max_range_cm"][1]:.0f} cm (est.)')
+        _label(out, f'#{res["index"] + 1} {dtxt}', (x1, max(20, y1 - 8)), fs, th)
     # depth inset per pothole (up to 3), stacked on the left
     iw = max(120, w // 5)
     y0 = 8
@@ -353,7 +471,7 @@ def _annotate(img, D, results, vizs, out_path):
         ys, xs = v["idx"]
         hm[ys, xs] = v["dep"]
         crop = hm[Y1:Y2, X1:X2]
-        mx = max(float(crop.max()), 1e-6)
+        mx = max(float(crop.max()), 0.05)
         col = cv2.applyColorMap((np.clip(crop / mx, 0, 1) * 255).astype(np.uint8), cv2.COLORMAP_INFERNO)
         ih = int(iw * (Y2 - Y1) / (X2 - X1))
         ih = min(ih, h // 3)
@@ -362,7 +480,8 @@ def _annotate(img, D, results, vizs, out_path):
             break
         out[y0:y0 + ih, 8:8 + iw] = col
         cv2.rectangle(out, (8, y0), (8 + iw, y0 + ih), (255, 255, 255), 1)
-        _label(out, f'#{res["index"] + 1} depth', (12, y0 + int(22 * fs)), fs * 0.8, th)
+        _label(out, f'#{res["index"] + 1} depth' + ('' if res["depth_reliable"] else ' (unreliable)'),
+               (12, y0 + int(22 * fs)), fs * 0.8, th)
         y0 += ih + 8
     cv2.imwrite(str(out_path), out, [cv2.IMWRITE_JPEG_QUALITY, 88])
 
@@ -382,18 +501,21 @@ def _method(sc, depth_ms):
         "detection": "Detector boxes plus the traced damaged outline (OpenCV segmentation) for each pothole.",
         "scale": {
             "reference": "Reference object: real length divided by the long side of its box in pixels, about 10 percent.",
-            "ground_plane": "Camera height and perspective: Z = H f / (y - y_h), X = (x - cx) Z / f, each outline "
-                            "point mapped onto the road plane, about 30 percent.",
-            "closeup": "Close-up: about 1.2 m of road across the frame width, about 40 percent.",
+            "ground_plane": "Camera height and pitched-camera perspective with the horizon from the depth model, each "
+                            "outline point mapped onto the road plane, about 30 percent.",
+            "closeup": "Close-up or no usable horizon: about 2 m of road across the frame width, about 60 percent.",
         },
         "size": "minAreaRect of the outline on the road plane, width = shorter side, length = longer side, "
                 "area = outline area on the road plane.",
         "depth": f"{DEPTH_MODEL_ID} relative inverse depth, robust plane fit to a road ring around the outline, "
-                 "residual below the plane converted to metres from the camera geometry, clamped 1 to 30 cm.",
+                 "residual below the plane converted to metres from the camera geometry and capped at 0.35 x width. If the "
+                 "residual is not separable from road noise the depth is reported as not reliable with a range.",
         "volume": "mean depth x area, cold mix = volume x 2300 kg/m3 x 1.1 compaction.",
         "camera": sc["camera"], "camera_height_m": sc["H"], "fov_deg": FOV_DEG, "focal_px": round(sc["f"], 1),
-        "horizon_y": round(sc["yh"], 1), "horizon_source": "road edge vanishing point" if sc["horizon_found"]
-        else "fallback at 40 percent of the image height",
+        "horizon_y": round(sc["yh"], 1), "horizon_source": {
+            "depth": "zero of the depth model's road profile", "hough": "road edge vanishing point",
+            "fallback": "fallback at 40 percent of the image height"}[sc["horizon_src"]],
+        "horizon_profile_r2": sc["r2"], "horizon_hough_y": sc["hough_y"],
         "depth_model": DEPTH_MODEL_ID, "depth_device": d["device"], "depth_ms": depth_ms,
     }
 
@@ -406,18 +528,18 @@ def measure_image(img, reference=None, ref_box=None, camera="auto", box=None, ro
             rows = [detector.make_row(img, "pothole", *box, 1.0)]
         else:
             rows = [r for r in detector.detect_image(img)[0] if r["class_name"] == "pothole"]
-    sc = _scale_for(img, reference, ref_box, camera, rows)
+    td = time.time()
+    D = depth_map(img) if rows else None
+    depth_ms = int((time.time() - td) * 1000) if rows else 0
+    sc = _scale_for(img, D, reference, ref_box, camera, rows)
     common = []
     if sc["mode"] == "reference":
         common.append(f'Scale from the {REFERENCE_WORDS.get(reference.get("type"), "reference")} '
                       f'({reference["length_cm"]:g} cm).')
-    elif sc["mode"] == "ground_plane" and not sc["horizon_found"]:
-        common.append("Horizon not visible, assumed at 40 percent of the image height.")
-    results, vizs, depth_ms = [], [], 0
+    elif sc["mode"] == "ground_plane" and sc["horizon_src"] == "fallback":
+        common.append("Horizon not found, assumed at 40 percent of the image height, so size is a rough guess.")
+    results, vizs = [], []
     if rows:
-        td = time.time()
-        D = depth_map(img)
-        depth_ms = int((time.time() - td) * 1000)
         for i, r in enumerate(rows):
             res, v = _measure_one(img, D, r, i, sc, common)
             results.append(res)
@@ -505,6 +627,20 @@ def register(app):
         res["reference"] = reference
         _cache_put(ck, res)
         return res
+
+    @app.post("/api/measure/warmup")
+    def warmup():
+        """Load the small depth model in the background so the first measurement is fast."""
+        if _depth["model"] is None:
+            def _go():
+                try:
+                    with _lock:
+                        _load_depth()
+                except Exception:
+                    pass
+            threading.Thread(target=_go, daemon=True).start()
+            return {"status": "loading"}
+        return {"status": "ready", "device": _depth["device"]}
 
     @app.get("/api/measure/defect/{defect_id}")
     def measure_defect(defect_id: int, camera: str = "auto"):

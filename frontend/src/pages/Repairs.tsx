@@ -68,11 +68,12 @@ export default function Repairs() {
       ops.rates().then((r) => setRates(r ?? {})).catch((e) => setRatesErr(e?.message || 'Could not load rates'))
   }
 
+  const [objective, setObjective] = useState<'risk' | 'delay'>('risk')
   const runPlan = async () => {
     setBusy(true)
     setPlanErr('')
     try {
-      const p = await ops.budget(Math.max(0, Number(budget) || 0))
+      const p = await ops.budget(Math.max(0, Number(budget) || 0), objective)
       setPlan({ ...p, selected: Array.isArray(p?.selected) ? p.selected : [] })
       setView('plan')
     } catch (e: any) {
@@ -119,6 +120,10 @@ export default function Repairs() {
               Budget in rupees
               <input type="number" min={0} step={1000} value={budget} onChange={(e) => setBudget(Number(e.target.value))} onKeyDown={(e) => e.key === 'Enter' && runPlan()} />
             </label>
+            <div className="seg" title="What the plan should save first">
+              <button className={objective === 'risk' ? 'on' : ''} onClick={() => setObjective('risk')}>Most dangerous first</button>
+              <button className={objective === 'delay' ? 'on' : ''} onClick={() => setObjective('delay')}>Costliest to delay first</button>
+            </div>
             <button className="btn primary" disabled={busy} onClick={runPlan}><Wrench size={16} weight="bold" /> {busy ? 'Planning...' : 'Plan repairs'}</button>
           </div>
         </div>
@@ -127,6 +132,7 @@ export default function Repairs() {
           <div className="rp-result">
             <div className="rp-stat"><span>Selected</span><b>{plan.selected.length}</b></div>
             <div className="rp-stat"><span>Cost used</span><b>{inr(plan.total_cost)}</b></div>
+            {plan.objective === 'delay' && <div className="rp-stat"><span>Waiting cost avoided</span><b>{inr(plan.delay_weekly_avoided ?? 0)} / week</b></div>}
             <div className="rp-stat"><span>Budget left</span><b>{inr(plan.left)}</b></div>
             <div className="rp-stat rp-share">
               <span>Share of total risk covered</span>
@@ -148,7 +154,7 @@ export default function Repairs() {
         </div>
         <table className="t">
           <thead>
-            <tr><th></th><th>ID</th><th>Class</th><th>Severity</th><th>Area m2</th><th>Depth cm</th><th>Material</th><th>Total cost</th><th>Risk</th></tr>
+            <tr><th></th><th>ID</th><th>Class</th><th>Severity</th><th>Area m2</th><th>Depth cm</th><th>Material</th><th>Total cost</th><th>Cost of waiting</th><th>Risk</th></tr>
           </thead>
           <tbody>
             {shown.map((r) => (
@@ -161,6 +167,7 @@ export default function Repairs() {
                 <td className="mono">{num(r.depth_cm, 1)}</td>
                 <td>{r.material || '-'}</td>
                 <td className="mono"><b>{inr(r.total_cost)}</b></td>
+                <td className="mono" title="Assumed growth of the repair bill if left alone"><span style={{ color: (r.delay_weekly ?? 0) > 0 ? 'var(--orange)' : 'var(--ink-2)' }}>{(r.delay_weekly ?? 0) > 0 ? `+${inr(r.delay_weekly ?? 0)} / week` : '-'}</span></td>
                 <td><Risk score={r.risk_score} level={r.risk_level} /></td>
               </tr>
             ))}
