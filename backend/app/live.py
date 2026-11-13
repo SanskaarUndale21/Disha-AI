@@ -34,6 +34,8 @@ class LiveSession:
         self.fall = safety.FallMonitor()
         self.people = []
         self.hazards = []
+        self.want_people = True
+        self.want_hazards = True
         self.gps = None  # (lat, lon) from the client
 
     def _safety(self, frame, out):
@@ -47,20 +49,20 @@ class LiveSession:
         except Exception as e:
             print(f"[live] lane check failed: {e!r}")
         try:
-            if n % 2 == 1:
+            if n % 2 == 1 and self.want_people:
                 pots = [(t["id"], t["box"]) for t in out if t["cls"] == "pothole" and t["confirmed"] and t["id"] is not None]
                 self.people, evs = self.fall.update(frame, pots)
                 for ev in evs[:1]:
                     url = safety.snapshot(frame, ev)
                     lat, lon = self.gps if self.gps else (None, None)
                     em = safety.record_emergency(ev, url, lat, lon)
-                    res["emergency"] = {"id": em["id"], "type": "fall_near_pothole", "pothole_id": ev["pothole_id"],
+                    res["emergency"] = {"id": em["id"], "type": "fall_near_pothole" if ev["pothole_id"] is not None else "fall", "pothole_id": ev["pothole_id"],
                                         "message": em["message"], "snapshot_url": url}
             res["people"] = [{"box": p["box"], "fallen": p["fallen"]} for p in self.people]
         except Exception as e:
             print(f"[live] fall check failed: {e!r}")
         try:
-            if n % 4 == 2:
+            if n % 4 == 2 and self.want_hazards:
                 self.hazards = safety.detect_hazards(frame)
             res["hazards"] = [{"box": [round(v, 1) for v in h["box"]], "kind": h["kind"], "label": h["label"], "conf": h["conf"]} for h in self.hazards]
         except Exception as e:
@@ -167,6 +169,12 @@ def register_ws(app):
                     t = m.get("type")
                     if t == "config":
                         sess.cracks = bool(m.get("cracks", True))
+                        if "classes" in m:
+                            sess.tk.allow = set(m["classes"]) or None
+                        if "people" in m:
+                            sess.want_people = bool(m["people"])
+                        if "hazards" in m:
+                            sess.want_hazards = bool(m["hazards"])
                         await ws.send_json({"type": "config", "cracks": sess.cracks})
                     elif t == "gps":
                         try:

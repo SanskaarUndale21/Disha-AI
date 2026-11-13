@@ -369,7 +369,7 @@ TRACK_ARGS = SimpleNamespace(tracker_type="bytetrack", track_high_thresh=0.22, t
 class Tracker:
     """ByteTrack + per-track aggregation (majority class, best frame, crop). Used by video files and live mode."""
 
-    def __init__(self, imgsz=None, far=True):
+    def __init__(self, imgsz=None, far=True, allow=None):
         from ultralytics.trackers.byte_tracker import BYTETracker
         self.bt = BYTETracker(TRACK_ARGS)
         self.tracks = {}
@@ -377,6 +377,7 @@ class Tracker:
         self.frame_idx = 0
         self.imgsz = imgsz
         self.far = far
+        self.allow = set(allow) if allow else None
         self.w = self.h = 0
 
     def disp(self, tid):
@@ -400,6 +401,8 @@ class Tracker:
         for x1, y1, x2, y2, tid, score, k, *_ in out:
             tid = int(tid)
             cls_now = config.CLASSES[int(k)]
+            if self.allow and cls_now not in self.allow:
+                continue
             tr = self.tracks.setdefault(tid, {"hits": 0, "classes": Counter(), "best": None, "best_q": -1,
                                               "first": self.frame_idx, "crop": None})
             tr["hits"] += 1
@@ -472,7 +475,7 @@ def normalize_quality(q):
     return "4k" if str(q or "").lower() in ("4k", "2160p", "uhd") else "2k"
 
 
-def detect_video(path, out_path, frame_cb=None, quality="2k"):
+def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None):
     """Track defects through a video. Returns (unique track rows, meta). Annotated H.264 video is written."""
     import imageio.v2 as iio
 
@@ -484,7 +487,7 @@ def detect_video(path, out_path, frame_cb=None, quality="2k"):
                             ffmpeg_log_level="error", pixelformat="yuv420p")
     quality = normalize_quality(quality)
     cfg = VIDEO_QUALITY[quality]
-    tk = Tracker(imgsz=cfg["imgsz"], far=cfg["far"])
+    tk = Tracker(imgsz=cfg["imgsz"], far=cfg["far"], allow=classes)
     idx = processed = 0
     t0 = time.time()
     try:

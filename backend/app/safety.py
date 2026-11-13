@@ -451,9 +451,10 @@ class FallMonitor:
                 if not P.fallen:
                     P.fallen = True
                     near = self._near_pothole(box, t)
-                    if near and t - P.last_alert >= FALL_COOLDOWN_S:
+                    if t - P.last_alert >= FALL_COOLDOWN_S:
                         P.last_alert = t
-                        events.append({"person_id": pid, "box": box, "pothole_id": near[0], "pothole_box": near[2]})
+                        events.append({"person_id": pid, "box": box, "pothole_id": near[0] if near else None,
+                                       "pothole_box": near[2] if near else None})
         people = [{"id": P.id, "box": [round(v, 1) for v in P.box], "fallen": P.fallen}
                   for P in self.people.values() if P.last_t == t]
         return people, events
@@ -471,9 +472,10 @@ MOCK_TO = "Emergency 112 (mock, not dialled)"
 
 def snapshot(frame, ev):
     img = frame.copy()
-    x1, y1, x2, y2 = [int(v) for v in ev["pothole_box"]]
-    cv2.rectangle(img, (x1, y1), (x2, y2), (48, 59, 255), 2)
-    cv2.putText(img, f"PH {ev['pothole_id']}", (x1, max(14, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (48, 59, 255), 2)
+    if ev.get("pothole_box"):
+        x1, y1, x2, y2 = [int(v) for v in ev["pothole_box"]]
+        cv2.rectangle(img, (x1, y1), (x2, y2), (48, 59, 255), 2)
+        cv2.putText(img, f"PH {ev['pothole_id']}", (x1, max(14, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (48, 59, 255), 2)
     x1, y1, x2, y2 = [int(v) for v in ev["box"]]
     cv2.rectangle(img, (x1, y1), (x2, y2), (32, 45, 217), 3)
     cv2.putText(img, "FALL", (x1, max(14, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (32, 45, 217), 2)
@@ -484,7 +486,7 @@ def snapshot(frame, ev):
 
 def record_emergency(ev, snapshot_url, lat=None, lon=None):
     global _em_seq
-    msg = f"Fall detected near pothole PH {ev['pothole_id']}"
+    msg = f"Fall detected near pothole PH {ev['pothole_id']}" if ev["pothole_id"] is not None else "Person down detected on the road"
     if lat is not None and lon is not None:
         msg += f" at {lat:.5f}, {lon:.5f}"
     with _em_lock:
