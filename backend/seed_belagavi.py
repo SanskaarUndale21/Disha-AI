@@ -137,6 +137,8 @@ def main():
         lat += random.uniform(-0.0012, 0.0012)
         lon += random.uniform(-0.0012, 0.0012)
         status = pick(STATUS_W)
+        if status == "rejected" and sev in ("Critical", "Severe"):
+            status = "in_progress"  # serious damage is never closed without work
         created = t_now - timedelta(days=random.randint(0, 48), hours=random.randint(0, 23), minutes=random.randint(0, 59))
         updated = created if status == "submitted" else created + timedelta(days=random.randint(1, 9), hours=random.randint(0, 6))
         if updated > t_now:
