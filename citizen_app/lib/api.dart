@@ -360,6 +360,93 @@ class Api {
     }
   }
 
+  Future<Map<String, dynamic>> _postJson(String path, Map<String, dynamic> body) async {
+    try {
+      final r = await http
+          .post(Uri.parse('${prefs.server}$path'),
+              headers: {..._headers, 'Content-Type': 'application/json'}, body: jsonEncode(body))
+          .timeout(const Duration(seconds: 20));
+      if (r.statusCode >= 400) throw ApiException(_err(r.body, r.statusCode));
+      return Map<String, dynamic>.from(jsonDecode(r.body));
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException("Can't reach the RoadWatch server. Check your internet connection.");
+    }
+  }
+
+  // ---------- drive mode ----------
+  Future<String> driveStart() async =>
+      '${(await _postJson('/api/drive/start', {'device_id': prefs.deviceId}))['session_id']}';
+
+  Future<Map<String, dynamic>> driveStop(String sessionId) => _postJson('/api/drive/stop', {'session_id': sessionId});
+
+  /// One camera frame with the GPS fix taken at capture time.
+  Future<Map<String, dynamic>> driveFrame(String sessionId, List<int> jpeg,
+      {double? lat, double? lon, double? accuracy, double? heading, double? speed, required DateTime capturedAt}) async {
+    final req = http.MultipartRequest('POST', Uri.parse('${prefs.server}/api/drive/frame'))
+      ..headers.addAll(_headers)
+      ..fields.addAll({
+        'session_id': sessionId,
+        'device_id': prefs.deviceId,
+        'captured_at': capturedAt.toUtc().toIso8601String(),
+        if (lat != null) 'lat': '$lat',
+        if (lon != null) 'lon': '$lon',
+        if (accuracy != null) 'accuracy': '$accuracy',
+        if (heading != null) 'heading': '$heading',
+        if (speed != null) 'speed': '$speed',
+      })
+      ..files.add(http.MultipartFile.fromBytes('file', jpeg, filename: 'frame.jpg'));
+    final streamed = await req.send().timeout(const Duration(seconds: 30));
+    final body = await streamed.stream.bytesToString();
+    if (streamed.statusCode >= 400) throw ApiException(_err(body, streamed.statusCode));
+    return Map<String, dynamic>.from(jsonDecode(body));
+  }
+
+  Future<List<Map<String, dynamic>>> driveSessions() async {
+    final d = await _get('/api/drive/sessions?$_dev');
+    return [for (final x in d as List) Map<String, dynamic>.from(x)];
+  }
+
+  // ---------- dashcam video import ----------
+  Future<Map<String, dynamic>> importVideo(XFile video,
+      {List<int>? gpx, String? gpxName, double? lat, double? lon, void Function(double)? onProgress}) async {
+    final bytes = await video.readAsBytes();
+    onProgress?.call(0.3);
+    final req = http.MultipartRequest('POST', Uri.parse('${prefs.server}/api/inspections'))
+      ..headers.addAll(_headers)
+      ..fields.addAll({
+        'inspector': 'citizen: ${prefs.name.isNotEmpty ? prefs.name : 'dashcam import'}',
+        'notes': 'Dashcam clip imported from the citizen app',
+        if (lat != null) 'lat': '$lat',
+        if (lon != null) 'lon': '$lon',
+      })
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: _fileName(video, 0)));
+    if (gpx != null) req.files.add(http.MultipartFile.fromBytes('gpx_file', gpx, filename: gpxName ?? 'track.gpx'));
+    try {
+      final streamed = await req.send().timeout(const Duration(minutes: 10));
+      final body = await streamed.stream.bytesToString();
+      if (streamed.statusCode >= 400) throw ApiException(_err(body, streamed.statusCode));
+      onProgress?.call(1);
+      return Map<String, dynamic>.from(jsonDecode(body));
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Upload failed. Check your connection and try again.');
+    }
+  }
+
+  Future<Map<String, dynamic>> jobStatus(String jobId) async => Map<String, dynamic>.from(await _get('/api/jobs/$jobId'));
+
+  // ---------- complaint routing + public map ----------
+  Future<Map<String, dynamic>> routeFor(String ticket) async =>
+      Map<String, dynamic>.from(await _get('/api/route/${Uri.encodeComponent(ticket)}'));
+
+  Future<List<Map<String, dynamic>>> publicDefects() async {
+    final d = await _get('/api/public/defects');
+    return [for (final x in d as List) Map<String, dynamic>.from(x)];
+  }
+
   static const _videoExt = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
 
   static bool isVideo(XFile f) {

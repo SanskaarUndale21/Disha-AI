@@ -24,6 +24,7 @@ from .db import (Complaint, ComplaintMedia, Defect, DefectHistory, Detection, In
 from .geo import GpxTrack, haversine_m, read_exif
 from . import ops
 from . import voice
+from . import citizen
 
 app = FastAPI(title="RoadWatch AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -707,6 +708,7 @@ live.register_ws(app)
 auth.register_routes(app)
 events.register(app)
 screening.register(app)
+citizen.register(app)
 voice.register(app)
 ops.register(app)
 

@@ -1,0 +1,77 @@
+{
+  "source": "Placeholder directory. Every email below is a non-routable placeholder (.invalid). The admin must replace each one with the complaint address published on the urban local body's official website, then set verified to true. Do not guess addresses.",
+  "authorities": {
+    "bengaluru": {
+      "name": "Bruhat Bengaluru Mahanagara Palike",
+      "short": "BBMP",
+      "aliases": ["bengaluru", "bangalore", "bengaluru urban", "bruhat bengaluru mahanagara palike", "bbmp"],
+      "email": "complaints@example-bbmp.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "mysuru": {
+      "name": "Mysuru City Corporation",
+      "short": "MCC",
+      "aliases": ["mysuru", "mysore", "mysuru city corporation"],
+      "email": "complaints@example-mysurucc.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "hubballi-dharwad": {
+      "name": "Hubballi-Dharwad Municipal Corporation",
+      "short": "HDMC",
+      "aliases": ["hubballi-dharwad", "hubballi", "hubli", "dharwad", "hubli-dharwad", "hubballi dharwad"],
+      "email": "complaints@example-hdmc.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "mangaluru": {
+      "name": "Mangaluru City Corporation",
+      "short": "MCC",
+      "aliases": ["mangaluru", "mangalore", "mangaluru city corporation"],
+      "email": "complaints@example-mangalurucc.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "belagavi": {
+      "name": "Belagavi City Corporation",
+      "short": "BCC",
+      "aliases": ["belagavi", "belgaum", "belagavi city corporation"],
+      "email": "complaints@example-belagavicc.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "pune": {
+      "name": "Pune Municipal Corporation",
+      "short": "PMC",
+      "aliases": ["pune", "pune city", "pune municipal corporation"],
+      "email": "complaints@example-pmc.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "mumbai": {
+      "name": "Brihanmumbai Municipal Corporation",
+      "short": "BMC",
+      "aliases": ["mumbai", "greater mumbai", "mumbai suburban", "mumbai city", "brihanmumbai municipal corporation"],
+      "email": "complaints@example-mcgm.invalid",
+      "helpline": null,
+      "verified": false,
+      "applicable": true
+    },
+    "default": {
+      "name": null,
+      "short": null,
+      "aliases": [],
+      "email": null,
+      "helpline": null,
+      "verified": false,
+      "applicable": false
+    }
+  }
+}

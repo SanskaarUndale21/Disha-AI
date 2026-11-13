@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../api.dart';
@@ -23,6 +28,75 @@ class _DetailScreenState extends State<DetailScreen> {
   late Complaint? _c = widget.initial;
   Timer? _poll;
   bool _showAi = true;
+  bool _routing = false;
+
+  /// Finds the authority for this road and opens an editable email draft (or shares photo and text).
+  Future<void> _emailComplaint(Complaint c) async {
+    setState(() => _routing = true);
+    Map<String, dynamic> r;
+    try {
+      r = await api.routeFor(c.ticket);
+    } catch (e) {
+      if (mounted) toast(context, '$e', error: true);
+      return;
+    } finally {
+      if (mounted) setState(() => _routing = false);
+    }
+    if (!mounted) return;
+    if (r['applicable'] != true) {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (ctx) => CupertinoAlertDialog(
+          title: const Text('Email is not available for this road'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('${r['reason'] ?? 'No office is set up for this location yet.'}'),
+          ),
+          actions: [CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+        ),
+      );
+      return;
+    }
+    final email = '${r['email'] ?? ''}';
+    final subject = '${r['subject'] ?? 'Road damage complaint ${c.ticket}'}';
+    final body = '${r['body'] ?? ''}';
+    final photo = c.media.where((m) => !m.isVideo).map((m) => m.mediaUrl).firstOrNull;
+    final choice = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: Text('Send to ${r['authority'] ?? 'the road authority'}'),
+        message: Text(email),
+        actions: [
+          CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, 0), child: const Text('Open email draft')),
+          if (photo != null)
+            CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, 1), child: const Text('Share photo and text')),
+        ],
+        cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 0) {
+      final uri = Uri.parse('mailto:$email?subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}');
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication).catchError((_) => false);
+      if (!mounted) return;
+      toast(context, ok ? 'Attach your photo of the damage before you send.' : 'No email app found on this phone.',
+          error: !ok);
+      return;
+    }
+    try {
+      final resp = await http.get(Uri.parse(api.url(photo))).timeout(const Duration(seconds: 20));
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${c.ticket}.jpg');
+      await file.writeAsBytes(resp.bodyBytes);
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile(file.path)],
+        subject: subject,
+        text: ['To: $email', '', body].join('\n'),
+      ));
+    } catch (_) {
+      if (mounted) toast(context, 'Could not prepare the photo to share.', error: true);
+    }
+  }
 
   @override
   void initState() {
@@ -203,6 +277,27 @@ class _DetailScreenState extends State<DetailScreen> {
                   ]),
                 ),
                 const SizedBox(height: 16),
+                Pressable(
+                  onTap: _routing ? null : () => _emailComplaint(c),
+                  child: CardBox(
+                    child: Row(children: [
+                      const IconBadge(CupertinoIcons.mail_solid, AppColors.blue, size: 48),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Email complaint', style: T.headline(context)),
+                          const SizedBox(height: 2),
+                          Text('Send it to the office responsible for this road',
+                              style: T.sub(context).copyWith(fontSize: 13)),
+                        ]),
+                      ),
+                      _routing
+                          ? const CupertinoActivityIndicator()
+                          : Icon(CupertinoIcons.chevron_right, size: 18, color: AppColors.of(context).textTertiary),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 CallCard(number: prefs.helpline, subtitle: 'Questions? Quote ${c.ticket}'),
               ]),
             ),

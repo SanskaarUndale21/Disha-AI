@@ -7,6 +7,7 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'auth_screen.dart';
+import 'drive_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -106,6 +107,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _group('YOUR DETAILS', [
             _field(_name, 'Name', CupertinoIcons.person_fill, AppColors.blue, TextInputType.name),
             _field(_phone, 'Mobile', CupertinoIcons.phone_fill, AppColors.green, TextInputType.phone),
+          ]),
+          _group('DRIVE MODE', [
+            Pressable(
+              onTap: () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const DriveHistoryScreen())),
+              child: _row(CupertinoIcons.car_detailed, AppColors.indigo, 'Drive history', '', chevron: true),
+            ),
           ]),
           _group('HELP', [
             Pressable(

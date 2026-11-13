@@ -102,3 +102,11 @@ Configuration via env vars (`RD_CONF`, `RD_DUP_RADIUS_M`, `RD_DUP_SIM`, `RD_WEIG
 
 Disclaimer: risk scores support prioritisation; they do not replace an engineer's site inspection.
 Ultralytics YOLO is AGPL-3.0.
+
+## Acknowledgements
+
+- RDD2022 / CRDDC2022 road damage data and challenge write-ups (sekilab, University of Tokyo).
+- Public pothole datasets on Kaggle and Roboflow Universe (Chitholian / Roboflow pothole set, road-anomaly, potholes-detection-yolov8 and others) used for fine-tuning.
+- PotholeNet (YOLO11m, Indian roads) as the starting checkpoint for the pothole specialist.
+- Product ideas for citizen drive mode, jurisdiction routing and the public map were inspired by
+  [coding-parrot/pothole-reporter](https://github.com/coding-parrot/pothole-reporter) (MIT). No code was copied; RoadWatch implements them in its own Flutter / FastAPI stack with its own detection models.

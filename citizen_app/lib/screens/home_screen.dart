@@ -8,6 +8,9 @@ import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'detail_screen.dart';
+import 'drive_screen.dart';
+import 'import_screen.dart';
+import 'public_map_screen.dart';
 import 'report_screen.dart';
 import 'reports_screen.dart';
 
@@ -102,6 +105,34 @@ class _HomeScreenState extends State<HomeScreen> {
               _HeroCard(onTap: () => _report()),
               const SizedBox(height: 14),
               _CallCard(number: prefs.helpline),
+              const SectionLabel('More ways to help'),
+              Row(children: [
+                Expanded(
+                    child: _ToolTile(
+                        icon: CupertinoIcons.car_detailed,
+                        color: AppColors.indigo,
+                        title: 'Drive Mode',
+                        detail: 'Scan the road while you drive',
+                        onTap: () => openDriveMode(context))),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _ToolTile(
+                        icon: CupertinoIcons.film_fill,
+                        color: AppColors.orange,
+                        title: 'Dashcam',
+                        detail: 'Import a recorded clip',
+                        onTap: () => Navigator.of(context)
+                            .push(CupertinoPageRoute(builder: (_) => const ImportScreen())))),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _ToolTile(
+                        icon: CupertinoIcons.map_fill,
+                        color: AppColors.green,
+                        title: 'City map',
+                        detail: 'Every known pothole',
+                        onTap: () => Navigator.of(context)
+                            .push(CupertinoPageRoute(builder: (_) => const PublicMapScreen())))),
+              ]),
               SectionLabel('Near you',
                   trailing: locator.spot?.area?.isNotEmpty == true
                       ? Flexible(
@@ -395,6 +426,30 @@ class CallCard extends StatelessWidget {
 
 class _CallCard extends CallCard {
   const _CallCard({required super.number});
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile(
+      {required this.icon, required this.color, required this.title, required this.detail, required this.onTap});
+  final IconData icon;
+  final Color color;
+  final String title, detail;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: onTap,
+        child: CardBox(
+          radius: 20,
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            IconBadge(icon, color, size: 36),
+            const SizedBox(height: 10),
+            Text(title, style: T.headline(context).copyWith(fontSize: 15.5)),
+            const SizedBox(height: 2),
+            Text(detail, maxLines: 2, style: T.sub(context).copyWith(fontSize: 12.5)),
+          ]),
+        ),
+      );
 }
 
 class _Stat extends StatelessWidget {

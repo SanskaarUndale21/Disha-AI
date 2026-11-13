@@ -27,7 +27,8 @@ def _default(o):
 
 
 def publish(type_: str, data: dict | None = None, audience: str = "officer"):
-    ev = {"type": type_, "data": data or {}, "audience": audience,
+    data = json.loads(json.dumps(data or {}, default=_default))  # json-safe (datetimes etc.)
+    ev = {"type": type_, "data": data, "audience": audience,
           "ts": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     with _lock:
         _recent.append(ev)
