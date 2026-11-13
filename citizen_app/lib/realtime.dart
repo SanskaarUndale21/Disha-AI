@@ -20,6 +20,9 @@ class Realtime {
   bool _stopped = true;
   final connected = ValueNotifier<bool>(false);
 
+  /// Every event as (type, data), for screens that want live updates without owning the socket.
+  static final feed = StreamController<(String, Map<String, dynamic>)>.broadcast();
+
   void start() {
     _stopped = false;
     _connect();
@@ -66,7 +69,9 @@ class Realtime {
       final type = m['type'] as String? ?? '';
       if (type == 'hello' || type == 'auth.error') return;
       final data = m['data'];
-      onEvent(type, data is Map<String, dynamic> ? data : <String, dynamic>{});
+      final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+      feed.add((type, map));
+      onEvent(type, map);
     } catch (_) {}
   }
 

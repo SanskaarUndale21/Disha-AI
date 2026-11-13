@@ -184,6 +184,35 @@ def _images_row(ctx):
     return Table([cells]) if cells else None
 
 
+def road_record_flowables(lat, lon, ss):
+    """Road record section (SAMPLE DATA) for a location. Returns a list of flowables, never raises."""
+    from reportlab.platypus import Paragraph, Spacer
+    try:
+        from .roadrecords import DISCLAIMER, lookup_point
+        r = lookup_point(lat, lon)
+    except Exception:
+        return []
+    el = [Spacer(1, 10), Paragraph("Road record (sample data)", ss["Heading3"])]
+    if not r.get("found"):
+        el.append(Paragraph("No road record found near this location.", ss["BodyText"]))
+    else:
+        rows = [["Field", "Value"],
+                ["Road", f"{r['name']} ({r['ref']})"],
+                ["Maintaining authority", r["authority"]],
+                ["Built", f"{r['built_year']} ({r['age_years']} years old)"],
+                ["Contractor", r["contractor"]],
+                ["Scheme", r["scheme_full"]],
+                ["Cost (sanctioned / completed)", f"Rs {r['sanctioned_cost_cr']:.1f} cr / Rs {r['completed_cost_cr']:.1f} cr"],
+                ["Length, lanes, surface", f"{r['length_km']} km, {r['lane_count']} lanes, {r['surface']}"],
+                ["Last resurfaced", str(r["last_resurfaced_year"] or "not recorded")],
+                ["Defect liability", ("Under liability until " if r["under_liability"] else "Ended in ")
+                 + str(r["defect_liability_until"])],
+                ["Note", Paragraph(r["liability_note"], ss["BodyText"])]]
+        el.append(_table(rows, widths=[160, 370]))
+    el.append(Paragraph(DISCLAIMER, ss["Italic"]))
+    return el
+
+
 def complaint_pdf(ctx):
     """Citizen-facing complaint report for one defect. ctx is built by ops._report_ctx."""
     from reportlab.lib.styles import getSampleStyleSheet
@@ -217,6 +246,7 @@ def complaint_pdf(ctx):
            Paragraph(ctx["text"], ss["BodyText"]), Spacer(1, 10),
            Paragraph("Scan the QR code or open the tracking link to follow repair progress. Size is an estimate "
                      "from the image and is indicative only.", ss["Italic"])]
+    el += road_record_flowables(d.lat, d.lon, ss)
     doc.build(el)
     return buf.getvalue()
 
@@ -306,6 +336,7 @@ def authority_pdf(ctx, rates=None):
     else:
         el.append(Paragraph("No open alerts.", ss["BodyText"]))
     el += [Spacer(1, 8), Paragraph("Complaint text", ss["Heading3"]), Paragraph(ctx["text"], ss["BodyText"])]
+    el += road_record_flowables(d.lat, d.lon, ss)
     doc.build(el)
     return buf.getvalue()
 

@@ -1,6 +1,6 @@
 import type { Icon } from '@phosphor-icons/react'
 import {
-  BellRinging, ChartLineUp, ChatCircleText, Cpu, Images, MapTrifold, Phone, RoadHorizon, SealCheck, UploadSimple, UsersThree, VideoCamera, Wrench,
+  BellRinging, ChartLineUp, ChatCircleText, Cpu, Images, MapPinArea, MapTrifold, Phone, RoadHorizon, SealCheck, UploadSimple, UsersThree, VideoCamera, Wrench,
 } from '@phosphor-icons/react'
 
 /** macOS Settings-style icon tile: white glyph on a coloured squircle. */
@@ -19,6 +19,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Operations',
     items: [
       { to: '/', icon: MapTrifold, color: '#007aff', label: 'Command center' },
+      { to: '/map', icon: MapPinArea, color: '#1f5fbf', label: 'Live map' },
       { to: '/alerts', icon: BellRinging, color: '#d92d20', label: 'Alerts', badge: 'alerts' },
       { to: '/live', icon: VideoCamera, color: '#ff3b30', label: 'Live patrol' },
       { to: '/complaints', icon: ChatCircleText, color: '#ff9500', label: 'Citizen complaints', badge: 'complaints' },

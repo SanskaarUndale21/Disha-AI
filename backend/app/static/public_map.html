@@ -114,6 +114,53 @@
     .actions .btn { flex: 1; justify-content: center; }
     #map { min-height: 60vh; }
   }
+
+  .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .stat b.small { font-size: 17px; line-height: 1.15; padding-top: 4px; overflow-wrap: anywhere; }
+  .stat.red b { color: #d92d20; }
+  .stat.warn b { color: #b86e00; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; align-items: start; }
+  .mapcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .seg { display: inline-flex; border: 1.5px solid var(--asphalt); border-radius: 10px; overflow: hidden; }
+  .seg button { font: 600 14px "Barlow", sans-serif; padding: 9px 16px; min-height: 44px; border: 0; background: #fff; color: var(--ink); cursor: pointer; }
+  .seg button + button { border-left: 1.5px solid var(--asphalt); }
+  .seg button[aria-pressed="true"] { background: var(--asphalt); color: var(--yellow); }
+  .seg button:focus-visible, .planner button:focus-visible, .rep:focus-visible, .route:focus-visible, .planner input:focus-visible { outline: 3px solid #1f5fbf; outline-offset: 2px; }
+  .sq { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; opacity: .85; }
+  .zlabel { min-width: 26px; height: 26px; border-radius: 13px; border: 2px solid #fff; color: #fff; font: 700 14px/22px "Barlow Condensed", sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .zlabel.yellow { color: #1c1e22; }
+  .reports h2 { font: 700 20px "Barlow Condensed", sans-serif; margin: 0 0 8px; }
+  #rep-list { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; }
+  .rep { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; width: 100%; font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; min-height: 48px; cursor: pointer; transition: background .6s; }
+  .rep.fresh { background: #fff4c2; border-color: var(--yellow); }
+  .rep b { font-weight: 700; }
+  .rep .sub { grid-column: 1 / 2; color: var(--muted); font-size: 13px; }
+  .st { align-self: start; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+  .st.submitted { background: #e2edfd; color: #1b57b8; }
+  .st.in_review { background: #e9e8fb; color: #4a45c4; }
+  .st.in_progress { background: #fdecd2; color: #a35a00; }
+  .st.resolved { background: #dcf3e4; color: #1d7a42; }
+  .st.rejected { background: #fbe0dd; color: #b3261e; }
+  .empty { color: var(--muted); margin: 6px 0; }
+  .planner input, .planner button { min-height: 44px; }
+  .planner button.go { background: var(--yellow); color: var(--asphalt); border-color: var(--yellow); font-weight: 700; }
+  .planner .inputs { grid-template-columns: 1fr; }
+  .route .sub.warn { color: #b3261e; font-weight: 600; }
+  .route .advice { margin-top: 4px; }
+  .rdot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 11px/20px "Barlow", sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .endpin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #fff; color: #fff; font: 700 14px/24px "Barlow", sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  #banner { display: none; background: var(--asphalt); color: #fff; border-left: 4px solid var(--yellow); border-radius: 10px; padding: 10px 14px; }
+  #banner.on { display: block; }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    #rep-list { max-height: none; }
+  }
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat.area { grid-column: span 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 </head>
 <body>
@@ -128,38 +175,63 @@
   </div>
 </header>
 
-<section class="stats" aria-label="Summary">
-  <div class="stat open"><b id="s-open">-</b><span>Open</span></div>
-  <div class="stat fixed"><b id="s-repaired">-</b><span>Repaired</span></div>
-  <div class="stat"><b id="s-reports">-</b><span>Total reports</span></div>
-  <div class="stat"><b id="s-cit">-</b><span>Citizen reports, 30 days</span></div>
-  <div class="stat km"><b id="s-km">-</b><span>Km surveyed, 30 days</span></div>
+<section class="stats" aria-label="Summary" aria-live="polite">
+  <div class="stat open"><b id="s-open">-</b><span>Open defects</span></div>
+  <div class="stat"><b id="s-comp">-</b><span>Complaints received</span></div>
+  <div class="stat warn"><b id="s-compopen">-</b><span>Complaints still open</span></div>
+  <div class="stat red"><b id="s-red">-</b><span>Red zones</span></div>
+  <div class="stat area"><b class="small" id="s-area">-</b><span>Most affected area</span></div>
 </section>
 
 <main>
-  <div id="map" role="region" aria-label="Map of road damage"></div>
-  <div class="card row">
-    <div class="legend">
-      <span><i class="dot" style="background:var(--open)"></i>Open</span>
-      <span><i class="dot" style="background:var(--fixed)"></i>Repaired</span>
-      <span id="status">Loading</span>
-      <span class="live" id="live"><i></i><span>Connecting</span></span>
+  <div class="layout">
+    <div class="mapcol">
+      <div class="card row">
+        <div class="seg" role="group" aria-label="What to show on the map">
+          <button type="button" data-mode="areas" aria-pressed="false">Areas</button>
+          <button type="button" data-mode="pins" aria-pressed="false">Pins</button>
+          <button type="button" data-mode="both" aria-pressed="true">Both</button>
+        </div>
+        <div class="legend" id="legend-zones">
+          <span><i class="sq" style="background:#2e9a57"></i>Green: 1 to 2 defects</span>
+          <span><i class="sq" style="background:#f2b705"></i>Yellow: 3 to 5</span>
+          <span><i class="sq" style="background:#d92d20"></i>Red: 6 or more, or 3 or more serious</span>
+        </div>
+      </div>
+      <div id="banner" role="status"></div>
+      <div id="map" role="region" aria-label="Map of road damage"></div>
+      <div class="card row">
+        <div class="legend">
+          <span><i class="dot" style="background:var(--open)"></i>Open</span>
+          <span><i class="dot" style="background:var(--fixed)"></i>Repaired</span>
+          <span id="status">Loading</span>
+          <span class="live" id="live"><i></i><span>Connecting</span></span>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="card planner" id="planner">
-    <h2>Plan a smoother route</h2>
-    <div class="inputs">
-      <input id="r-from" placeholder="From (place or latitude, longitude)" autocomplete="off">
-      <input id="r-to" placeholder="To (place or latitude, longitude)" autocomplete="off">
-      <button class="go" id="r-go">Compare routes</button>
+    <div class="side">
+      <div class="card planner" id="planner">
+        <h2>Plan a smoother route</h2>
+        <div class="inputs">
+          <input id="r-from" aria-label="Start place" placeholder="From (place or latitude, longitude)" autocomplete="off">
+          <input id="r-to" aria-label="Destination" placeholder="To (place or latitude, longitude)" autocomplete="off">
+        </div>
+        <div class="tools">
+          <button id="r-here" type="button">Use my location</button>
+          <button class="go" id="r-go" type="button">Compare routes</button>
+        </div>
+        <p id="route-msg" aria-live="polite">Routes are compared by driving time and by the road damage reported along them, updated live as people report new damage.</p>
+        <div id="route-list"></div>
+      </div>
+      <div class="card reports">
+        <h2>Recent reports</h2>
+        <div id="rep-list" aria-live="polite"><p class="empty">Loading reports...</p></div>
+      </div>
     </div>
-    <div class="tools"><button id="r-here" type="button">Use my location as start</button></div>
-    <p id="route-msg">Routes are compared by driving time and by the road damage reported along them, updated live as people report new damage.</p>
-    <div id="route-list"></div>
   </div>
   <div class="card" id="download">
     <p class="privacy"><strong>Privacy.</strong> No names, phone numbers or photos are published. This map shows only the
-      location, type and status of each defect.</p>
+      location, type and status of each defect, and reports show only the area.</p>
     <p class="privacy" style="margin-top:8px">To report a pothole, call the helpline on
       <a href="tel:+918064270577">+91 80 6427 0577</a> or use the RoadWatch app on your phone.</p>
   </div>
@@ -219,13 +291,92 @@
 
   function setText(id, v) { document.getElementById(id).textContent = v; }
 
-  fetch("/api/public/stats").then(function (r) { return r.json(); }).then(function (s) {
-    setText("s-open", s.open);
-    setText("s-repaired", s.repaired);
-    setText("s-reports", s.total_reports);
-    setText("s-cit", s.citizens_reports_last_30d);
-    setText("s-km", s.drive_km_last_30d);
-  }).catch(function () {});
+  function getJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  var pinsGroup = L.layerGroup().addTo(map), zonesGroup = L.layerGroup().addTo(map), mode = "both";
+  var ZC = { red: "#d92d20", yellow: "#f2b705", green: "#2e9a57" };
+
+  function loadSummary() {
+    getJSON("/api/public/summary").then(function (s) {
+      setText("s-open", s.open_defects); setText("s-comp", s.complaints_total);
+      setText("s-compopen", s.complaints_open); setText("s-red", s.red_zones);
+      setText("s-area", s.most_affected_area || "None yet");
+    }).catch(function () {});
+  }
+  function loadZones() {
+    getJSON("/api/public/zones?cell_m=300").then(function (z) {
+      zonesGroup.clearLayers();
+      (z.cells || []).forEach(function (c) {
+        var dLat = c.size_m / 2 / 111320, dLon = c.size_m / 2 / (111320 * Math.cos(c.lat * Math.PI / 180));
+        var col = ZC[c.level] || ZC.green;
+        var tip = esc(c.label || (c.count + " defects"));
+        L.rectangle([[c.lat - dLat, c.lon - dLon], [c.lat + dLat, c.lon + dLon]],
+          { color: col, weight: 1.5, fillColor: col, fillOpacity: 0.32 })
+          .bindTooltip(tip, { sticky: true }).bindPopup("<b>" + tip + "</b>").addTo(zonesGroup);
+        L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "rw", html: '<div class="zlabel ' + esc(c.level) + '" style="background:' + col + '">' + esc(c.count) + "</div>",
+          iconSize: [26, 26], iconAnchor: [13, 13] }), title: c.label, keyboard: false }).bindPopup("<b>" + tip + "</b>").addTo(zonesGroup);
+      });
+    }).catch(function () {});
+  }
+  function setMode(m) {
+    mode = m;
+    var b = document.querySelectorAll(".seg button");
+    for (var i = 0; i < b.length; i++) b[i].setAttribute("aria-pressed", b[i].getAttribute("data-mode") === m ? "true" : "false");
+    if (m === "pins") map.removeLayer(zonesGroup); else if (!map.hasLayer(zonesGroup)) map.addLayer(zonesGroup);
+    if (m === "areas") map.removeLayer(pinsGroup); else if (!map.hasLayer(pinsGroup)) map.addLayer(pinsGroup);
+    document.getElementById("legend-zones").style.display = m === "pins" ? "none" : "";
+  }
+  (function () {
+    var b = document.querySelectorAll(".seg button");
+    for (var i = 0; i < b.length; i++) b[i].onclick = function () { setMode(this.getAttribute("data-mode")); };
+  })();
+  loadSummary(); loadZones();
+
+  // ---- recent reports from everyone
+  var STATUS = { submitted: "Submitted", in_review: "In review", in_progress: "In progress", resolved: "Resolved", rejected: "Rejected" };
+  var CATS = { pothole: "Pothole", crack: "Cracks", waterlogging: "Waterlogging", broken_road: "Broken road", other: "Other" };
+  var seenReports = null, freshSet = {};
+  function ago(iso) {
+    var d = new Date(/Z|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z"), s = (Date.now() - d.getTime()) / 1000;
+    if (isNaN(s)) return "";
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago";
+    if (s < 7 * 86400) return Math.floor(s / 86400) + " d ago";
+    return day(iso);
+  }
+  function renderReports(list) {
+    var box = document.getElementById("rep-list"); box.innerHTML = "";
+    if (!list.length) { box.innerHTML = '<p class="empty">No reports yet. Be the first to report a road problem.</p>'; return; }
+    list.forEach(function (r) {
+      var el = document.createElement("button"); el.type = "button";
+      var hasLoc = typeof r.lat === "number" && typeof r.lon === "number";
+      el.className = "rep" + (freshSet[r.number] ? " fresh" : "");
+      var cat = CATS[r.category] || NAMES[r.category] || "Road damage", st = STATUS[r.status] || r.status;
+      el.setAttribute("aria-label", cat + " " + r.number + ", " + (r.area || "area not shared") + ", " + st);
+      el.innerHTML = "<span><b>" + esc(cat) + "</b> " + esc(r.number) + '</span><span class="st ' + esc(r.status) + '">' + esc(st) + "</span>" +
+        '<span class="sub">' + esc((r.area || "Location not shared") + (r.created_at ? ", " + ago(r.created_at) : "")) + "</span>";
+      el.onclick = function () {
+        if (!hasLoc) { toast("This report has no map location.", false); return; }
+        map.setView([r.lat, r.lon], 16); pulse(r.lat, r.lon);
+        document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      };
+      box.appendChild(el);
+    });
+  }
+  function loadReports() {
+    getJSON("/api/public/complaints?limit=40").then(function (list) {
+      var added = [];
+      list.forEach(function (r) {
+        if (seenReports && !seenReports[r.number]) { freshSet[r.number] = 1; added.push(r.number); }
+      });
+      seenReports = seenReports || {};
+      list.forEach(function (r) { seenReports[r.number] = 1; });
+      renderReports(list);
+      added.forEach(function (n) { setTimeout(function () { delete freshSet[n]; var e = document.querySelectorAll(".rep.fresh"); for (var i = 0; i < e.length; i++) e[i].classList.remove("fresh"); }, 6500); });
+    }).catch(function () { document.getElementById("rep-list").innerHTML = '<p class="empty">Could not load reports. Try again later.</p>'; });
+  }
+  loadReports();
+  setInterval(loadReports, 60000);
 
   var pts = [];
   function pinIcon(p, cls) {
@@ -234,10 +385,10 @@
   }
   function addMarker(p) {
     var key = String(p.uid).toUpperCase();
-    if (byUid[key]) { map.removeLayer(byUid[key]); }
+    if (byUid[key]) { pinsGroup.removeLayer(byUid[key]); }
     var cls = p.status === "repaired" ? "repaired" : "open";
     var m = L.marker([p.lat, p.lon], { icon: pinIcon(p, cls), title: (NAMES[p["class"]] || "Road damage") + " " + p.number,
-      zIndexOffset: cls === "open" ? 100 : 0 }).bindPopup(popup(p)).addTo(map);
+      zIndexOffset: cls === "open" ? 100 : 0 }).bindPopup(popup(p)).addTo(pinsGroup);
     m.on("popupopen", function () { history.replaceState(null, "", "#" + p.uid); });
     byUid[key] = m;
     return m;
@@ -268,11 +419,10 @@
   // ---- live feed: reports from other people appear here as they happen
   var liveEl = document.getElementById("live");
   function setLive(on, txt) { liveEl.className = "live" + (on ? " on" : ""); liveEl.lastChild.textContent = txt; }
+  var rt = null;
   function refreshStats() {
-    fetch("/api/public/stats").then(function (r) { return r.json(); }).then(function (s) {
-      setText("s-open", s.open); setText("s-repaired", s.repaired); setText("s-reports", s.total_reports);
-      setText("s-cit", s.citizens_reports_last_30d); setText("s-km", s.drive_km_last_30d);
-    }).catch(function () {});
+    clearTimeout(rt);
+    rt = setTimeout(function () { loadSummary(); loadZones(); loadReports(); }, 700);
   }
   var retry = 1000;
   function connect() {
@@ -301,59 +451,81 @@
   connect();
 
   // ---- route planner
-  var routeLayer = L.layerGroup().addTo(map), lastQuery = null, lastRes = null;
+  var routeLayer = L.layerGroup().addTo(map), lastQuery = null, lastRes = null, selIdx = 0;
   function rmsg(t, err) { var e = document.getElementById("route-msg"); e.textContent = t; e.className = err ? "err" : ""; }
-  function draw(res, idx) {
-    routeLayer.clearLayers();
+  function banner(t) {
+    var b = document.getElementById("banner"); b.textContent = t; b.className = t ? "on" : "";
+    if (t) { clearTimeout(banner.t); banner.t = setTimeout(function () { banner(""); }, 12000); }
+  }
+  function endIcon(txt, col) { return L.divIcon({ className: "rw", html: '<div class="endpin" style="background:' + col + '">' + txt + "</div>", iconSize: [30, 30], iconAnchor: [15, 15] }); }
+  function draw(res, idx, fit) {
+    selIdx = idx; routeLayer.clearLayers();
     res.routes.forEach(function (r) {
       if (r.index === idx) return;
-      L.polyline(r.geometry, { color: "#8a9097", weight: 5, opacity: 0.55 }).addTo(routeLayer).on("click", function () { draw(res, r.index); });
+      L.polyline(r.geometry, { color: "#8a9097", weight: 6, opacity: 0.6 }).addTo(routeLayer).on("click", function () { draw(res, r.index, false); });
     });
     var r = res.routes[idx];
     var line = L.polyline(r.geometry, { color: r.labels.indexOf("recommended") >= 0 ? "#2e9a57" : "#1f5fbf", weight: 7, opacity: 0.95 }).addTo(routeLayer);
-    r.defects.forEach(function (h) {
-      L.circleMarker([h.lat, h.lon], { radius: 8, color: "#fff", weight: 2, fillColor: h.risk >= 70 ? "#d92d20" : "#e08a00", fillOpacity: 1 })
-        .bindPopup(esc((NAMES[h["class"]] || "Road damage") + " " + h.number + ", risk " + Math.round(h.risk))).addTo(routeLayer);
+    r.defects.forEach(function (h, i) {
+      L.marker([h.lat, h.lon], { icon: L.divIcon({ className: "rw", html: '<div class="rdot" style="background:' + (h.risk >= 70 ? "#d92d20" : "#e08a00") + '">' + esc(h.number) + "</div>",
+        iconSize: [24, 24], iconAnchor: [12, 12] }), title: (NAMES[h["class"]] || "Road damage") + " " + h.number })
+        .bindPopup(esc((NAMES[h["class"]] || "Road damage") + " " + h.number + ", " + (h.severity || "") + ", risk " + Math.round(h.risk))).addTo(routeLayer);
     });
-    L.marker([res.origin.lat, res.origin.lon]).addTo(routeLayer);
-    L.marker([res.destination.lat, res.destination.lon]).addTo(routeLayer);
-    map.fitBounds(line.getBounds(), { padding: [40, 40] });
+    L.marker([res.origin.lat, res.origin.lon], { icon: endIcon("A", "#2a6fdb"), title: "Start" }).addTo(routeLayer);
+    L.marker([res.destination.lat, res.destination.lon], { icon: endIcon("B", "#17191d"), title: "Destination" }).addTo(routeLayer);
+    if (fit !== false) map.fitBounds(line.getBounds(), { padding: [40, 40] });
     var kids = document.querySelectorAll(".route");
-    for (var i = 0; i < kids.length; i++) kids[i].className = "route" + (i === idx ? " sel" : "");
+    for (var i = 0; i < kids.length; i++) { kids[i].className = "route" + (i === idx ? " sel" : ""); kids[i].setAttribute("aria-pressed", i === idx ? "true" : "false"); }
   }
-  function show(res) {
+  function show(res, idx, fit) {
     lastRes = res; var box = document.getElementById("route-list"); box.innerHTML = "";
     res.routes.forEach(function (r) {
-      var el = document.createElement("div"); el.className = "route";
+      var el = document.createElement("div"); el.className = "route"; el.tabIndex = 0; el.setAttribute("role", "button");
       var chips = r.labels.map(function (l) { return '<span class="chip' + (l === "recommended" ? " rec" : "") + '">' + esc(l) + "</span>"; }).join("");
-      el.innerHTML = "<b>Route " + (r.index + 1) + "</b>" + chips +
-        '<div class="sub">' + r.duration_min + " min, " + r.distance_km + " km. " +
-        (r.defect_count ? r.defect_count + " reported road defects (" + r.severe_count + " serious)" : "No reported road damage") + "</div>";
-      el.onclick = function () { draw(res, r.index); };
+      var dc = r.defect_count || 0;
+      el.setAttribute("aria-label", "Route " + (r.index + 1) + ", " + r.duration_min + " minutes, " + r.distance_km + " km, " + dc + " reported potholes");
+      el.innerHTML = "<b>" + esc(Math.round(r.duration_min)) + " min</b> <span class=\"sub\" style=\"display:inline\">" + esc(r.distance_km) + " km</span>" + chips +
+        '<div class="sub' + (r.severe_count ? " warn" : "") + '">' +
+        (dc ? dc + " reported " + (dc === 1 ? "pothole" : "potholes") + ", " + r.severe_count + " serious" : "No reported potholes on this route") + "</div>";
+      el.onclick = function () { draw(res, r.index, true); };
+      el.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); draw(res, r.index, true); } };
       box.appendChild(el);
     });
-    rmsg(res.advice, false); draw(res, res.recommended);
+    rmsg(res.advice || "", false); draw(res, idx, fit);
+  }
+  function friendly(m) {
+    var l = String(m || "").toLowerCase();
+    if (/not found|geocode|could not find|no place|unknown place/.test(l)) return "We could not find one of those places. Try a nearby landmark or type latitude, longitude.";
+    if (/busy|timeout|timed out|unavailable|50\d|rate/.test(l)) return "The routing service is busy right now. Please try again in a moment.";
+    return m || "Could not plan this trip. Try again.";
   }
   function plan(quiet) {
     var o = document.getElementById("r-from").value.trim(), d = document.getElementById("r-to").value.trim();
     if (!o || !d) { rmsg("Enter where you start and where you are going.", true); return; }
-    lastQuery = [o, d]; if (!quiet) rmsg("Comparing routes...", false);
+    lastQuery = [o, d]; if (!quiet) { rmsg("Comparing routes...", false); banner(""); }
     fetch("/api/routeplan?origin=" + encodeURIComponent(o) + "&dest=" + encodeURIComponent(d))
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || "Could not plan this trip"); return j; }); })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(typeof j.detail === "string" ? j.detail : "Could not plan this trip"); return j; }, function () { throw new Error("busy"); }); })
       .then(function (j) {
         var was = lastRes ? lastRes.recommended : null;
-        show(j);
-        if (quiet && was !== null && was !== j.recommended) toast("A new report changed the best route", false);
+        if (!j.routes || !j.routes.length) throw new Error("No drivable route found between those places.");
+        if (quiet) {
+          var changed = was !== null && was !== j.recommended;
+          show(j, changed ? j.recommended : Math.min(selIdx, j.routes.length - 1), false);
+          if (changed) { toast("A new report changed the best route", false); banner("A new report changed the best route"); }
+        } else show(j, j.recommended, true);
       })
-      .catch(function (e) { rmsg(e.message, true); });
+      .catch(function (e) { if (!quiet) rmsg(friendly(e.message), true); });
   }
   document.getElementById("r-go").onclick = function () { plan(false); };
   document.getElementById("r-to").addEventListener("keydown", function (e) { if (e.key === "Enter") plan(false); });
+  document.getElementById("r-from").addEventListener("keydown", function (e) { if (e.key === "Enter") document.getElementById("r-to").focus(); });
   document.getElementById("r-here").onclick = function () {
-    if (!navigator.geolocation) { rmsg("Location is not available in this browser.", true); return; }
+    if (!navigator.geolocation) { rmsg("Location is not available in this browser. Type your start place instead.", true); return; }
+    rmsg("Finding your location...", false);
     navigator.geolocation.getCurrentPosition(function (p) {
       document.getElementById("r-from").value = p.coords.latitude.toFixed(5) + ", " + p.coords.longitude.toFixed(5);
-    }, function () { rmsg("Location permission was denied. Type your start place instead.", true); });
+      rmsg("Start set to your location. Enter a destination.", false);
+    }, function () { rmsg("Location permission was denied. Type your start place instead.", true); }, { timeout: 15000 });
   };
   window.__routeRefresh = function () { if (lastQuery) plan(true); };
 

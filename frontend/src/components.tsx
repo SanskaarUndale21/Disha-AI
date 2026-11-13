@@ -3,6 +3,7 @@ import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 're
 import L from 'leaflet'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { MeasurePanel } from './measure'
+import { RoadRecord } from './roadrecord'
 import { api, fmtDate, fmtDay, inr, label, ops, reportUrl, type CostRow, type Defect } from './api'
 
 const RISK_HEX: Record<string, string> = { High: '#ff3b30', Medium: '#ff9500', Low: '#34c759' }
@@ -187,7 +188,7 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
     <div className="drawer-bg" onClick={onClose}>
       <div className="drawer" onClick={(e) => e.stopPropagation()}>
         {!d ? (
-          'Loading...'
+          <div className="skel-stack" aria-busy="true"><i className="skel" style={{ width: '45%', height: 24 }} /><i className="skel" style={{ width: '100%', height: 180 }} /><i className="skel" style={{ width: '80%' }} /><i className="skel" style={{ width: '65%' }} /></div>
         ) : (
           <div className="grid">
             <div className="row">
@@ -274,6 +275,7 @@ export function DefectDrawer({ id, onClose, onChanged }: { id: number; onClose: 
                 )}
               </div>
             </div>
+            <RoadRecord defectId={d.id} lat={d.lat} lon={d.lon} />
             {d.history && d.history.length > 0 && (
               <div className="card">
                 <h3>Progress timeline</h3>

@@ -143,7 +143,7 @@ def _iou(a, b):
     return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1]) - inter + 1e-9)
 
 
-def infer(img, cracks=None, conf_floor=None):
+def infer(img, cracks=None, conf_floor=None, imgsz=None):
     """Run the ensemble on one BGR frame. Returns Dets with unified class ids (config.CLASSES)."""
     roles = _load()
     cracks = USE_CRACKS if cracks is None else cracks
@@ -153,7 +153,7 @@ def infer(img, cracks=None, conf_floor=None):
             if r.role in ("cracks", "features") and not cracks:
                 continue
             c = r.conf if conf_floor is None else min(r.conf, conf_floor)
-            res = r.model.predict(img, conf=c, iou=config.IOU_THRESHOLD, imgsz=config.IMG_SIZE, quantize=16,
+            res = r.model.predict(img, conf=c, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE, quantize=16,
                                   verbose=False)[0]
             b = res.boxes
             if b is None or not len(b):
@@ -181,7 +181,7 @@ def infer(img, cracks=None, conf_floor=None):
 FAR_PASS = os.getenv("RD_FAR_PASS", "1") != "0"
 
 
-def infer_far(img):
+def infer_far(img, imgsz=None):
     """Second look at the distant road, where potholes are only a few pixels wide.
 
     The band of the frame between the horizon and the middle of the road is cropped, enlarged 2x and run through
@@ -200,7 +200,7 @@ def infer_far(img):
         for r in _load():
             if r.role != "pothole":
                 continue
-            res = r.model.predict(up, conf=0.2, iou=config.IOU_THRESHOLD, imgsz=config.IMG_SIZE, quantize=16,
+            res = r.model.predict(up, conf=0.2, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE, quantize=16,
                                   verbose=False)[0].boxes
             if res is None or not len(res):
                 continue
@@ -369,12 +369,14 @@ TRACK_ARGS = SimpleNamespace(tracker_type="bytetrack", track_high_thresh=0.22, t
 class Tracker:
     """ByteTrack + per-track aggregation (majority class, best frame, crop). Used by video files and live mode."""
 
-    def __init__(self):
+    def __init__(self, imgsz=None, far=True):
         from ultralytics.trackers.byte_tracker import BYTETracker
         self.bt = BYTETracker(TRACK_ARGS)
         self.tracks = {}
         self.display = {}
         self.frame_idx = 0
+        self.imgsz = imgsz
+        self.far = far
         self.w = self.h = 0
 
     def disp(self, tid):
@@ -386,11 +388,11 @@ class Tracker:
         """Detect + track one frame. Returns list of rows for the currently visible tracks."""
         self.h, self.w = frame.shape[:2]
         proc, _ = preprocess(frame)
-        d = infer(proc, cracks=cracks, conf_floor=0.1)
-        if FAR_PASS and self.frame_idx % 2 == 0:
-            self._far = infer_far(proc)
+        d = infer(proc, cracks=cracks, conf_floor=0.1, imgsz=self.imgsz)
+        if FAR_PASS and self.far and self.frame_idx % 2 == 0:
+            self._far = infer_far(proc, self.imgsz)
         far = getattr(self, "_far", None)
-        if FAR_PASS and far is not None and len(far):
+        if FAR_PASS and self.far and far is not None and len(far):
             d = merge_dets(d, far)
         out = self.bt.update(d, proc) if len(d) else self.bt.update(Dets(np.zeros((0, 4)), [], []), proc)
         self.frame_idx += 1
@@ -458,7 +460,19 @@ def label_track(r):
     return f'{tag} {r["severity"]} {r["confidence"]:.2f}'
 
 
-def detect_video(path, out_path, frame_cb=None):
+VIDEO_QUALITY = {
+    # 2K: faster. Frames above 2560 px are scaled down; detector input 640; far-road zoom pass off.
+    "2k": {"max_side": 2560, "imgsz": 640, "far": False},
+    # 4K: more detail. Frames up to 3840 px; detector input 960; far-road zoom pass on (finds distant potholes).
+    "4k": {"max_side": 3840, "imgsz": 960, "far": True},
+}
+
+
+def normalize_quality(q):
+    return "4k" if str(q or "").lower() in ("4k", "2160p", "uhd") else "2k"
+
+
+def detect_video(path, out_path, frame_cb=None, quality="2k"):
     """Track defects through a video. Returns (unique track rows, meta). Annotated H.264 video is written."""
     import imageio.v2 as iio
 
@@ -468,7 +482,9 @@ def detect_video(path, out_path, frame_cb=None):
     stride = max(1, config.VIDEO_FRAME_STRIDE)
     writer = iio.get_writer(str(out_path), fps=fps / stride, codec="libx264", quality=7, macro_block_size=8,
                             ffmpeg_log_level="error", pixelformat="yuv420p")
-    tk = Tracker()
+    quality = normalize_quality(quality)
+    cfg = VIDEO_QUALITY[quality]
+    tk = Tracker(imgsz=cfg["imgsz"], far=cfg["far"])
     idx = processed = 0
     t0 = time.time()
     try:
@@ -481,6 +497,10 @@ def detect_video(path, out_path, frame_cb=None):
                 continue
             if processed >= config.VIDEO_MAX_FRAMES:
                 break
+            fh, fw = frame.shape[:2]
+            if max(fh, fw) > cfg["max_side"]:
+                sc = cfg["max_side"] / float(max(fh, fw))
+                frame = cv2.resize(frame, (int(fw * sc) // 2 * 2, int(fh * sc) // 2 * 2), interpolation=cv2.INTER_AREA)
             rows = tk.step(frame, time_s=idx / fps)
             shown = [r for r in rows if r["confirmed"]]
             ann = draw(frame, shown, label_track)
@@ -495,7 +515,7 @@ def detect_video(path, out_path, frame_cb=None):
         writer.close()
     out = tk.final_rows()
     meta = {"fps": fps, "frames_total": total, "frames_processed": processed, "width": tk.w, "height": tk.h,
-            "raw_track_ids": len(tk.tracks), "ms": int((time.time() - t0) * 1000)}
+            "raw_track_ids": len(tk.tracks), "quality": quality, "ms": int((time.time() - t0) * 1000)}
     return out, meta
 
 

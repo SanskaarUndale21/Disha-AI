@@ -447,6 +447,37 @@ class Api {
     return [for (final x in d as List) Map<String, dynamic>.from(x)];
   }
 
+  /// Density grid for the public map. Null when the endpoint is not available.
+  Future<Map<String, dynamic>?> publicZones({int cellM = 300}) async {
+    try {
+      return Map<String, dynamic>.from(await _get('/api/public/zones?cell_m=$cellM'));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Anonymised recent reports from everyone. Empty when the endpoint is not available.
+  Future<List<Map<String, dynamic>>> publicComplaints({int limit = 40}) async {
+    try {
+      final d = await _get('/api/public/complaints?limit=$limit');
+      return [for (final x in d as List) Map<String, dynamic>.from(x)];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> publicSummary() async {
+    try {
+      return Map<String, dynamic>.from(await _get('/api/public/summary'));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Compares drive routes by time and reported road damage. Throws [ApiException] with a readable message.
+  Future<Map<String, dynamic>> routePlan(String origin, String dest) async => Map<String, dynamic>.from(await _get(
+      '/api/routeplan?origin=${Uri.encodeQueryComponent(origin)}&dest=${Uri.encodeQueryComponent(dest)}'));
+
   static const _videoExt = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
 
   static bool isVideo(XFile f) {

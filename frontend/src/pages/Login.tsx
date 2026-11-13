@@ -32,8 +32,9 @@ export default function Login() {
     <div className="login-wrap">
       <form className="card login" onSubmit={submit}>
         <img className="logo" src="/logo.svg" alt="" />
-        <h2>Sign in to RoadWatch</h2>
+        <h2>Sign in to the admin panel</h2>
         <p>Use your municipal account. New accounts get officer access once an administrator approves them.</p>
+        <p className="note"><b>Citizens:</b> use the citizen portal at <a href="http://localhost:5174">http://localhost:5174</a></p>
         {session && profile?.role === 'citizen' && (
           <div className="err">{profile.email} does not have officer access yet. Ask an administrator to approve it.</div>
         )}

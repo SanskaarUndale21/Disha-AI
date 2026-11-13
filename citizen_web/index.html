@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadWatch for citizens</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="mark"></span><b>RoadWatch</b><small>Citizen portal</small></div>
+  <nav id="tabs" role="tablist">
+    <button role="tab" data-tab="report" class="on">Report damage</button>
+    <button role="tab" data-tab="mine">My reports</button>
+    <button role="tab" data-tab="map">Map and routes</button>
+  </nav>
+  <span id="live" class="live"><i></i><span>Connecting</span></span>
+</header>
+
+<main>
+  <section id="tab-report" class="pane on">
+    <div class="hero">
+      <h1>See a bad road? Tell the city in a minute.</h1>
+      <p>Add a photo or video. We check it shows real road damage before it is filed, so reports reach the repair team faster.</p>
+    </div>
+    <form id="form" class="card">
+      <label>What is wrong
+        <select id="category">
+          <option value="pothole">Pothole</option>
+          <option value="crack">Cracks</option>
+          <option value="waterlogging">Waterlogging</option>
+          <option value="broken_road">Broken road</option>
+          <option value="other">Something else</option>
+        </select>
+      </label>
+      <label>Photos or videos
+        <input id="files" type="file" accept="image/*,video/*" multiple>
+      </label>
+      <div id="checks" class="checks"></div>
+      <div class="row">
+        <label class="grow">Location
+          <input id="addr" placeholder="Street, area, landmark">
+        </label>
+        <button type="button" id="gps" class="ghost">Use my location</button>
+      </div>
+      <p id="gps-note" class="note"></p>
+      <label>Details (optional)
+        <textarea id="desc" rows="3" placeholder="How deep is it, which lane, since when"></textarea>
+      </label>
+      <div class="row">
+        <label class="grow">Your name (optional)<input id="name"></label>
+        <label class="grow">Phone for updates (optional)<input id="phone" inputmode="tel"></label>
+      </div>
+      <button id="submit" class="primary" type="submit">Check and submit report</button>
+      <p id="msg" class="note" role="status"></p>
+    </form>
+    <div id="done" class="card ok hidden"></div>
+  </section>
+
+  <section id="tab-mine" class="pane">
+    <div class="hero"><h1>Your reports</h1><p>Reports filed from this browser. Status updates appear here as the repair team works on them.</p></div>
+    <div id="mine" class="list"></div>
+  </section>
+
+  <section id="tab-map" class="pane">
+    <iframe id="mapframe" title="Road damage map and route planner"></iframe>
+  </section>
+</main>
+<div id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>

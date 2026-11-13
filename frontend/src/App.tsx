@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, NavLink, Route, Routes, useLocation } from 'react-router-dom'
-import { Moon, SignIn, SignOut, Sun } from '@phosphor-icons/react'
+import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
+import { List, Moon, SignIn, SignOut, Sun, X } from '@phosphor-icons/react'
 import { api, ops, voice } from './api'
 import { useAuth } from './auth'
 import { useLiveRefresh, useRealtime } from './events'
@@ -8,6 +8,7 @@ import { NAV_GROUPS, Tile } from './icons'
 import Dashboard from './pages/Dashboard'
 import Analyze from './pages/Analyze'
 import Live from './pages/Live'
+import LiveMap from './pages/LiveMap'
 import Defects from './pages/Defects'
 import Verify from './pages/Verify'
 import Progress from './pages/Progress'
@@ -34,6 +35,15 @@ function Officer({ children }: { children: ReactNode }) {
         </div>
       </div>
     )
+  return <>{children}</>
+}
+
+/** Admin panel only: when sign-in is enabled every page except /login needs an officer or admin account. */
+function AdminGate({ children }: { children: ReactNode }) {
+  const { enabled, ready, isOfficer } = useAuth()
+  if (!enabled) return <>{children}</>
+  if (!ready) return null
+  if (!isOfficer) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -76,22 +86,39 @@ export default function App() {
   useEffect(loadBadges, [isOfficer])
   useLiveRefresh(['complaint.', 'detection.', 'inspection.', 'alert.'], loadBadges)
   const initials = (profile?.full_name || profile?.email || '?').split(/[\s@.]/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
-  const flush = loc.pathname === '/'
+  const flush = loc.pathname === '/' || loc.pathname === '/map'
+  const [menu, setMenu] = useState(false)
+  useEffect(() => setMenu(false), [loc.pathname])
+  useEffect(() => {
+    if (!menu) return
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setMenu(false)
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [menu])
+  const title = NAV_GROUPS.flatMap((g) => g.items).find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to)))?.label ?? 'RoadWatch'
 
   return (
     <div className="shell">
-      <aside className="side">
+      <a className="skip-link" href="#main">Skip to content</a>
+      <header className="topbar">
+        <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Open menu" aria-expanded={menu}><List size={18} weight="bold" /></button>
+        <img src="/logo.svg" alt="" />
+        <b>{title}</b>
+      </header>
+      {menu && <div className="side-scrim" onClick={() => setMenu(false)} />}
+      <aside className={`side ${menu ? 'open' : ''}`}>
+        <button className="icon-btn side-close" onClick={() => setMenu(false)} aria-label="Close menu"><X size={16} weight="bold" /></button>
         <div className="brand">
           <img src="/logo.svg" alt="" />
           <div>
             <b>RoadWatch</b>
-            <small>Municipal road console</small>
+            <small>Admin panel</small>
           </div>
         </div>
         {NAV_GROUPS.map((g) => (
           <div key={g.title}>
             <div className="nav-group">{g.title}</div>
-            <nav className="nav">
+            <nav className="nav" aria-label={g.title}>
               {g.items.filter((n) => !n.admin || isAdmin).map((n) => (
                 <NavLink key={n.to} to={n.to} end={n.to === '/'}>
                   <Tile icon={n.icon} color={n.color} />
@@ -126,9 +153,21 @@ export default function App() {
             ))}
         </div>
       </aside>
-      <main className={`main ${flush ? 'flush' : ''}`}>
+      <main id="main" className={`main ${flush ? 'flush' : ''}`}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<AdminGate><AdminRoutes /></AdminGate>} />
+        </Routes>
+      </main>
+    </div>
+  )
+}
+
+function AdminRoutes() {
+  return (
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/map" element={<LiveMap />} />
           <Route path="/live" element={<Live />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/repairs" element={<Repairs />} />
@@ -140,10 +179,7 @@ export default function App() {
           <Route path="/progress" element={<Progress />} />
           <Route path="/inspections" element={<Inspections />} />
           <Route path="/model" element={<Model />} />
-          <Route path="/login" element={<Login />} />
           <Route path="/users" element={<Officer><Users /></Officer>} />
         </Routes>
-      </main>
-    </div>
   )
 }

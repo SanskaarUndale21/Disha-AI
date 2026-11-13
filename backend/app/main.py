@@ -27,6 +27,7 @@ from . import ops
 from . import voice
 from . import citizen
 from . import measure
+from . import zones, roadrecords, analysis_report
 
 app = FastAPI(title="RoadWatch AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -131,7 +132,8 @@ async def create_inspection(
     file: UploadFile = File(...), gpx_file: Optional[UploadFile] = File(None), lat: Optional[str] = Form(None),
     lon: Optional[str] = Form(None), captured_at: Optional[str] = Form(None), road_name: Optional[str] = Form(None),
     road_type: str = Form("unknown"), traffic_level: str = Form("unknown"), inspector: Optional[str] = Form(None),
-    notes: Optional[str] = Form(None), gpx_offset_s: float = Form(0.0), s: Session = Depends(get_session),
+    notes: Optional[str] = Form(None), gpx_offset_s: float = Form(0.0), quality: str = Form("2k"),
+    s: Session = Depends(get_session),
 ):
     gpx = None
     if gpx_file is not None and gpx_file.filename:
@@ -140,12 +142,12 @@ async def create_inspection(
         except Exception as e:
             raise HTTPException(400, f"Invalid GPX: {e}")
     insp, res = _ingest(s, await file.read(), file.filename, _f(lat), _f(lon), captured_at, road_name, road_type,
-                        traffic_level, inspector, notes, gpx, gpx_offset_s)
+                        traffic_level, inspector, notes, gpx, gpx_offset_s, quality=quality)
     return res
 
 
 def _ingest(s, data, filename, lat, lon, captured_at=None, road_name=None, road_type="unknown",
-            traffic_level="unknown", inspector=None, notes=None, gpx=None, gpx_offset_s=0.0):
+            traffic_level="unknown", inspector=None, notes=None, gpx=None, gpx_offset_s=0.0, quality="2k"):
     """Store one media file as an Inspection and run detection (image now, video in a background job)."""
     ext = Path(filename or "").suffix.lower()
     if ext not in IMAGE_EXT | VIDEO_EXT:
@@ -167,7 +169,7 @@ def _ingest(s, data, filename, lat, lon, captured_at=None, road_name=None, road_
 
     job = uuid.uuid4().hex
     JOBS[job] = {"status": "running", "progress": 0.0, "inspection_id": insp.id}
-    threading.Thread(target=_process_video_job, args=(job, insp.id, stored, gpx, gpx_offset_s), daemon=True).start()
+    threading.Thread(target=_process_video_job, args=(job, insp.id, stored, gpx, gpx_offset_s, quality), daemon=True).start()
     return insp, {"job_id": job, "inspection_id": insp.id, "status": "running"}
 
 
@@ -216,7 +218,7 @@ def _announce(insp_dict):
             "lat": d["lat"], "lon": d["lon"], "crop_url": d["crop_url"], "inspection_id": d["inspection_id"]})
 
 
-def _process_video_job(job, insp_id, stored, gpx, gpx_offset):
+def _process_video_job(job, insp_id, stored, gpx, gpx_offset, quality="2k"):
     s = SessionLocal()
     try:
         insp = s.get(Inspection, insp_id)
@@ -225,14 +227,15 @@ def _process_video_job(job, insp_id, stored, gpx, gpx_offset):
         def cb(p):
             JOBS[job]["progress"] = round(p, 3)
 
-        tracks, meta = detector.detect_video(stored, out, cb)
+        tracks, meta = detector.detect_video(stored, out, cb, quality)
         insp.width, insp.height, insp.fps = meta["width"], meta["height"], meta["fps"]
         insp.frames_processed = meta["frames_processed"]
         dets = pipeline.register(s, insp, tracks, gpx=gpx, gpx_offset=gpx_offset)
         insp.annotated_path = str(out)
         insp.processing_ms = meta["ms"]
         insp.summary = dict(pipeline.summarize(dets), raw_track_ids=meta["raw_track_ids"],
-                            unique_tracks=len(tracks), frames_processed=meta["frames_processed"])
+                            unique_tracks=len(tracks), frames_processed=meta["frames_processed"],
+                            quality=meta.get("quality", "2k"))
         s.commit()
         JOBS[job].update(status="done", progress=1.0)
         _announce(ser_insp(insp, with_dets=True))
@@ -711,6 +714,9 @@ auth.register_routes(app)
 events.register(app)
 screening.register(app)
 routing.register(app)
+zones.register(app)
+roadrecords.register(app)
+analysis_report.register(app)
 citizen.register(app)
 measure.register(app)
 voice.register(app)

@@ -1,75 +1,103 @@
-import { useRef, useState } from 'react'
-import { api, label, type Inspection } from '../api'
+import { useEffect, useRef, useState } from 'react'
+import { FilePdf } from '@phosphor-icons/react'
+import { analysisPdfUrl, api, label, type Inspection } from '../api'
+import { RoadRecord } from '../roadrecord'
 import { DefectDrawer, LocationPicker, Pill, Risk } from '../components'
 import { MeasurePanel } from '../measure'
 
-export function InspectionResult({ insp, file }: { insp: Inspection; file?: File | null }) {
+export function InspectionResult({ insp, file, quality }: { insp: Inspection; file?: File | null; quality?: string }) {
   const [sel, setSel] = useState<number | null>(null)
   const [measure, setMeasure] = useState(false)
-  const hasPothole = (insp.detections ?? []).some((d) => d.class_name === 'pothole')
   const s = insp.summary ?? {}
   const dets = insp.detections ?? []
+  const isVideo = insp.media_type === 'video'
+  const hasPothole = dets.some((d) => d.class_name === 'pothole')
+  const potholes = new Set(dets.filter((d) => d.class_name === 'pothole').map((d) => d.defect_uid ?? `t${d.track_id ?? d.id}`)).size
+  const uniqueDefects = s.unique_tracks ?? dets.length
+  const rawTracks = s.raw_track_ids ?? uniqueDefects
+  const q = String(s.quality ?? quality ?? '').toLowerCase()
+  const secs = insp.processing_ms != null ? insp.processing_ms / 1000 : null
   return (
     <div className="grid g-wide" style={{ marginTop: 14 }}>
       <div className="card">
-        <div className="row" style={{ marginBottom: 10 }}>
+        <div className="row" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>Inspection #{insp.id} result</h3>
           <span className="spacer" />
-          <a className="btn sm" href={`/api/reports/inspection/${insp.id}.pdf`}>PDF</a>
+          <a className="btn primary" href={analysisPdfUrl(insp.id)} target="_blank" rel="noreferrer"><FilePdf size={17} weight="fill" /> Download PDF report</a>
         </div>
-        {insp.media_type !== 'video' ? (
-          <img className="media" src={insp.annotated_url ?? ''} />
+        {!isVideo ? (
+          <img className="media" src={insp.annotated_url ?? ''} alt="Annotated road photo with detected damage" />
         ) : (
-          <video className="media" src={insp.annotated_url ?? ''} controls autoPlay muted loop />
+          <video className="media" src={insp.annotated_url ?? ''} controls autoPlay muted loop playsInline />
         )}
         <p className="note">
-          {insp.media_type === 'video'
-            ? `${insp.frames_processed} frames tracked with ByteTrack, ${s.raw_track_ids ?? 0} raw track IDs filtered to ${s.unique_tracks ?? 0} unique defects. `
-            : ''}
-          {s.enhanced ? 'Low-light/contrast correction (CLAHE) applied. ' : ''}
+          {isVideo ? 'Boxes and defect IDs are drawn on the video. ' : ''}
+          {s.enhanced ? 'Low-light correction (CLAHE) applied. ' : ''}
           Location: {insp.lat != null ? `${insp.lat.toFixed(6)}, ${insp.lon!.toFixed(6)} via ${insp.location_source}` : 'unknown'}.
-          Processed in {insp.processing_ms} ms with {insp.model_name}.
+          {' '}Processed in {secs != null ? `${secs.toFixed(secs < 10 ? 1 : 0)} s` : '-'}{insp.model_name ? ` with ${insp.model_name}` : ''}
+          {isVideo && insp.frames_processed ? `, ${insp.frames_processed} frames tracked` : ''}{isVideo && q ? `, ${q === '4k' ? '4K detailed' : '2K fast'} mode` : ''}.
           {insp.duplicate_of_inspection && <b> This exact image was already uploaded as inspection #{insp.duplicate_of_inspection}.</b>}
         </p>
       </div>
       <div className="grid" style={{ alignContent: 'start' }}>
+        <div className="card ar-hero">
+          <div className="ar-big num">{potholes}</div>
+          <div>
+            <div className="ar-hl">Unique potholes found</div>
+            {isVideo ? (
+              <div className="note">{rawTracks} raw tracks merged into {uniqueDefects} unique defect{uniqueDefects === 1 ? '' : 's'}. The same pothole seen in many frames is counted once.</div>
+            ) : (
+              <div className="note">{uniqueDefects} defect{uniqueDefects === 1 ? '' : 's'} of all types in this photo.</div>
+            )}
+          </div>
+        </div>
         <div className="grid g3">
-          <div className="card kpi"><div className="l">Detected</div><div className="v">{s.total ?? 0}</div></div>
+          <div className="card kpi"><div className="l">Detected</div><div className="v">{s.total ?? dets.length}</div></div>
           <div className="card kpi"><div className="l">New defects</div><div className="v">{s.new_defects ?? 0}</div></div>
-          <div className="card kpi"><div className="l">Duplicates</div><div className="v">{s.duplicates ?? 0}</div></div>
+          <div className="card kpi"><div className="l">Already known</div><div className="v">{s.duplicates ?? 0}</div></div>
         </div>
         <div className="card">
-          <h3>Counts by category</h3>
+          <h3>Counts by class</h3>
           <div className="row">
             {Object.entries(s.by_class ?? {}).map(([k, v]) => (
-              <span key={k} className="pill">{label(k)}: {v as number}</span>
+              <span key={k} className="pill">{label(k)}: <b className="num">{v as number}</b></span>
             ))}
             {dets.length === 0 && <span className="muted">No road damage detected.</span>}
           </div>
         </div>
-        <div className="card scroll-x">
-          <h3>Detections</h3>
+      </div>
+      <div className="card scroll-x" style={{ gridColumn: '1 / -1' }}>
+        <h3>Detected defects</h3>
+        {dets.length === 0 ? (
+          <div className="empty">Nothing was flagged. Try a clearer photo or a drive with more daylight.</div>
+        ) : (
           <table className="t">
-            <thead><tr><th></th><th>Defect</th><th>Class</th><th>Conf</th><th>Severity</th><th>Risk</th></tr></thead>
+            <thead><tr><th></th><th>ID</th><th>Class</th><th>Confidence</th><th>Severity</th><th>Risk</th>{isVideo && <th>Frames seen</th>}</tr></thead>
             <tbody>
               {dets.map((d) => (
-                <tr key={d.id} className="click" onClick={() => d.defect_id && setSel(d.defect_id)}>
-                  <td>{d.crop_url && <img className="thumb" src={d.crop_url} />}</td>
+                <tr key={d.id} className="click" tabIndex={0} onClick={() => d.defect_id && setSel(d.defect_id)} onKeyDown={(e) => e.key === 'Enter' && d.defect_id && setSel(d.defect_id)}>
+                  <td>{d.crop_url && <img className="thumb" src={d.crop_url} alt="" />}</td>
                   <td>
                     <span className="uid">{d.defect_uid}</span>
                     {d.is_duplicate && <div><span className="pill dup">already reported</span></div>}
-                    {d.track_id != null && <div className="note">track #{d.track_id}, {d.frames_seen} frames</div>}
                   </td>
                   <td>{label(d.class_name)}</td>
-                  <td className="mono">{d.confidence.toFixed(2)}</td>
+                  <td>
+                    <span className="mono">{d.confidence.toFixed(2)}</span>{' '}
+                    <span className={`pill ${d.confidence >= 0.4 ? 'Minor' : 'Moderate'}`}>{d.confidence >= 0.4 ? 'High confidence' : 'Possible'}</span>
+                  </td>
                   <td><Pill v={d.severity} /></td>
                   <td><Risk score={d.risk_score} level={d.risk_level} /></td>
+                  {isVideo && <td className="mono">{d.frames_seen ?? '-'}</td>}
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
+      {insp.lat != null && insp.lon != null && (
+        <div style={{ gridColumn: '1 / -1' }}><RoadRecord lat={insp.lat} lon={insp.lon} /></div>
+      )}
       {insp.media_type === 'image' && file && hasPothole && (
         <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="row">
@@ -92,6 +120,16 @@ export default function Analyze() {
   const [form, setForm] = useState({ captured_at: '', road_name: '', road_type: 'unknown', traffic_level: 'unknown', inspector: '', gpx_offset_s: '0' })
   const [busy, setBusy] = useState(false)
   const [prog, setProg] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  const [quality, setQuality] = useState<'2k' | '4k'>('2k')
+  const [doneQuality, setDoneQuality] = useState('2k')
+  useEffect(() => {
+    if (!busy) return
+    const t0 = Date.now()
+    setElapsed(0)
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000)
+    return () => clearInterval(t)
+  }, [busy])
   const [err, setErr] = useState('')
   const [res, setRes] = useState<Inspection | null>(null)
   const [drag, setDrag] = useState(false)
@@ -116,6 +154,8 @@ export default function Analyze() {
     const fd = new FormData()
     fd.append('file', file)
     if (gpx) fd.append('gpx_file', gpx)
+    if (file.type.startsWith('video')) fd.append('quality', quality)
+    setDoneQuality(quality)
     if (loc) {
       fd.append('lat', String(loc[0]))
       fd.append('lon', String(loc[1]))
@@ -194,13 +234,24 @@ export default function Analyze() {
               </select>
             </label>
             {isVideo && (
+              <div className="f" style={{ gridColumn: '1 / -1' }}>
+                Video quality
+                <div className="seg" role="group" aria-label="Video quality" style={{ alignSelf: 'flex-start' }}>
+                  <button type="button" className={quality === '2k' ? 'on' : ''} aria-pressed={quality === '2k'} onClick={() => setQuality('2k')}>2K (fast)</button>
+                  <button type="button" className={quality === '4k' ? 'on' : ''} aria-pressed={quality === '4k'} onClick={() => setQuality('4k')}>4K (detailed)</button>
+                </div>
+                <span className="note">2K analyses faster. 4K keeps more detail, so distant potholes are found more often.</span>
+              </div>
+            )}
+            {isVideo && (
               <label className="f">GPX track (optional)<input type="file" accept=".gpx" onChange={(e) => setGpx(e.target.files?.[0] ?? null)} /></label>
             )}
             {isVideo && gpx && <label className="f">GPX time offset (s)<input type="number" value={form.gpx_offset_s} onChange={set('gpx_offset_s')} /></label>}
           </div>
           <div className="row">
             <button className="btn primary" disabled={!file || busy} onClick={submit}>{busy ? 'Analyzing...' : 'Run detection'}</button>
-            {busy && isVideo && <div style={{ flex: 1 }}><div className="bar"><div style={{ width: `${prog * 100}%` }} /></div><div className="note">{Math.round(prog * 100)}% of frames tracked</div></div>}
+            {busy && !isVideo && <span className="note num">{elapsed}s elapsed</span>}
+            {busy && isVideo && <div style={{ flex: 1 }}><div className="bar"><div style={{ width: `${prog * 100}%` }} /></div><div className="note num">{Math.round(prog * 100)}% of frames tracked, {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')} elapsed</div></div>}
           </div>
           {err && <div className="err">{err}</div>}
         </div>
@@ -218,7 +269,7 @@ export default function Analyze() {
           </div>
         </div>
       </div>
-      {res && <InspectionResult insp={res} file={file} />}
+      {res && <InspectionResult insp={res} file={file} quality={doneQuality} />}
     </>
   )
 }

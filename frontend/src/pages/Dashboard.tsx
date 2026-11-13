@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   ChatCircleText, CheckCircle, FilePdf, Images, MapPin, SealCheck, Siren, VideoCamera, Warning, DownloadSimple,
 } from '@phosphor-icons/react'
-import { api, label, type Defect } from '../api'
+import { api, label, pub, type Defect, type PublicSummary } from '../api'
 import { DefectDrawer, DefectMap } from '../components'
 import { useLiveRefresh, useRealtime, type RtEvent } from '../events'
 import { CLASS_HEX, RISK_HEX, Tile } from '../icons'
@@ -49,10 +49,18 @@ export default function Dashboard() {
   const [st, setSt] = useState<any>(null)
   const [defects, setDefects] = useState<Defect[]>([])
   const [sel, setSel] = useState<number | null>(null)
+  const [pubSum, setPubSum] = useState<PublicSummary | null>(null)
+  const [today, setToday] = useState<number | null>(null)
   const { feed } = useRealtime()
   const load = () => {
     api.stats().then(setSt).catch(() => {})
     api.defects().then(setDefects).catch(() => {})
+    pub.summary().then(setPubSum).catch(() => {})
+    pub.complaints(100).then((rows) => {
+      const d0 = new Date().toDateString()
+      const utc = (t: string) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z')
+      setToday(rows.filter((r) => utc(r.created_at).toDateString() === d0).length)
+    }).catch(() => {})
   }
   useEffect(load, [])
   useLiveRefresh(['defect.', 'inspection.', 'detection.', 'live.', 'complaint.'], load)
@@ -79,7 +87,16 @@ export default function Dashboard() {
               <div className="stat"><b>{st.pending_verification}</b><span>Awaiting review</span></div>
               <div className="stat"><b>{st.repaired}</b><span>Repaired</span></div>
               <div className="stat"><b>{st.duplicates_prevented}</b><span>Duplicates merged</span></div>
+              {today != null && <div className="stat"><b>{pubSum?.complaints_today ?? today}</b><span>Complaints today</span></div>}
             </div>
+          )}
+          {pubSum && (
+            <Link to="/map" className="glass zone-chips" title="Open the live map">
+              <span className="zc red"><i />{pubSum.red_zones} red</span>
+              <span className="zc yellow"><i />{pubSum.yellow_zones} yellow</span>
+              <span className="zc green"><i />{pubSum.green_zones} green</span>
+              <small>zones</small>
+            </Link>
           )}
         </div>
 

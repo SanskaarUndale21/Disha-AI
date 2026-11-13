@@ -278,3 +278,82 @@ export const voice = {
   importCalls: (calls: unknown[]) => req<{ created: number; results: any[] }>('/api/voice/import', json({ calls })),
   link: (ticket: string) => req<{ upload_url: string; sms_text: string }>(`/api/voice/link/${ticket}`),
 }
+
+/* ---------- public map, route planner, road records ---------- */
+
+export type ZoneCell = { lat: number; lon: number; size_m: number; count: number; severe: number; level: 'red' | 'yellow' | 'green'; label: string }
+export type Zones = {
+  cells: ZoneCell[]
+  thresholds?: Record<string, any>
+  totals: { defects: number; cells: number; red: number; yellow: number; green: number }
+  cell_m: number
+}
+export type PublicComplaint = { number: string; category: string; status: string; lat: number | null; lon: number | null; created_at: string; area: string | null; source: string | null }
+export type PublicSummary = {
+  open_defects: number
+  complaints_total: number
+  complaints_open: number
+  complaints_resolved: number
+  complaints_today?: number
+  red_zones: number
+  yellow_zones: number
+  green_zones: number
+  most_affected_area: string | null
+}
+export type RouteDefect = { uid: string; number: number; class: string; severity: string; risk: number; lat: number; lon: number; off_route_m: number; penalty_min: number }
+export type PlannedRoute = {
+  index: number
+  distance_km: number
+  duration_min: number
+  defects: RouteDefect[]
+  defect_count: number
+  severe_count: number
+  penalty_min: number
+  effective_min: number
+  labels: ('fastest' | 'smoothest' | 'recommended')[]
+  geometry: [number, number][]
+}
+export type RoutePlan = {
+  routes: PlannedRoute[]
+  recommended: number
+  fastest: number
+  advice: string
+  origin: { lat: number; lon: number; name?: string }
+  destination: { lat: number; lon: number; name?: string }
+}
+export type RoadRecordData = {
+  found: boolean
+  name?: string
+  ref?: string
+  authority?: string
+  built_year?: number
+  age_years?: number
+  contractor?: string
+  scheme?: string
+  scheme_full?: string
+  sanctioned_cost_cr?: number
+  completed_cost_cr?: number
+  length_km?: number
+  lane_count?: number
+  surface?: string
+  defect_liability_until?: string | number
+  under_liability?: boolean
+  liability_note?: string
+  last_resurfaced_year?: number
+  sample_data?: boolean
+  disclaimer?: string
+}
+
+export const pub = {
+  zones: (cell_m = 300) => req<Zones>(`/api/public/zones?cell_m=${cell_m}`),
+  complaints: (limit = 40) => req<PublicComplaint[]>(`/api/public/complaints?limit=${limit}`),
+  summary: () => req<PublicSummary>('/api/public/summary'),
+}
+export const routes = {
+  plan: (origin: string, dest: string) => req<RoutePlan>(`/api/routeplan?origin=${encodeURIComponent(origin)}&dest=${encodeURIComponent(dest)}`),
+}
+export const roads = {
+  asset: (lat: number, lon: number) => req<RoadRecordData>(`/api/roads/asset?lat=${lat}&lon=${lon}`),
+  forDefect: (id: number) => req<RoadRecordData>(`/api/roads/defect/${id}`),
+}
+export const analysisPdfUrl = (inspectionId: number) => `/api/reports/analysis/${inspectionId}.pdf`
