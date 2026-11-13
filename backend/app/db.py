@@ -8,7 +8,7 @@ from .config import DB_URL
 
 _sqlite = DB_URL.startswith("sqlite")
 engine = create_engine(DB_URL, connect_args={"check_same_thread": False} if _sqlite else {},
-                       pool_pre_ping=True, pool_size=5 if not _sqlite else 5, pool_recycle=300)
+                       pool_pre_ping=True, pool_size=10, max_overflow=30, pool_timeout=60, pool_recycle=300)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 Base = declarative_base()
 

@@ -31,6 +31,50 @@ from . import zones, roadrecords, analysis_report
 
 app = FastAPI(title="RoadWatch AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+# Short-lived cache for public read endpoints: the database is remote, and many clients poll the same data.
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.responses import Response as _Resp  # noqa: E402
+
+CACHE_PATHS = {"/api/public/defects", "/api/public/zones", "/api/public/stats", "/api/public/summary", "/api/public/complaints",
+               "/api/stats", "/api/defects", "/api/health"}
+CACHE_TTL_S = 6.0
+_cache: dict = {}
+_locks: dict = {}
+
+
+def clear_read_cache():
+    _cache.clear()
+
+
+class ReadCache(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method != "GET" or request.url.path not in CACHE_PATHS or request.headers.get("authorization"):
+            return await call_next(request)
+        import asyncio
+        key = str(request.url)
+        hit = _cache.get(key)
+        if hit and time.time() - hit[0] < CACHE_TTL_S:
+            return _Resp(hit[1], status_code=200, media_type="application/json", headers={"X-Cache": "hit"})
+        lock = _locks.setdefault(key, asyncio.Lock())
+        async with lock:  # single flight: one request recomputes, the rest wait for it
+            hit = _cache.get(key)
+            if hit and time.time() - hit[0] < CACHE_TTL_S:
+                return _Resp(hit[1], status_code=200, media_type="application/json", headers={"X-Cache": "hit"})
+            resp = await call_next(request)
+            if resp.status_code != 200:
+                return resp
+            body = b"".join([chunk async for chunk in resp.body_iterator])
+            _cache[key] = (time.time(), body)
+            if len(_cache) > 200:
+                _cache.clear()
+                _locks.clear()
+            return _Resp(body, status_code=200, media_type=resp.media_type or "application/json", headers={"X-Cache": "miss"})
+
+
+app.add_middleware(ReadCache)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])  # outermost, so cached replies carry CORS headers
 init_db()
 
 app.mount("/media/uploads", StaticFiles(directory=config.UPLOADS), name="uploads")
@@ -152,8 +196,19 @@ def _ingest(s, data, filename, lat, lon, captured_at=None, road_name=None, road_
     ext = Path(filename or "").suffix.lower()
     if ext not in IMAGE_EXT | VIDEO_EXT:
         raise HTTPException(400, f"Unsupported file type {ext}")
+    if not data:
+        raise HTTPException(400, "The file is empty")
     stored = config.UPLOADS / f"{uuid.uuid4().hex}{ext}"
     stored.write_bytes(data)
+    if ext in IMAGE_EXT:
+        ok = cv2.imdecode(np.frombuffer(data[:50_000_000], dtype=np.uint8), cv2.IMREAD_COLOR) is not None
+    else:
+        _cap = cv2.VideoCapture(str(stored))
+        ok = _cap.isOpened() and _cap.read()[0]
+        _cap.release()
+    if not ok:
+        stored.unlink(missing_ok=True)
+        raise HTTPException(400, "This file could not be read as a " + ("photo" if ext in IMAGE_EXT else "video") + ". Try a JPG, PNG, MP4 or MOV file.")
     exif = read_exif(stored) if ext in IMAGE_EXT else {"lat": None, "lon": None, "captured_at": None}
     la, lo, src = _resolve_location(exif, lat, lon, gpx)
     when = _parse_dt(captured_at) or exif.get("captured_at") or now()
@@ -294,7 +349,8 @@ def delete_inspection(iid: int, s: Session = Depends(get_session), _u=Depends(au
 @app.get("/api/defects")
 def list_defects(status: Optional[str] = None, risk: Optional[str] = None, cls: Optional[str] = None,
                  s: Session = Depends(get_session)):
-    q = s.query(Defect)
+    from sqlalchemy.orm import defer
+    q = s.query(Defect).options(defer(Defect.embedding))
     if status:
         q = q.filter(Defect.status == status)
     if risk:
@@ -447,29 +503,33 @@ def export_verified(s: Session = Depends(get_session), _u=Depends(auth.require_o
 
 @app.get("/api/stats")
 def stats(s: Session = Depends(get_session)):
-    defects = s.query(Defect).filter(Defect.status != "rejected").all()
-    insps = s.query(Inspection).all()
-    dets = s.query(Detection).all()
-    by = lambda items, key: {k: sum(1 for x in items if key(x) == k) for k in sorted({key(x) for x in items})}
-    timeline = {}
-    for i in insps:
-        day = (i.captured_at or i.created_at).date().isoformat()
-        t = timeline.setdefault(day, {"date": day, "inspections": 0, "detections": 0})
-        t["inspections"] += 1
-        t["detections"] += len(i.detections)
+    from sqlalchemy import case, func
+    # aggregate in the database: the old version loaded every row and lazily queried per inspection (very slow on a remote DB)
+    ins = s.query(func.count(Inspection.id), func.sum(case((Inspection.media_type == "image", 1), else_=0)),
+                  func.sum(case((Inspection.media_type == "video", 1), else_=0))).one()
+    det = s.query(func.count(Detection.id), func.sum(case((Detection.is_duplicate == True, 1), else_=0)),  # noqa: E712
+                  func.sum(case((Detection.verification == "pending", 1), else_=0)),
+                  func.sum(case((Detection.verification.in_(("confirmed", "corrected")), 1), else_=0)),
+                  func.sum(case((Detection.verification == "rejected", 1), else_=0))).one()
+    live = Defect.status != "rejected"
+
+    def grp(col):
+        return {k: n for k, n in s.query(col, func.count(Defect.id)).filter(live).group_by(col).all() if k is not None}
+
+    st = {k: n for k, n in s.query(Defect.status, func.count(Defect.id)).filter(live).group_by(Defect.status).all()}
+    high = s.query(func.count(Defect.id)).filter(live, Defect.risk_level == "High", Defect.status == "active").scalar() or 0
+    day = func.date(func.coalesce(Inspection.captured_at, Inspection.created_at))
+    per_day = {str(d): n for d, n in s.query(day, func.count(Inspection.id)).group_by(day).all()}
+    dets_day = {str(d): n for d, n in s.query(day, func.count(Detection.id)).join(Detection, Detection.inspection_id == Inspection.id)
+                .group_by(day).all()}
+    timeline = [{"date": d, "inspections": per_day[d], "detections": dets_day.get(d, 0)} for d in sorted(per_day)]
     return {
-        "inspections": len(insps), "images": sum(1 for i in insps if i.media_type == "image"),
-        "videos": sum(1 for i in insps if i.media_type == "video"), "detections": len(dets),
-        "unique_defects": len(defects), "active": sum(1 for d in defects if d.status == "active"),
-        "repaired": sum(1 for d in defects if d.status == "repaired"),
-        "high_risk": sum(1 for d in defects if d.risk_level == "High" and d.status == "active"),
-        "duplicates_prevented": sum(1 for d in dets if d.is_duplicate),
-        "pending_verification": sum(1 for d in dets if d.verification == "pending"),
-        "verified": sum(1 for d in dets if d.verification in ("confirmed", "corrected")),
-        "rejected": sum(1 for d in dets if d.verification == "rejected"),
-        "by_class": by(defects, lambda d: d.class_name), "by_severity": by(defects, lambda d: d.severity),
-        "by_risk": by(defects, lambda d: d.risk_level), "by_trend": by(defects, lambda d: d.trend),
-        "timeline": sorted(timeline.values(), key=lambda x: x["date"]),
+        "inspections": ins[0] or 0, "images": int(ins[1] or 0), "videos": int(ins[2] or 0), "detections": det[0] or 0,
+        "unique_defects": sum(st.values()), "active": st.get("active", 0), "repaired": st.get("repaired", 0),
+        "high_risk": high, "duplicates_prevented": int(det[1] or 0), "pending_verification": int(det[2] or 0),
+        "verified": int(det[3] or 0), "rejected": int(det[4] or 0),
+        "by_class": grp(Defect.class_name), "by_severity": grp(Defect.severity),
+        "by_risk": grp(Defect.risk_level), "by_trend": grp(Defect.trend), "timeline": timeline,
     }
 
 

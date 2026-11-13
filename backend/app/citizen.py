@@ -566,7 +566,8 @@ def register(app):
     def public_defects():
         s = SessionLocal()
         try:
-            rows = (s.query(Defect).filter(Defect.status.in_(("active", "repaired")), Defect.lat != None,  # noqa
+            from sqlalchemy.orm import defer
+            rows = (s.query(Defect).options(defer(Defect.embedding)).filter(Defect.status.in_(("active", "repaired")), Defect.lat != None,  # noqa
                                            Defect.lon != None).order_by(Defect.id).all())  # noqa
             return [_ser_public(d) for d in rows]
         finally:

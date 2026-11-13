@@ -27,6 +27,11 @@ def _default(o):
 
 
 def publish(type_: str, data: dict | None = None, audience: str = "officer"):
+    try:  # any change invalidates the public read cache
+        from . import main as _m
+        _m.clear_read_cache()
+    except Exception:
+        pass
     data = json.loads(json.dumps(data or {}, default=_default))  # json-safe (datetimes etc.)
     ev = {"type": type_, "data": data, "audience": audience,
           "ts": datetime.now(timezone.utc).isoformat(timespec="seconds")}

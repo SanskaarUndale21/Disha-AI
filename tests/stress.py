@@ -220,7 +220,9 @@ async def main():
     async with httpx.AsyncClient(limits=httpx.Limits(max_connections=200)) as c:
         h = await c.get(BASE + "/api/health")
         print("health:", h.status_code, h.text[:100])
-        for fn in (read_load, ws_fanout, complaint_flood, screening, fuzz, route_burst, image_load, video_load, fall_alarm):
+        allf = (read_load, ws_fanout, complaint_flood, screening, fuzz, route_burst, image_load, video_load, fall_alarm)
+        only = sys.argv[2:]
+        for fn in [f for f in allf if not only or f.__name__ in only]:
             try:
                 await fn(c)
             except Exception as e:
