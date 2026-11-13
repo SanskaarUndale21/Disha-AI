@@ -265,7 +265,13 @@ def detect_people(frame, conf=0.3, imgsz=640):
     boxes = r.boxes.xyxy.cpu().numpy()
     confs = r.boxes.conf.cpu().numpy()
     kps = r.keypoints.data.cpu().numpy() if r.keypoints is not None else None
+    H = frame.shape[0]
     for i in range(len(boxes)):
+        x1, y1, x2, y2 = [float(v) for v in boxes[i]]
+        # a small person-shaped blob cut off by the bottom edge is the rider's own hand or mirror reflection in a
+        # handlebar or dashboard video, not someone lying on the road
+        if y2 >= 0.965 * H and kps is not None and sum(1 for j in (5, 6, 11, 12) if kps[i][j][2] >= KP_CONF) < 2:
+            continue  # cut off at the bottom edge with no torso visible
         out.append({"box": [float(v) for v in boxes[i]], "conf": float(confs[i]),
                     "kps": kps[i].tolist() if kps is not None else None})
     return out

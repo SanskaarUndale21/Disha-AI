@@ -7,6 +7,8 @@ import numpy as np
 
 from . import config, scoring, similarity
 from .db import Defect, DefectHistory, Detection, Inspection, now
+from sqlalchemy.orm import lazyload
+
 from .geo import haversine_m
 
 UID_PREFIX = {"pothole": "PH", "alligator_crack": "AC", "transverse_crack": "TC", "longitudinal_crack": "LC",
@@ -28,7 +30,7 @@ def _radius(src_a, src_b):
     return config.DUP_RADIUS_MANUAL_M if "manual" in (src_a, src_b) else config.DUP_RADIUS_M
 
 
-def find_match(s, cls, lat, lon, loc_src, emb, exclude_ids, before: datetime):
+def find_match(s, cls, lat, lon, loc_src, emb, exclude_ids, before: datetime, pool=None):
     """Best existing defect for a new detection, or (None, sim, dist).
 
     With location on both sides: candidate must be within the radius and visually similar (sim >= threshold);
@@ -36,12 +38,18 @@ def find_match(s, cls, lat, lon, loc_src, emb, exclude_ids, before: datetime):
     Without location: only a very high visual similarity counts (sim >= DUP_SIM_NO_GPS).
     """
     best, best_score, best_sim, best_d = None, -1.0, None, None
-    q = s.query(Defect).filter(Defect.status != "rejected")
-    if lat is not None:
-        dlat = 0.0005  # ~55 m prefilter box
-        q = q.filter((Defect.lat == None) | ((Defect.lat.between(lat - dlat, lat + dlat)) &  # noqa: E711
-                                             (Defect.lon.between(lon - dlat * 2, lon + dlat * 2))))
-    for d in q.all():
+    if pool is not None:
+        # candidates were loaded once for the whole upload (one database call instead of one per detection)
+        dlat = 0.0005
+        cand = [d for d in pool if lat is None or d.lat is None or (abs(d.lat - lat) <= dlat and abs(d.lon - lon) <= dlat * 2)]
+    else:
+        q = s.query(Defect).filter(Defect.status != "rejected")
+        if lat is not None:
+            dlat = 0.0005  # ~55 m prefilter box
+            q = q.filter((Defect.lat == None) | ((Defect.lat.between(lat - dlat, lat + dlat)) &  # noqa: E711
+                                                 (Defect.lon.between(lon - dlat * 2, lon + dlat * 2))))
+        cand = q.all()
+    for d in cand:
         if d.id in exclude_ids or not compatible(cls, d.class_name) or d.embedding is None:
             continue
         ref = similarity.from_bytes(d.embedding)
@@ -80,11 +88,31 @@ def refresh_defect_risk(d: Defect):
                                               d.report_count, d.trend)
 
 
+def _load_pool(s, insp, rows, gpx=None, gpx_offset=0.0):
+    """Load every defect that could match any detection of this upload with ONE query (bounding box of all
+    detection positions, padded by about 110 m). Returns None when positions are unknown (falls back to per-row)."""
+    pts = []
+    for r in rows:
+        if gpx is not None and r.get("time_s") is not None:
+            pts.append(gpx.position(r["time_s"], gpx_offset)[:2])
+        elif insp.lat is not None:
+            pts.append((insp.lat, insp.lon))
+    if not pts or len(pts) != len(rows):
+        return None
+    la, lo = [p[0] for p in pts], [p[1] for p in pts]
+    pad = 0.001
+    q = (s.query(Defect).options(lazyload("*")).filter(Defect.status != "rejected")
+         .filter((Defect.lat == None) | ((Defect.lat.between(min(la) - pad, max(la) + pad)) &  # noqa: E711
+                                         (Defect.lon.between(min(lo) - 2 * pad, max(lo) + 2 * pad)))))
+    return q.all()
+
+
 def register(s, insp: Inspection, rows, frame_img=None, gpx=None, gpx_offset=0.0, duplicate_upload=False):
     """Persist detections of an inspection and link each to a unique defect (new or existing)."""
     matched_ids = set()
     det_objs = []
     when = insp.captured_at or now()
+    pool = _load_pool(s, insp, rows, gpx, gpx_offset)
     for r in rows:
         c = r.get("crop")
         if c is None and frame_img is not None:
@@ -104,7 +132,7 @@ def register(s, insp: Inspection, rows, frame_img=None, gpx=None, gpx_offset=0.0
                         frame_index=r.get("frame_index", 0), frames_seen=r.get("frames_seen", 1), lat=lat, lon=lon,
                         crop_path=crop_name)
 
-        match, sim, dist = find_match(s, r["class_name"], lat, lon, src, emb, matched_ids, when)
+        match, sim, dist = find_match(s, r["class_name"], lat, lon, src, emb, matched_ids, when, pool)
         if match is not None:
             matched_ids.add(match.id)
             prev = (s.query(DefectHistory).filter(DefectHistory.defect_id == match.id, DefectHistory.present == True)  # noqa
@@ -142,6 +170,8 @@ def register(s, insp: Inspection, rows, frame_img=None, gpx=None, gpx_offset=0.0
             refresh_defect_risk(defect)
             s.add(defect)
             s.flush()
+            if pool is not None:
+                pool.append(defect)
             defect.uid = f"{UID_PREFIX.get(defect.class_name, 'RD')}-{defect.id:05d}"
             matched_ids.add(defect.id)
             det.defect_id = defect.id
