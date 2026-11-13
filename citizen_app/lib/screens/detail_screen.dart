@@ -65,7 +65,7 @@ class _DetailScreenState extends State<DetailScreen> {
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: Text('Send to ${r['authority'] ?? 'the road authority'}'),
-        message: Text(email),
+        message: Text(r['verified'] == true ? email : '$email\nAddress not yet verified by the admin.'),
         actions: [
           CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, 0), child: const Text('Open email draft')),
           if (photo != null)

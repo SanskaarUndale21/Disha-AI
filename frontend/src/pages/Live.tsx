@@ -246,10 +246,12 @@ export default function Live() {
       }
       s.onerror = () => bad(new Error('Cannot reach the detection server'))
       s.onclose = () => {
+        if (ws.current && ws.current !== s) return // a newer session replaced this socket: ignore its late close
         running.current = false
         setStatus((x) => (x === 'live' ? 'disconnected' : x))
       }
       s.onmessage = (e) => {
+        if (ws.current && ws.current !== s) return // stale socket from a previous source
         const m = JSON.parse(e.data)
         if (m.type === 'frame') {
           inflight.current = Math.max(0, inflight.current - 1)
@@ -343,13 +345,36 @@ export default function Live() {
     }
   }
 
-  const startUrl = async (url: string) => {
+  const startUrl = async (url: string, file?: File) => {
     stop()
     const v = video.current!
     v.srcObject = null
     v.src = url
     v.loop = true
-    await v.play()
+    v.playbackRate = 0.6 // recorded clips play a little slower so boxes stay on the potholes
+    try {
+      await v.play()
+    } catch {
+      if (!file) {
+        setStatus('this video cannot be played')
+        return
+      }
+      // the browser cannot decode this codec (MPEG-4 Part 2, HEVC...): convert it on the server to H.264
+      setStatus('converting video for the browser...')
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const r = await fetch('/api/live/transcode', { method: 'POST', body: fd })
+        if (!r.ok) throw new Error((await r.json()).detail ?? 'conversion failed')
+        const { url: playable } = await r.json()
+        v.src = playable
+        v.playbackRate = 0.6
+        await v.play()
+      } catch (e: any) {
+        setStatus(`video could not be played: ${e.message}`)
+        return
+      }
+    }
     setSrc('file')
     await begin()
   }
@@ -424,7 +449,7 @@ export default function Live() {
             <button className="btn primary" onClick={startCamera}><Camera size={17} weight="fill" /> Camera</button>
             <button className="btn" onClick={() => startUrl('/media/samples/pothole_drive.mp4')}><FilmStrip size={17} weight="fill" /> Demo drive</button>
             <button className="btn" onClick={() => fileIn.current?.click()}><FileVideo size={17} weight="fill" /> Video file</button>
-            <input ref={fileIn} type="file" accept="video/*" hidden onChange={(e) => e.target.files?.[0] && startUrl(URL.createObjectURL(e.target.files[0]))} />
+            <input ref={fileIn} type="file" accept="video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) startUrl(URL.createObjectURL(f), f); e.target.value = '' }} />
           </div>
         </div>
         <div className="live-wrap">

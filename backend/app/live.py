@@ -11,6 +11,7 @@ import asyncio
 import json
 import time
 import uuid
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -77,7 +78,24 @@ def save_session(sess: LiveSession, meta: dict):
 
 
 def register_ws(app):
-    from fastapi import WebSocket, WebSocketDisconnect
+    from fastapi import File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+
+    @app.post("/api/live/transcode")
+    async def live_transcode(file: UploadFile = File(...)):
+        """Convert a clip the browser cannot play (MPEG-4 Part 2, HEVC, AVI...) to H.264 MP4 for Live patrol."""
+        import subprocess
+        import imageio_ffmpeg
+        src = config.UPLOADS / f"live_src_{uuid.uuid4().hex}{Path(file.filename or 'v.mp4').suffix or '.mp4'}"
+        src.write_bytes(await file.read())
+        dst = config.UPLOADS / f"live_{uuid.uuid4().hex}.mp4"
+        cmd = [imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+               "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-vf", "scale='min(1280,iw)':-2",
+               "-an", "-movflags", "+faststart", str(dst)]
+        r = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=600)
+        src.unlink(missing_ok=True)
+        if r.returncode != 0 or not dst.exists():
+            raise HTTPException(400, "This video could not be converted. Try an MP4 or MOV file.")
+        return {"url": f"/media/uploads/{dst.name}"}
 
     @app.websocket("/ws/live")
     async def live_ws(ws: WebSocket):
