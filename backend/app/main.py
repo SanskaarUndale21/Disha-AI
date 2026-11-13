@@ -235,7 +235,7 @@ def _process_video_job(job, insp_id, stored, gpx, gpx_offset, quality="2k", clas
         insp.processing_ms = meta["ms"]
         insp.summary = dict(pipeline.summarize(dets), raw_track_ids=meta["raw_track_ids"],
                             unique_tracks=len(tracks), frames_processed=meta["frames_processed"],
-                            quality=meta.get("quality", "2k"))
+                            quality=meta.get("quality", "2k"), falls=meta.get("falls", []))
         s.commit()
         JOBS[job].update(status="done", progress=1.0)
         _announce(ser_insp(insp, with_dets=True))

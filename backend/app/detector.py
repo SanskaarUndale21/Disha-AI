@@ -475,7 +475,7 @@ def normalize_quality(q):
     return "4k" if str(q or "").lower() in ("4k", "2160p", "uhd") else "2k"
 
 
-def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None):
+def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None, falls=True):
     """Track defects through a video. Returns (unique track rows, meta). Annotated H.264 video is written."""
     import imageio.v2 as iio
 
@@ -490,6 +490,13 @@ def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None):
     tk = Tracker(imgsz=cfg["imgsz"], far=cfg["far"], allow=classes)
     idx = processed = 0
     t0 = time.time()
+    fm, fall_list = None, []
+    if falls:
+        try:
+            from . import safety
+            fm = safety.FallMonitor()
+        except Exception as e:
+            print(f"[video] fall monitor unavailable: {e!r}")
     try:
         while True:
             ok, frame = cap.read()
@@ -508,6 +515,22 @@ def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None):
             shown = [r for r in rows if r["confirmed"]]
             ann = draw(frame, shown, label_track)
             hud(ann, len(tk.unique()), tk.by_class())
+            if fm is not None:
+                try:
+                    pots = [(r["track_id"], [r["x1"], r["y1"], r["x2"], r["y2"]]) for r in shown if r.get("class_name") == "pothole" and r.get("track_id") is not None]
+                    people, evs = fm.observe(idx / fps, safety.detect_people(frame), pots)
+                    for pp in people:
+                        x1, y1, x2, y2 = [int(v) for v in pp["box"]]
+                        col = (48, 59, 255) if pp["fallen"] else (255, 255, 255)
+                        cv2.rectangle(ann, (x1, y1), (x2, y2), col, 3 if pp["fallen"] else 1)
+                        if pp["fallen"]:
+                            cv2.putText(ann, "PERSON DOWN", (x1, max(18, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
+                    for ev in evs:
+                        url = safety.snapshot(ann, ev)
+                        em = safety.record_emergency(ev, url)
+                        fall_list.append({"id": em["id"], "time_s": round(idx / fps, 1), "snapshot_url": url, "message": em["message"]})
+                except Exception as e:
+                    print(f"[video] fall check failed: {e!r}")
             writer.append_data(cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
             processed += 1
             idx += 1
@@ -518,7 +541,7 @@ def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None):
         writer.close()
     out = tk.final_rows()
     meta = {"fps": fps, "frames_total": total, "frames_processed": processed, "width": tk.w, "height": tk.h,
-            "raw_track_ids": len(tk.tracks), "quality": quality, "ms": int((time.time() - t0) * 1000)}
+            "raw_track_ids": len(tk.tracks), "quality": quality, "falls": fall_list, "ms": int((time.time() - t0) * 1000)}
     return out, meta
 
 

@@ -251,7 +251,7 @@ def pose_model():
     return _pose
 
 
-def detect_people(frame, conf=0.4, imgsz=480):
+def detect_people(frame, conf=0.3, imgsz=640):
     """[{box:[x1,y1,x2,y2], conf, kps: 17x3 list}] for people in a BGR frame."""
     m = pose_model()
     if m is None:
@@ -313,6 +313,7 @@ FALL_WINDOW_S = 1.5
 FALL_HOLD_S = 0.5
 FALL_DROP = 0.25
 FALL_COOLDOWN_S = 60.0
+LYING_HOLD_S = 1.5  # a person already lying still this long counts as down
 KP_CONF = 0.3
 
 
@@ -363,6 +364,7 @@ class _Person:
         self.hist = deque()  # (t, box, hip_y, horizontal)
         self.last_t = t
         self.down_since = None  # candidate fall start
+        self.horiz_since = None  # when the body first became horizontal (for people found already lying down)
         self.fallen = False
         self.last_alert = -1e9
 
@@ -436,8 +438,14 @@ class FallMonitor:
         for pid in seen:
             P = self.people[pid]
             _, box, hip_y, horiz = P.hist[-1]
+            P.horiz_since = (P.horiz_since if P.horiz_since is not None else t) if horiz else None
             if P.down_since is None:
-                if horiz:
+                if horiz and t - P.horiz_since >= LYING_HOLD_S and len(P.hist) >= 3:
+                    c0 = ((P.hist[0][1][0] + P.hist[0][1][2]) / 2, (P.hist[0][1][1] + P.hist[0][1][3]) / 2)
+                    c1 = ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+                    if math.hypot(c1[0] - c0[0], c1[1] - c0[1]) < 0.6 * max(1.0, box[2] - box[0]):
+                        P.down_since = P.horiz_since  # lying still on the road: person down
+                if horiz and P.down_since is None:
                     for (tp, bp, hy, hz) in P.hist:
                         if hz or t - tp > FALL_WINDOW_S:
                             continue

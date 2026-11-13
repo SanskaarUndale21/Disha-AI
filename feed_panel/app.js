@@ -187,7 +187,7 @@
       "<div class=\"stat\"><b>" + (s.unique_tracks != null ? s.unique_tracks : rows.length) + "</b><span>tracked IDs</span></div>" +
       "<div class=\"stat\"><b>" + (s.max_risk != null ? Math.round(s.max_risk) : "-") + "</b><span>top risk</span></div></div>" +
       "<p class=\"note\">" + esc(classes || "No classes") + "</p><div class=\"tlist\">" + list + "</div>" +
-      "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a></div></div>";
+      ((i.summary && i.summary.falls && i.summary.falls.length) ? "<div class=\"toast\" style=\"border-left-color:#ff3b30\"><b>Person down detected</b> at " + i.summary.falls.map(function (f) { return f.time_s + " s"; }).join(", ") + " in this video.</div>" : "") + "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a></div></div>";
   }
   $("vgo").onclick = function () {
     var f = $("vfile").files[0];

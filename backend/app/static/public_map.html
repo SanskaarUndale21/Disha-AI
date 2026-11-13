@@ -288,12 +288,14 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     }
     res.routes.forEach(function (r) {
       var chips = r.labels.map(function (l) { return "<span class='chip" + (l === "recommended" ? " rec" : "") + "'>" + esc(l) + "</span>"; }).join("");
-      html += "<div class='route" + (r.index === selIdx ? " sel" : "") + "' data-i='" + r.index + "'><div class='t'>" + fmtMin(r.duration_min) + "<span>" + r.distance_km + " km</span></div>" +
-        "<div class='d'>" + chips + "<span class='chip " + (r.defect_count ? "bad" : "ok") + "'>" + (r.defect_count ? r.defect_count + " potholes and defects" : "No damage reported") + "</span></div></div>";
+      var eta = new Date(Date.now() + r.duration_min * 60000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      html += "<div class='route" + (r.index === selIdx ? " sel" : "") + "' data-i='" + r.index + "'><div class='t'>" + fmtMin(r.duration_min) + "<span>" + r.distance_km + " km, arrive " + eta + "</span></div>" +
+        "<div class='d'>" + (r.detour ? "<span class='chip'>avoids damaged roads</span>" : "") + chips + "<span class='chip " + (r.defect_count ? "bad" : "ok") + "'>" + (r.defect_count ? r.defect_count + " potholes and defects" : "No damage reported") + "</span></div></div>";
     });
     html += routeDetail(res.routes[selIdx]);
     $("body").innerHTML = html;
     Array.prototype.forEach.call($("body").querySelectorAll(".dl button"), function (el) {
+      if (el.dataset.lat === "null") { el.disabled = true; return; }
       el.onclick = function () { map.flyTo({ center: [+el.dataset.lon, +el.dataset.lat], zoom: 17, pitch: is3d ? 58 : 0 }); };
     });
     Array.prototype.forEach.call($("body").querySelectorAll(".route"), function (el) {
@@ -312,7 +314,13 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     var ph = r.defects.filter(function (h) { return h["class"] === "pothole"; }).length, other = r.defects.length - ph, cnt = {};
     r.defects.forEach(function (h) { var n = NAMES[h["class"]] || "Other"; cnt[n] = (cnt[n] || 0) + 1; });
     var chips = Object.keys(cnt).map(function (n) { return "<span class='chip'>" + esc(n) + " " + cnt[n] + "</span>"; }).join("");
-    return "<div class='card'><h3>Road damage on Route " + (r.index + 1) + "</h3>" +
+    var stepsHtml = (r.steps || []).map(function (st) {
+      var d = st.distance_m >= 1000 ? (st.distance_m / 1000).toFixed(1) + " km" : st.distance_m + " m";
+      return "<button data-lat='" + st.lat + "' data-lon='" + st.lon + "'><em>" + d + "</em><span>" + esc(st.text) + "</span></button>";
+    }).join("");
+    return "<div class='card'><h3>Journey: Route " + (r.index + 1) + "</h3><div class='kv'><b>Distance</b><span>" + r.distance_km + " km</span><b>Time</b><span>" + fmtMin(r.duration_min) + "</span><b>Road damage</b><span>" + r.defect_count + " reported (" + r.potholes + " potholes)</span></div>" +
+      "<details style='margin-top:10px'><summary style='cursor:pointer;font-weight:600'>Step-by-step directions (" + (r.steps || []).length + ")</summary><div class='dl'>" + stepsHtml + "</div></details></div>" +
+      "<div class='card'><h3>Road damage on Route " + (r.index + 1) + "</h3>" +
       "<div class='stat3'><b>" + ph + "</b><span>potholes</span><b style='font-size:22px'>" + other + "</b><span>other defects</span><b style='font-size:22px;color:var(--red)'>" + r.severe_count + "</b><span>serious</span></div>" +
       "<div class='row'>" + chips + "</div>" +
       "<div class='dl'>" + (list.map(function (x) {

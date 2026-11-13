@@ -218,7 +218,7 @@
       "<div class=\"vtog\"><label><input type=\"checkbox\" id=\"vposs\"" + (showPossible ? " checked" : "") + "> Show possible too</label><span class=\"note\">" + (s.quality ? String(s.quality).toUpperCase() + " mode" : "") + "</span></div>" +
       "<p class=\"note\">AI estimate, verified by officers. Weak detections are hidden by default.</p>" +
       "<div class=\"tlist\">" + list + "</div>" +
-      "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a>" +
+      ((i.summary && i.summary.falls && i.summary.falls.length) ? "<div class=\"toast\" style=\"border-left-color:#ff3b30\"><b>Person down detected</b> at " + i.summary.falls.map(function (f) { return f.time_s + " s"; }).join(", ") + " in this video.</div>" : "") + "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a>" +
       "</div></div>";
     $("vposs").onchange = function () { showPossible = this.checked; renderResult(null); };
     if (fresh) o.scrollIntoView({ behavior: "smooth", block: "start" });

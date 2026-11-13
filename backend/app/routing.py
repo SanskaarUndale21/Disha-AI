@@ -107,17 +107,52 @@ def _dist_to_polyline(px, py, xs, ys):
     return float(np.sqrt((px - cx) ** 2 + (py - cy) ** 2).min())
 
 
-def _osrm_routes(o, d):
-    url = f"{OSRM_URL}/route/v1/driving/{o[1]},{o[0]};{d[1]},{d[0]}"
+def _osrm_routes(o, d, via=None, alternatives=True):
+    pts = [o] + ([via] if via else []) + [d]
+    path = ";".join(f"{p[1]},{p[0]}" for p in pts)
+    url = f"{OSRM_URL}/route/v1/driving/{path}"
     try:
         r = httpx.get(url, timeout=25, headers={"User-Agent": UA},
-                      params={"alternatives": "3", "overview": "full", "geometries": "geojson", "steps": "false"})
+                      params={"alternatives": "3" if alternatives and not via else "false", "overview": "full",
+                              "geometries": "geojson", "steps": "true"})
         j = r.json()
     except (httpx.HTTPError, ValueError):
+        if via:
+            return []
         raise HTTPException(503, "The route service is busy. Try again in a moment.")
     if j.get("code") != "Ok" or not j.get("routes"):
+        if via:
+            return []
         raise HTTPException(404, "No drivable route was found between these places.")
     return j["routes"]
+
+
+def _instruction(st):
+    m = st.get("maneuver", {})
+    t, mod, name = m.get("type", ""), m.get("modifier", ""), st.get("name") or ""
+    on = f" onto {name}" if name else ""
+    if t == "depart":
+        return f"Head {mod or 'out'}{(' on ' + name) if name else ''}".replace("Head out", "Start")
+    if t == "arrive":
+        return "You have arrived at your destination"
+    if t == "roundabout" or t == "rotary":
+        return f"At the roundabout take exit {m.get('exit', '')}{on}".strip()
+    if t in ("turn", "end of road", "fork", "on ramp", "off ramp", "merge", "new name", "continue") or mod:
+        verb = {"left": "Turn left", "right": "Turn right", "slight left": "Bear left", "slight right": "Bear right",
+                "sharp left": "Sharp left", "sharp right": "Sharp right", "straight": "Continue straight",
+                "uturn": "Make a U-turn"}.get(mod, "Continue")
+        return verb + on
+    return "Continue" + on
+
+
+def _steps(r):
+    out = []
+    for leg in r.get("legs", []):
+        for st in leg.get("steps", []):
+            loc = st.get("maneuver", {}).get("location")
+            out.append({"text": _instruction(st), "distance_m": round(st.get("distance", 0)),
+                        "lat": loc[1] if loc else None, "lon": loc[0] if loc else None})
+    return out
 
 
 def plan(o, d):
@@ -130,8 +165,8 @@ def plan(o, d):
         s.close()
     lat0, lon0 = (o[0] + d[0]) / 2, (o[1] + d[1]) / 2
     dxy = [(x, *_to_xy(x.lat, x.lon, lat0, lon0)) for x in defects]
-    out = []
-    for i, r in enumerate(routes):
+
+    def score(r, i, detour=False):
         coords = r["geometry"]["coordinates"]  # [lon, lat]
         lons, lats = [c[0] for c in coords], [c[1] for c in coords]
         xs, ys = _to_xy(lats, lons, lat0, lon0)
@@ -151,10 +186,35 @@ def plan(o, d):
         step = max(1, len(coords) // 700)
         geom = [[round(c[1], 5), round(c[0], 5)] for c in coords[::step]] + [[round(coords[-1][1], 5), round(coords[-1][0], 5)]]
         penalty = round(sum(h["penalty_min"] for h in hits), 1)
-        out.append({"index": i, "distance_km": round(r["distance"] / 1000, 2), "duration_min": round(r["duration"] / 60, 1),
-                    "defects": hits, "defect_count": len(hits), "severe_count": sum(1 for h in hits if h["risk"] >= 70),
-                    "penalty_min": penalty, "effective_min": round(r["duration"] / 60 + penalty, 1),
-                    "damage_per_km": round(len(hits) / max(0.1, r["distance"] / 1000), 2), "geometry": geom})
+        return {"index": i, "distance_km": round(r["distance"] / 1000, 2), "duration_min": round(r["duration"] / 60, 1),
+                "defects": hits, "defect_count": len(hits), "severe_count": sum(1 for h in hits if h["risk"] >= 70),
+                "potholes": sum(1 for h in hits if h["class"] == "pothole"), "detour": detour,
+                "penalty_min": penalty, "effective_min": round(r["duration"] / 60 + penalty, 1),
+                "damage_per_km": round(len(hits) / max(0.1, r["distance"] / 1000), 2), "geometry": geom, "steps": _steps(r)}
+
+    out = [score(r, i) for i, r in enumerate(routes)]
+
+    # A road with many potholes: look for a detour that steers around the worst cluster (via-point on either side).
+    best = min(out, key=lambda r: r["effective_min"])
+    if best["defect_count"] >= 3:
+        pts = best["defects"]
+        centre = max(pts, key=lambda h: sum(1 for q in pts if abs(q["lat"] - h["lat"]) < 0.002 and abs(q["lon"] - h["lon"]) < 0.002))
+        vx, vy = (d[1] - o[1]) * math.cos(math.radians(lat0)), d[0] - o[0]
+        n = math.hypot(vx, vy) or 1.0
+        px, py = -vy / n, vx / n  # unit perpendicular (east, north)
+        for sign in (1, -1):
+            for off in (600.0, 1200.0):
+                via = (centre["lat"] + sign * py * off / 110540.0,
+                       centre["lon"] + sign * px * off / (111320.0 * math.cos(math.radians(lat0))))
+                for r in _osrm_routes(o, d, via=via)[:1]:
+                    if r["distance"] > routes[0]["distance"] * 1.9 + 3000:
+                        continue
+                    cand = score(r, len(out), detour=True)
+                    dup = any(abs(c["distance_km"] - cand["distance_km"]) < 0.15 and abs(c["defect_count"] - cand["defect_count"]) <= 1 for c in out)
+                    if not dup and cand["defect_count"] < best["defect_count"]:
+                        out.append(cand)
+            if len(out) >= 5:
+                break
     fastest = min(out, key=lambda r: r["duration_min"])
     smoothest = min(out, key=lambda r: (r["penalty_min"], r["duration_min"]))
     best = min(out, key=lambda r: r["effective_min"])
