@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ChatCircleText, CheckCircle, FilePdf, Images, MapPin, SealCheck, Siren, VideoCamera, Warning, DownloadSimple,
 } from '@phosphor-icons/react'
-import { api, label, pub, type Defect, type PublicSummary } from '../api'
-import { DefectDrawer, DefectMap } from '../components'
+import { api, label, mapUrl, pub, type Defect, type PublicSummary } from '../api'
+import { authToken, useAuth } from '../auth'
+import { DefectDrawer } from '../components'
 import { useLiveRefresh, useRealtime, type RtEvent } from '../events'
 import { CLASS_HEX, RISK_HEX, Tile } from '../icons'
 import { Hero3D } from '../depth'
@@ -43,6 +44,27 @@ function FeedRow({ e }: { e: RtEvent }) {
       </div>
       <span className="note">{ago(e.ts)}</span>
     </div>
+  )
+}
+
+
+/** Live, fully interactive map (pan, zoom, filters, pin cards, directions) embedded from the shared map page. */
+function InteractiveMap({ onSelect }: { onSelect: (id: number) => void }) {
+  const ref = useRef<HTMLIFrameElement>(null)
+  const { isOfficer } = useAuth()
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light'
+  const send = () => ref.current?.contentWindow?.postMessage({ type: 'rw-auth', officer: !!isOfficer, token: isOfficer ? authToken() : null }, '*')
+  useEffect(() => {
+    send()
+    const t = setInterval(send, 4000)
+    const on = (e: MessageEvent) => { if (e.data?.type === 'rw-defect' && typeof e.data.id === 'number') onSelect(e.data.id) }
+    window.addEventListener('message', on)
+    return () => { clearInterval(t); window.removeEventListener('message', on) }
+  })
+  return (
+    <iframe ref={ref} onLoad={send} title="Live defect map" allow="geolocation; fullscreen"
+      src={`${mapUrl()}?embed=1&theme=${dark ? 'dark' : 'light'}`}
+      style={{ width: '100%', height: 460, border: 0, borderRadius: 14, background: '#1d2230' }} />
   )
 }
 
@@ -127,7 +149,7 @@ export default function Dashboard() {
       <div className="dash-grid">
         <div className="card">
           <div className="card-h"><h3>Live defect map</h3><Link className="btn sm" to="/map">Open full map</Link></div>
-          <DefectMap defects={defects.filter((d) => d.status !== 'rejected')} onSelect={(d) => setSel(d.id)} className="map tall" />
+          <InteractiveMap onSelect={(id) => setSel(id)} />
           <div className="legend-row">
             {(['High', 'Medium', 'Low'] as const).map((k) => (
               <span key={k}><i style={{ background: RISK_HEX[k] }} />{k} risk</span>

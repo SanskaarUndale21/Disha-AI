@@ -177,3 +177,9 @@ html.fx .hh .tagline { --d: 6; --k: .03; } html.fx .hh .display { --d: 14; --k: 
 @media (min-width: 900px) { .below .sec { padding: 48px; } }
 @media (max-width: 380px) { .brand img { width: 30px; height: 30px; } .brand b { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { .view.enter > * { animation: none; } .bignum.sk { animation: none; } }
+
+/* interactive map preview on Home (an embedded live map instead of a picture) */
+.mc-vis.embedmap { position: relative; display: block; min-height: 380px; border-radius: 22px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+.mc-vis.embedmap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #1d2230; }
+.mc-vis.embedmap .chip.cnt { position: absolute; right: 12px; top: 12px; z-index: 2; pointer-events: none; }
+@media (max-width: 760px) { .mc-vis.embedmap { min-height: 340px; } }

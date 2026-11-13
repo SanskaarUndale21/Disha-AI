@@ -1,5 +1,5 @@
 /* Disha AI service worker: caches the app shell so it opens offline. API calls are never cached. */
-var CACHE = "rw-shell-v8";
+var CACHE = "rw-shell-v9";
 var SHELL = [
   "./", "index.html", "style.css", "theme.css", "glass.css", "ux2.css", "i18n.js", "glass3d.js", "callroom.js", "callroom.css", "road3d.js", "app.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png",
