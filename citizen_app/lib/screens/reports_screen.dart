@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 
 import '../api.dart';
+import '../i18n.dart';
+import 'home_screen.dart' show friendlyError;
 import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -60,7 +62,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           sliver: SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
             sliver: SliverList.list(children: [
-              Text('My Reports', style: T.largeTitle(context)),
+              Text(tr('nav_reports'), style: T.largeTitle(context)),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -76,11 +78,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 18),
               if (_items == null && _error == null)
-                const Padding(padding: EdgeInsets.all(40), child: CupertinoActivityIndicator())
+                const Column(children: [Skeleton(height: 92, radius: 20), SizedBox(height: 10), Skeleton(height: 92, radius: 20), SizedBox(height: 10), Skeleton(height: 92, radius: 20)])
               else if (_error != null && (_items ?? []).isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(30),
-                  child: Text(_error!, textAlign: TextAlign.center, style: T.sub(context)),
+                  child: Text(friendlyError(_error!), textAlign: TextAlign.center, style: T.sub(context)),
                 )
               else if (list.isEmpty)
                 Padding(

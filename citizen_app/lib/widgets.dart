@@ -190,11 +190,14 @@ class PhotoTile extends StatelessWidget {
             left: 10,
             right: 10,
             bottom: 9,
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: Colors.white, fontSize: labelSize, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(label,
+                  maxLines: 1,
+                  style: TextStyle(
+                      color: Colors.white, fontSize: labelSize, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
+            ),
           ),
         ]),
       );
@@ -309,4 +312,37 @@ String timeAgo(DateTime t) {
   if (d.inDays < 7) return '${d.inDays}d ago';
   const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return '${t.day} ${m[t.month - 1]} ${t.year}';
+}
+
+/// Pulsing placeholder shown while content loads.
+class Skeleton extends StatefulWidget {
+  const Skeleton({super.key, required this.height, this.radius = 16});
+  final double height, radius;
+  @override
+  State<Skeleton> createState() => _SkeletonState();
+}
+
+class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
+  late final _ac = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
+  @override
+  void dispose() {
+    _ac.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return AnimatedBuilder(
+      animation: _ac,
+      builder: (_, _) => Container(
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: Color.lerp(c.fill, c.separator, _ac.value),
+          borderRadius: BorderRadius.circular(widget.radius),
+        ),
+      ),
+    );
+  }
 }

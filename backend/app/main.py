@@ -849,6 +849,8 @@ from . import nav as _nav  # noqa: E402
 _nav.register(app)
 from . import insights as _ins  # noqa: E402
 _ins.register(app)
+from . import telegram as _tg  # noqa: E402
+_tg.register(app)
 
 # serve built frontend if present
 _dist = config.ROOT / "frontend" / "dist"

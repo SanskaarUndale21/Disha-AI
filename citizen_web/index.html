@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1F2133" id="meta-theme">
 <script>(function(){var t="dark";try{t=localStorage.getItem("rw-theme")==="light"?"light":"dark";}catch(e){}document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("meta-theme");if(m)m.setAttribute("content",t==="dark"?"#1F2133":"#F4F1DE");})();</script>
@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="callroom.css">
 <link rel="stylesheet" href="glass.css">
+<link rel="stylesheet" href="ux2.css">
 </head>
 <body>
 <canvas id="bg3d" aria-hidden="true"></canvas>
@@ -99,15 +100,16 @@
   <header class="topbar" id="topbar">
     <a class="brand" href="#/home" aria-label="Disha AI home"><img src="icons/icon-192.png" alt="" width="34" height="34"><b>Disha <span>AI</span></b></a>
     <nav class="pillnav" id="pillnav" aria-label="Sections">
-      <a class="nl" href="#/home" data-nl="home">Home</a>
-      <a class="nl" href="#/report" data-nl="report">Report</a>
-      <a class="nl" href="#/drive" data-nl="drive">Video analysis</a>
-      <a class="nl" href="#/map" data-nl="map">Map</a>
-      <a class="nl" href="#/reports" data-nl="reports">My reports</a>
-      <a class="nl" href="#/alerts" data-nl="alerts">Alerts</a>
+      <a class="nl" href="#/home" data-nl="home" data-i18n="home">Home</a>
+      <a class="nl" href="#/report" data-nl="report" data-i18n="report">Report</a>
+      <a class="nl" href="#/drive" data-nl="drive" data-i18n="drive">Video analysis</a>
+      <a class="nl" href="#/map" data-nl="map" data-i18n="map">Map</a>
+      <a class="nl" href="#/reports" data-nl="reports" data-i18n="reports">My reports</a>
+      <a class="nl" href="#/alerts" data-nl="alerts" data-i18n="alerts">Alerts</a>
     </nav>
     <div class="tools-r">
-      <button type="button" class="pbtn sage" id="talk-btn" style="padding:8px 16px;min-height:40px" aria-label="Talk to Disha, a live voice call">Talk to Disha</button>
+      <button type="button" class="pbtn sage" id="talk-btn" data-i18n="talk" style="padding:8px 16px;min-height:44px" aria-label="Talk to Disha, a live voice call">Talk to Disha</button>
+      <button type="button" class="ibtn langbtn" id="lang-btn" aria-label="Language"><span>EN</span></button>
       <button type="button" class="ibtn" id="theme-btn" aria-label="Switch to dark mode"><svg class="ic i-moon" aria-hidden="true"><use href="#i-moon"/></svg><svg class="ic i-sun" aria-hidden="true"><use href="#i-sun"/></svg></button>
       <button type="button" class="ibtn bell" id="bell" aria-label="Notifications"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg><em id="bell-badge" class="badge" hidden>0</em></button>
       <a class="ibtn who" href="#/profile" id="who" data-nl="profile" aria-label="Profile"><svg class="ic" aria-hidden="true"><use href="#i-person-s"/></svg></a>
@@ -115,11 +117,11 @@
   </header>
 
   <nav class="tabbar" id="tabbar" aria-label="Main">
-    <a class="tab" href="#/home" data-tab="home"><svg class="ic" aria-hidden="true"><use href="#i-house"/></svg><span>Home</span></a>
-    <a class="tab" href="#/reports" data-tab="reports"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg><span>My Reports</span></a>
-    <a class="tab tab-report" href="#/report" data-tab="report" aria-label="New report"><span class="fab"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span>Report</span></a>
-    <a class="tab" href="#/map" data-tab="map"><svg class="ic" aria-hidden="true"><use href="#i-map"/></svg><span>Map</span></a>
-    <a class="tab" href="#/profile" data-tab="profile"><svg class="ic" aria-hidden="true"><use href="#i-person"/></svg><span>Profile</span></a>
+    <a class="tab" href="#/home" data-tab="home"><svg class="ic" aria-hidden="true"><use href="#i-house"/></svg><span data-i18n="home">Home</span></a>
+    <a class="tab" href="#/reports" data-tab="reports"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg><span data-i18n="reports">My Reports</span></a>
+    <a class="tab tab-report" href="#/report" data-tab="report" aria-label="New report"><span class="fab"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span data-i18n="report">Report</span></a>
+    <a class="tab" href="#/map" data-tab="map"><svg class="ic" aria-hidden="true"><use href="#i-map"/></svg><span data-i18n="map">Map</span></a>
+    <a class="tab" href="#/profile" data-tab="profile"><svg class="ic" aria-hidden="true"><use href="#i-person"/></svg><span data-i18n="profile">Profile</span></a>
   </nav>
 
   <div class="stage">
@@ -146,6 +148,7 @@
 
 <noscript><p style="padding:24px;font-family:sans-serif">Disha AI needs JavaScript. Please turn it on, or call the helpline at 080 6427 0577.</p></noscript>
 <script src="config.js"></script>
+<script src="i18n.js"></script>
 <script src="glass3d.js"></script>
 <script src="road3d.js" defer></script>
 <script src="callroom.js" defer></script>

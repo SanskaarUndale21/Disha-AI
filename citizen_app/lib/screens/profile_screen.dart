@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 import '../api.dart';
+import '../i18n.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -89,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 12, 20, 120),
         children: [
-          Text('Profile', style: T.largeTitle(context)),
+          Text(tr('profile'), style: T.largeTitle(context)),
           const SizedBox(height: 22),
           Center(
             child: Container(
@@ -117,6 +118,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : _row(CupertinoIcons.square_arrow_right, AppColors.red, 'Sign out', ''),
               ),
             ]),
+          _group(tr('language').toUpperCase(), [
+            for (final l in appLangs)
+              Pressable(
+                onTap: () => setLang(l.$1),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(children: [
+                      Expanded(child: Text('${l.$3}  ·  ${l.$2}', style: T.body(context))),
+                      if (lang == l.$1) const Icon(CupertinoIcons.checkmark_alt, color: AppColors.blue, size: 22),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text(tr('language_hint'), style: T.sub(context).copyWith(fontSize: 12.5)),
+          ),
           _group('YOUR DETAILS', [
             _field(_name, 'Name', CupertinoIcons.person_fill, AppColors.blue, TextInputType.name),
             _field(_phone, 'Mobile', CupertinoIcons.phone_fill, AppColors.green, TextInputType.phone),

@@ -184,26 +184,28 @@ def plan(origin, dest, mode="car", avoid=True, language="en", route_at=None):
     routes = [_trip_to_route(t, defects, mode, i) for i, t in enumerate(trips)]
 
     if avoid and mode != "walk":
-        # steer around severe damage: block the worst clusters on the best route so far and ask the engine again
-        for _round in range(2):
+        # steer around damage: block the worst clusters on the best route so far and ask the engine again, trying
+        # progressively bolder strategies (more clusters, wider blocks) until a clearly smoother road appears
+        strategies = [(30, 28.0, 55), (12, 45.0, 40), (45, 60.0, 30)]  # (max clusters, block radius m, min risk)
+        for n_poly, radius, min_risk in strategies:
             best = min(routes, key=lambda r: r["effective_min"])
-            bad = [h for h in best["defects"] if h["risk"] >= 55 and h["class"] in ("pothole", "alligator_crack", "manhole")]
-            if len(bad) < 2:
+            if best["defect_count"] < 2:
                 break
+            bad = [h for h in best["defects"] if h["risk"] >= min_risk and h["class"] in ("pothole", "alligator_crack", "manhole")]
+            if len(bad) < 2:
+                continue
             bad.sort(key=lambda h: -h["risk"])
-            polys = [_ring(h["lat"], h["lon"]) for h in _clusters(bad)[:30]]
+            polys = [_ring(h["lat"], h["lon"], radius) for h in _clusters(bad, radius * 1.6)[:n_poly]]
             try:
                 d2 = _valhalla({**base_body, "exclude_polygons": polys})
             except HTTPException:
-                break
+                continue
             r2 = _trip_to_route(d2["trip"], defects, mode, len(routes), detour=True)
             dup = any(abs(r["distance_km"] - r2["distance_km"]) < 0.05 and r["defect_count"] == r2["defect_count"] for r in routes)
-            # accept only a real improvement that is not absurdly longer
-            if (not dup and r2["defect_count"] < best["defect_count"]
-                    and r2["duration_min"] <= best["duration_min"] * 1.7 + 8):
+            # accept a real improvement that is not absurdly longer
+            if (not dup and r2["effective_min"] < best["effective_min"]
+                    and r2["duration_min"] <= best["duration_min"] * 2.0 + 12):
                 routes.append(r2)
-            else:
-                break
 
     fastest = min(routes, key=lambda r: r["duration_min"])
     smoothest = min(routes, key=lambda r: (r["penalty_min"], r["duration_min"]))
@@ -213,12 +215,19 @@ def plan(origin, dest, mode="car", avoid=True, language="en", route_at=None):
     routes.sort(key=lambda r: (r is not best, r["effective_min"]))
     for i, r in enumerate(routes):
         r["index"] = i
+    all_bad = best["defect_count"] >= 15 or best["severe_count"] >= 5
     return {"mode": mode, "routes": routes, "recommended": 0, "fastest": routes.index(fastest), "advice": _advice(routes, fastest, best, mode),
-            "engine": "valhalla", "language": lang, "defects_considered": len(defects)}
+            "engine": "valhalla", "language": lang, "defects_considered": len(defects), "all_routes_damaged": all_bad and len(routes) >= 1,
+            "coverage": ("good" if len(defects) >= 40 else "thin" if len(defects) >= 5 else "none")}
 
 
 def _advice(routes, fastest, best, mode):
     who = {"car": "your car", "bike": "your two-wheeler", "walk": "you"}[mode]
+    if best["defect_count"] >= 15 or best["severe_count"] >= 5:
+        others = [r for r in routes if r is not best]
+        why = "every other route is worse or much longer" if others else "no other road was found"
+        return (f"Warning: the best available road still passes {best['defect_count']} reported defects ({best['severe_count']} serious); "
+                f"{why}. Slow down, avoid riding at night or in rain, and watch for the pothole alerts.")
     if best is fastest:
         if best["defect_count"] == 0:
             return "The fastest route has no reported road damage."

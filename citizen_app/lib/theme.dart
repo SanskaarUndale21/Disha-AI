@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'i18n.dart';
+
 /// iOS-inspired design tokens. Light + dark aware via [AppColors.of].
 class AppColors {
   final Color bg, card, cardAlt, text, textSecondary, textTertiary, separator, fill;
@@ -61,11 +63,11 @@ class StatusStyle {
 const statusOrder = ['submitted', 'in_review', 'in_progress', 'resolved'];
 
 StatusStyle statusStyle(String s) => switch (s) {
-      'in_review' => const StatusStyle('In review', AppColors.indigo, CupertinoIcons.eye_fill),
-      'in_progress' => const StatusStyle('Repair underway', AppColors.orange, CupertinoIcons.hammer_fill),
-      'resolved' => const StatusStyle('Resolved', AppColors.green, CupertinoIcons.checkmark_seal_fill),
-      'rejected' => const StatusStyle('Closed', AppColors.red, CupertinoIcons.xmark_circle_fill),
-      _ => const StatusStyle('Submitted', AppColors.blue, CupertinoIcons.paperplane_fill),
+      'in_review' => StatusStyle(tr('in_review'), AppColors.indigo, CupertinoIcons.eye_fill),
+      'in_progress' => StatusStyle(tr('repair_underway'), AppColors.orange, CupertinoIcons.hammer_fill),
+      'resolved' => StatusStyle(tr('resolved'), AppColors.green, CupertinoIcons.checkmark_seal_fill),
+      'rejected' => StatusStyle(tr('closed'), AppColors.red, CupertinoIcons.xmark_circle_fill),
+      _ => StatusStyle(tr('submitted'), AppColors.blue, CupertinoIcons.paperplane_fill),
     };
 
 ThemeData buildTheme(Brightness b) {

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+import '../i18n.dart' as i18n;
 import '../main.dart';
 import 'public_map_screen.dart';
 
@@ -68,7 +68,7 @@ class _NavMapScreenState extends State<NavMapScreen> {
     super.dispose();
   }
 
-  String _lang() => ui.PlatformDispatcher.instance.locale.languageCode == 'hi' ? 'hi' : 'en';
+  String _lang() => i18n.mapLang;
 
   Uri _url(String server) {
     final q = <String, String>{'app': '1', 'lang': _lang()};
@@ -101,13 +101,13 @@ class _NavMapScreenState extends State<NavMapScreen> {
     });
     // fail safe: offer the basic map if the page is still not up after 15 seconds
     _timeout = Timer(const Duration(seconds: 15), () {
-      if (mounted && _loading) _fail('The map is taking too long to open.');
+      if (mounted && _loading) _fail(i18n.tr('err_server'));
     });
     unawaited(_locationAllowed());
     final ok = await api.ensureServer();
     if (!mounted) return;
     if (!ok) {
-      _fail('Cannot reach the Disha AI server. Check that you are online and on the same network.');
+      _fail(i18n.tr('err_offline'));
       return;
     }
     var c = _wc;
@@ -228,10 +228,10 @@ class _NavMapScreenState extends State<NavMapScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(CupertinoIcons.location_north_fill, size: 44, color: Color(0xFF0A84FF)),
           const SizedBox(height: 18),
-          const Text('Opening map',
+          Text(i18n.tr('loading_map'),
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87)),
           const SizedBox(height: 6),
-          const Text('Getting roads and potholes ready', style: TextStyle(fontSize: 14, color: Colors.black54)),
+          Text(i18n.tr('loading_map_sub'), style: TextStyle(fontSize: 14, color: Colors.black54)),
           const SizedBox(height: 22),
           SizedBox(
             width: 180,
@@ -266,7 +266,7 @@ class _NavMapScreenState extends State<NavMapScreen> {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: FilledButton(onPressed: _start, child: const Text('Retry')),
+            child: FilledButton(onPressed: _start, child: Text(i18n.tr('retry'))),
           ),
           const SizedBox(height: 10),
           SizedBox(

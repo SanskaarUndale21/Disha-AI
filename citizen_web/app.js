@@ -30,6 +30,7 @@
     { key: "broken_road", label: "Broken road", hint: "Caved or washed out", icon: "warn", color: "red", photo: "broken_road" },
     { key: "other", label: "Other", hint: "Open manhole, debris", icon: "dots", color: "purple", photo: "other" }
   ];
+  CATS.forEach(function (c) { Object.defineProperty(c, "label", { get: function () { return T("c_" + c.key); }, enumerable: true }); Object.defineProperty(c, "hint", { get: function () { return T("h_" + c.key); }, enumerable: true }); });
   function catOf(k) { for (var i = 0; i < CATS.length; i++) if (CATS[i].key === k) return CATS[i]; return CATS[4]; }
   var STATUS = {
     submitted: { label: "Submitted", icon: "paper", color: "blue" },
@@ -38,6 +39,7 @@
     resolved: { label: "Resolved", icon: "seal", color: "green" },
     rejected: { label: "Closed", icon: "xcircle", color: "red" }
   };
+  Object.keys(STATUS).forEach(function (k) { Object.defineProperty(STATUS[k], "label", { get: function () { return T("st_" + k); }, enumerable: true }); });
   var STATUS_ORDER = ["submitted", "in_review", "in_progress", "resolved"];
   function statusOf(s) { return STATUS[s] || STATUS.submitted; }
   var DEFAULT_CLASSES = { longitudinal_crack: "Longitudinal crack", transverse_crack: "Transverse crack", alligator_crack: "Alligator crack", pothole: "Pothole", manhole: "Manhole or drain cover", speed_breaker: "Speed breaker", debris: "Debris or loose gravel", barricade: "Barricade or work zone" };
@@ -391,6 +393,11 @@
   /* ================= geolocation ================= */
   var spot = null, locBusy = false, locErr = "";
   function describe(lat, lon) {
+    return fetch(API + "/api/nav/reverse?lat=" + lat + "&lon=" + lon, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (j) {
+      var a = (j && (j.address || j.name)) || ""; if (!a) return Promise.reject(); return a;
+    }).catch(function () { return describeOsm(lat, lon); });
+  }
+  function describeOsm(lat, lon) {
     var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
     var t = setTimeout(function () { if (ctl) ctl.abort(); }, 6000);
     return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat=" + lat + "&lon=" + lon, { signal: ctl ? ctl.signal : undefined }).then(function (r) { clearTimeout(t); return r.json(); }).then(function (j) {
@@ -399,7 +406,7 @@
     }).catch(function () { clearTimeout(t); return ""; });
   }
   function locate(force) {
-    if (!navigator.geolocation) { locErr = "Location is not available in this browser. Type the street below instead."; return Promise.resolve(null); }
+    if (!navigator.geolocation) { locErr = T("e_gps_time"); return Promise.resolve(null); }
     if (spot && !force) return Promise.resolve(spot);
     locBusy = true; locErr = "";
     return new Promise(function (res) {
@@ -408,7 +415,7 @@
         describe(spot.lat, spot.lon).then(function (a) { if (spot) { spot.address = a; if (onSpot) onSpot(); } });
       }, function (e) {
         locBusy = false;
-        locErr = e && e.code === 1 ? "Location permission is off. Allow it in the browser, or type the street below." : e && e.code === 3 ? "Finding you took too long. Try again outdoors, or type the street below." : "We could not find your location. Type the street below instead.";
+        locErr = e && e.code === 1 ? T("e_gps") : e && e.code === 3 ? T("e_gps_time") : "We could not find your location. Type the street below instead.";
         res(null);
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
     });
@@ -549,14 +556,29 @@
     if (c) c.innerHTML = miniMap();
     var n = $("h-nearby"); if (n) n.textContent = defectsCache ? defectsCache.length + " spots" : "";
   }
+  function homeCtx() {
+    var mine = complaints || [];
+    if (complaints == null && lsGet("rw-last", "")) return '<div class="ctx card" aria-busy="true">' + skel(18, "width:45%") + skel(14, "width:70%;margin-top:10px") + skel(40, "margin-top:14px") + "</div>";
+    if (!mine.length) {
+      return '<div class="ctx card how3" aria-label="' + esc(T("how")) + '"><div class="ctx-k mono">' + esc(T("how")) + '</div><ol>' +
+        [["camera", "how1", "how1d"], ["target", "how2", "how2d"], ["hammer", "how3", "how3d"]].map(function (x, i) { return "<li>" + badgeIcon(x[0], ["blue", "green", "orange"][i], 36) + "<b>" + esc(T(x[1])) + "</b><small>" + esc(T(x[2])) + "</small></li>"; }).join("") + "</ol></div>";
+    }
+    var c = mine[0], st = c.status, idx = Math.max(0, STATUS_ORDER.indexOf(st)), closed = st === "rejected";
+    var days = Math.max(0, Math.floor((Date.now() - new Date(c.created_at).getTime()) / 864e5)), cat = catOf(c.category);
+    var open = st === "resolved" ? T("st_resolved") : closed ? T("st_rejected") : days === 0 ? T("today") : days + " " + (days === 1 ? T("day_open") : T("days_open"));
+    return '<a class="ctx card pressable" href="#/c/' + c.id + '" aria-label="' + esc(T("latest") + ": " + cat.label + ", " + statusOf(st).label) + '"><div class="ctx-top"><div><div class="ctx-k mono">' + esc(T("latest")) + '</div><div class="ctx-t">' + esc(cat.label) + ' <span>' + esc(c.ticket) + '</span></div></div><span class="ctx-d">' + esc(open) + '</span></div>' +
+      '<ol class="stp" aria-hidden="true">' + STATUS_ORDER.map(function (k, i) { return '<li class="' + (closed ? "" : i < idx ? "done" : i === idx ? "cur" : "") + '"><i></i><span>' + esc(T("st_" + k)) + "</span></li>"; }).join("") + '</ol><div class="ctx-go">' + esc(T("view")) + " " + icon("arrow") + "</div></a>";
+  }
   function viewHome(p, soft) {
     var q = getQueue(), mine = complaints || [];
     view.innerHTML =
       '<section class="hh"><div class="hh-in wrap">' +
+      homeCtx() +
       '<span class="tagline mono"><i class="ldot"></i>LIVE <u></u> AI CHECKED <u></u> FREE TO USE</span>' +
-      '<h1 class="display">Fix the road,<br><em>not the excuses.</em></h1>' +
-      '<p class="lede">Photograph a pothole, crack or flooded stretch. Disha AI checks it, pins it on the city map and sends it to the crew that repairs it.</p>' +
-      '<div class="cta-row"><a class="pbtn peach glow" href="#/report">Report an issue ' + icon("arrow") + '</a><a class="pbtn outline" href="#/map?dir=1">Plan a safe trip</a><button type="button" class="pbtn outline" data-talk="1">Talk to Disha</button></div>' +
+      '<h1 class="display">' + esc(T("hero1")) + '<br><em>' + esc(T("hero2")) + '</em></h1>' +
+      '<p class="lede">' + esc(T("lede")) + '</p>' +
+      '<div class="cta-row"><a class="pbtn peach glow" href="#/report">' + esc(T("report_btn")) + ' ' + icon("arrow") + '</a></div>' +
+      '<div class="qa" role="group" aria-label="' + esc(T("quick")) + '"><a class="qa-i" href="#/map?dir=1">' + icon("route") + '<span>' + esc(T("plan")) + '</span></a><button type="button" class="qa-i" data-talk="1">' + icon("wave") + '<span>' + esc(T("talk")) + '</span></button><a class="qa-i" href="#/alerts">' + icon("bell") + '<span>' + esc(T("alerts")) + '</span></a></div>' +
       '<div class="statstrip" id="h-stats" aria-live="polite">' + statStrip() + "</div>" +
       "</div></section>" +
       '<div class="below">' +
@@ -607,42 +629,149 @@
   /* ================= REPORT (new) ================= */
   var R = null;
   function newReportState(cat) {
-    return { category: cat || "pothole", files: [], desc: "", name: prefs.name, phone: prefs.phone, addr: "", sending: false, progress: 0, blockedUntil: null, blockedReason: "", warning: "", seq: 0, done: null, queued: null };
+    return { category: cat || "pothole", files: [], desc: "", name: prefs.name, phone: prefs.phone, addr: "", sending: false, progress: 0, blockedUntil: null, blockedReason: "", warning: "", seq: 0, done: null, queued: null, step: 0 };
   }
+  function buzz(n) { try { if (navigator.vibrate) navigator.vibrate(n || 12); } catch (e) {} }
+  function friendly(e) {
+    if (!navigator.onLine || (e && e.status === 0 && !navigator.onLine)) return T("e_offline");
+    if (e && (e.status === 0 || e.status === -1)) return T("e_server");
+    return (e && e.message) || T("e_server");
+  }
+  var STEPS = ["s_issue", "s_photo", "s_loc", "s_send"];
   function viewReport(p, soft) {
     if (p.parts[1] === "done" && R && (R.done || R.queued)) return viewDone();
     if (!R || R.done || R.queued || !soft && !R.keep) R = newReportState(p.q.cat);
     else if (p.q.cat) R.category = p.q.cat;
     R.keep = false;
-    var nameBlock = '<div class="section"><h2>Your contact</h2></div><div class="card fieldgroup"><label class="field">' + icon("person-s") + '<input id="r-name" autocomplete="name" placeholder="Full name" value="' + esc(R.name) + '"></label><label class="field">' + icon("phone") + '<input id="r-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Mobile number" value="' + esc(R.phone) + '"></label></div><p class="sub" style="padding:8px 4px 0;font-size:12.5px">Used only to send you repair updates. Optional.</p>';
     view.innerHTML =
-      '<div class="sheetbar"><button type="button" class="btn ghost" id="r-cancel">Cancel</button><h1 class="headline">New Report</h1><span></span></div>' +
-      '<div class="section"><h2>What\'s the issue?</h2></div>' +
-      '<div class="cats" role="radiogroup" aria-label="Issue type">' + CATS.map(function (c) { return '<button type="button" class="cat" role="radio" data-cat="' + c.key + '" aria-checked="' + (R.category === c.key) + '" aria-label="' + esc(c.label + ", " + c.hint) + '"><span class="phototile"><img alt="" src="assets/photos/' + c.photo + '_sq.jpg"><span class="iconbadge c-' + c.color + '" style="--s:30px">' + icon(c.icon) + '</span><span class="lbl">' + esc(c.label) + '</span></span><span class="tick">' + icon("check") + "</span></button>"; }).join("") + "</div>" +
-      '<div class="section"><h2>Photos &amp; videos</h2><span class="caption" id="r-count"></span></div>' +
-      '<div id="r-paused"></div><div id="r-files"></div><div id="r-warn"></div>' +
-      '<div class="section"><h2>Location</h2></div><div id="r-loc"></div>' +
-      '<div class="section"><h2>Details</h2></div><div class="card fieldgroup"><label class="field" style="display:block;padding:6px 16px 0"><textarea id="r-desc" class="formin" rows="3" maxlength="500" placeholder="e.g. Deep pothole near the bus stop, two-wheelers swerving into traffic">' + esc(R.desc) + '</textarea></label><div class="cnt" id="r-cnt">0/500</div></div>' +
-      '<div id="r-contact">' + nameBlock + "</div>" +
-      '<div class="sticky-submit"><p class="hint" id="r-hint" aria-live="polite"></p><button type="button" class="btn primary big block progress" id="r-submit"><i id="r-prog"></i><span id="r-sub-t">Submit report</span></button></div>' +
+      '<div class="sheetbar wzbar"><button type="button" class="btn ghost" id="r-back"></button><h1 class="headline" id="r-title"></h1><button type="button" class="btn ghost" id="r-cancel">' + esc(T("cancel")) + '</button></div>' +
+      '<ol class="wz-prog" aria-label="Progress">' + STEPS.map(function (k, i) { return '<li data-i="' + i + '"><i>' + (i + 1) + "</i><span>" + esc(T(k)) + "</span></li>"; }).join("") + "</ol>" +
+      '<div class="wz-step" id="r-step" aria-live="polite"></div>' +
+      '<div class="wz-bar"><p class="hint" id="r-hint" aria-live="polite"></p><button type="button" class="btn primary big block progress" id="r-next"><i id="r-prog"></i><span id="r-sub-t"></span></button></div>' +
       '<input id="in-photo" type="file" accept="image/*" capture="environment" hidden><input id="in-video" type="file" accept="video/*" capture="environment" hidden><input id="in-lib" type="file" accept="image/*,video/*" multiple hidden>';
-    $("r-desc").setAttribute("aria-label", "Describe the problem"); $("r-name").setAttribute("aria-label", "Full name"); $("r-phone").setAttribute("aria-label", "Mobile number");
-    Array.prototype.forEach.call(view.querySelectorAll("[data-cat]"), function (b) {
-      b.onclick = function () { R.category = b.dataset.cat; Array.prototype.forEach.call(view.querySelectorAll("[data-cat]"), function (x) { x.setAttribute("aria-checked", x === b); }); };
-    });
     $("r-cancel").onclick = function () { if (R.sending) return; var dirty = R.files.length || R.desc; if (dirty && !confirm("Discard this report?")) return; R = null; go("#/home"); };
-    $("r-desc").oninput = function () { R.desc = this.value; $("r-cnt").textContent = this.value.length + "/500"; paintSubmit(); };
-    $("r-cnt").textContent = R.desc.length + "/500";
-    $("r-name").oninput = function () { R.name = this.value; }; $("r-phone").oninput = function () { R.phone = this.value; };
+    $("r-back").onclick = function () { if (R.sending) return; if (R.step === 0) { $("r-cancel").onclick(); } else setStep(R.step - 1); };
+    $("r-next").onclick = onNext;
     $("in-photo").onchange = function () { addFiles(this.files); this.value = ""; };
     $("in-video").onchange = function () { addFiles(this.files); this.value = ""; };
     $("in-lib").onchange = function () { addFiles(this.files); this.value = ""; };
-    $("r-submit").onclick = submitReport;
-    $("r-submit").setAttribute("aria-disabled", "true");
-    onSpot = paintLoc;
-    paintFiles(); paintLoc(); paintSubmit();
-    if (!spot && !R.addr) locate().then(function () { paintLoc(); });
+    onSpot = function () { if (R && R.step === 2) paintStep(true); };
+    paintStep(false);
     return function () { onSpot = null; R && (R.keep = false); };
+  }
+  function setStep(n, noFocus) {
+    R.step = Math.max(0, Math.min(3, n)); buzz(10);
+    var st = $("r-step"); if (st) { st.classList.remove("in"); void st.offsetWidth; st.classList.add("in"); }
+    paintStep(false); $("main").scrollTop = 0;
+    if (!noFocus) { var h = $("r-h"); if (h) h.focus({ preventScroll: true }); }
+  }
+  function stepOk() {
+    if (!R) return false;
+    if (R.step === 1) return !R.files.some(function (f) { return f.state === "checking" || f.state === "fail" || f.state === "error"; });
+    if (R.step === 2) return !!spot || R.addr.trim().length >= 3;
+    if (R.step === 3) return canSubmit();
+    return true;
+  }
+  function stepHint() {
+    if (!R || R.sending) return "";
+    if (R.step === 1) { if (R.files.some(function (f) { return f.state === "checking"; })) return T("e_wait"); if (R.files.some(function (f) { return f.state === "fail" || f.state === "error"; })) return T("e_fail"); }
+    if (R.step === 2 && !stepOk()) return T("e_place");
+    if (R.step === 3 && !canSubmit()) return R.files.length ? T("e_fail") : T("e_need");
+    return "";
+  }
+  function onNext() {
+    if (!R || R.sending) return;
+    if (!stepOk()) { buzz([30, 40, 30]); var h = stepHint(); if (h) toast(h, { error: true }); return; }
+    if (R.step === 3) return submitReport();
+    setStep(R.step + 1);
+  }
+  function paintBar() {
+    var b = $("r-next"); if (!b || !R) return;
+    var ok = stepOk(), last = R.step === 3;
+    b.className = "btn big block progress " + (ok || R.sending ? "primary" : "");
+    if (ok || R.sending) b.removeAttribute("aria-disabled"); else b.setAttribute("aria-disabled", "true");
+    var label = last ? T("submit") : (R.step === 1 && !R.files.length ? T("skip_photo") : T("next"));
+    $("r-sub-t").innerHTML = R.sending ? '<span class="spinner" style="color:#fff"></span>' + (R.progress < 0.5 ? T("sending") : T("sent_wait")) : esc(label) + (last ? "" : " " + icon("arrow"));
+    $("r-prog").style.width = R.sending ? Math.round(Math.max(5, R.progress * 100)) + "%" : "0";
+    $("r-hint").textContent = stepHint();
+    $("r-back").innerHTML = icon("chev-l") + esc(R.step === 0 ? T("cancel") : T("back"));
+    $("r-back").setAttribute("aria-label", R.step === 0 ? T("cancel") : T("back"));
+    $("r-cancel").style.visibility = R.step === 0 ? "hidden" : "visible";
+    Array.prototype.forEach.call(view.querySelectorAll(".wz-prog li"), function (li) { var i = +li.dataset.i; li.className = i < R.step ? "done" : i === R.step ? "cur" : ""; if (i === R.step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current"); });
+    $("r-title").textContent = T("step_of", { n: R.step + 1 });
+  }
+  function paintSubmit() { paintBar(); }
+  function paintStep(keepFocus) {
+    var st = $("r-step"); if (!st || !R) return;
+    var fn = [stepIssue, stepPhoto, stepLoc, stepSend][R.step];
+    var ae = document.activeElement, fid = keepFocus && ae && ae.id && st.contains(ae) ? ae.id : null, fs = fid && ae.selectionStart;
+    st.innerHTML = fn();
+    bindStep();
+    if (fid && $(fid)) { try { $(fid).focus({ preventScroll: true }); if (fs != null && $(fid).setSelectionRange) $(fid).setSelectionRange(fs, fs); } catch (e) {} }
+    paintBar();
+  }
+  function stepIssue() {
+    return '<h2 class="wz-h" id="r-h" tabindex="-1">' + esc(T("q_issue")) + '</h2><div class="cats2" role="radiogroup" aria-label="' + esc(T("q_issue")) + '">' + CATS.map(function (c) {
+      return '<button type="button" class="cat2" role="radio" data-cat="' + c.key + '" aria-checked="' + (R.category === c.key) + '">' + badgeIcon(c.icon, c.color, 44) + '<span class="tx"><b>' + esc(c.label) + "</b><small>" + esc(c.hint) + '</small></span><span class="tick">' + icon("check") + "</span></button>";
+    }).join("") + "</div>";
+  }
+  function stepPhoto() {
+    var chk = blocked() ? '<div class="banner err" style="margin-bottom:12px">' + icon("xcircle") + "<div><b>" + esc(hhmm(R.blockedUntil)) + "</b> " + esc(R.blockedReason || "") + "</div></div>" : "";
+    var thumbs = R.files.map(function (it) {
+      var r = it.res, cls, txt, ic;
+      if (it.state === "checking") { cls = "chk"; txt = T("ai_check"); ic = "target"; }
+      else if (it.state === "pass") { cls = "ok"; txt = headline(r); ic = "seal"; }
+      else if (it.state === "fail") { cls = "bad"; txt = r && r.verdict === "rate_limited" ? "Paused" : T("ai_fail"); ic = "xcircle"; }
+      else { cls = "warn"; txt = T("ai_err"); ic = "refresh"; }
+      var base = it.video ? '<video src="' + esc(it.objUrl) + '#t=0.1" muted playsinline preload="metadata"></video>' : '<img alt="Photo ' + it.id + '" src="' + esc(it.objUrl) + '">';
+      return '<div class="thumb2"><div class="pv">' + base + (it.state === "checking" ? '<span class="over"><span class="spinner" style="color:#fff"></span></span>' : "") + '</div>' +
+        '<button type="button" class="chip2 ' + cls + '" ' + (it.state === "error" ? 'data-retry="' + it.id + '"' : it.state === "fail" && !(r && r.verdict === "rate_limited") ? 'data-retake="' + it.id + '"' : "") + ">" + icon(ic) + "<span>" + esc(txt) + "</span></button>" +
+        '<button type="button" class="rm2" data-rm="' + it.id + '" aria-label="' + esc(T("remove")) + '">' + icon("trash") + "</button>" +
+        (it.state === "fail" && r && r.reason ? '<p class="why">' + esc(r.reason) + "</p>" : "") + "</div>";
+    }).join("");
+    return '<h2 class="wz-h" id="r-h" tabindex="-1">' + esc(T("q_photo")) + "</h2>" + chk +
+      '<div class="capt"><button type="button" class="cap big" data-pick="photo">' + icon("camera") + "<b>" + esc(T("take_photo")) + '</b></button>' +
+      '<button type="button" class="cap" data-pick="video">' + icon("video") + "<b>" + esc(T("rec_video")) + '</b></button>' +
+      '<button type="button" class="cap" data-pick="lib">' + icon("photo") + "<b>" + esc(T("library")) + "</b></button></div>" +
+      (R.warning && !blocked() ? '<div class="banner" style="margin-top:12px">' + icon("warn") + "<div>" + esc(R.warning) + "</div></div>" : "") +
+      (R.files.length ? '<div class="thumbs2">' + thumbs + '</div><p class="caption" style="margin-top:8px">' + R.files.length + "/" + MAX_FILES + "</p>" : '<p class="tip">' + icon("info") + "<span>" + esc(T("photo_tip")) + "</span></p>");
+  }
+  function stepLoc() {
+    var has = !!spot;
+    var title = locBusy && !spot ? T("finding") : spot ? (spot.address || T("loc_found")) : R.addr.trim() || "";
+    var map = spot ? '<iframe title="Your location on a map" loading="lazy" tabindex="-1" src="https://www.openstreetmap.org/export/embed.html?bbox=' + [spot.lon - 0.003, spot.lat - 0.002, spot.lon + 0.003, spot.lat + 0.002].join("%2C") + "&layer=mapnik&marker=" + spot.lat + "%2C" + spot.lon + '"></iframe>' : "";
+    return '<h2 class="wz-h" id="r-h" tabindex="-1">' + esc(T("q_loc")) + '</h2>' +
+      '<button type="button" class="btn primary big block" id="r-locate"' + (locBusy ? " disabled" : "") + ">" + (locBusy ? '<span class="spinner" style="color:#fff"></span>' : icon("target")) + esc(locBusy ? T("finding") : T("use_loc")) + "</button>" +
+      (locErr ? '<div class="banner err" style="margin-top:12px" role="alert">' + icon("warn") + "<div>" + esc(locErr) + "</div></div>" : "") +
+      (has ? '<div class="card flush locc"><div class="locmap mini">' + map + '</div><div class="locrow">' + badgeIcon("pin", "green", 40) + '<div class="grow"><div class="caption">' + esc(T("loc_found")) + '</div><div class="headline">' + esc(title) + "</div></div></div></div>" : "") +
+      '<label class="field wz-addr" for="r-addr">' + icon("pin") + '<input id="r-addr" autocomplete="street-address" placeholder="' + esc(T("loc_edit")) + '" value="' + esc(R.addr) + '"></label>';
+  }
+  function stepSend() {
+    var c = catOf(R.category), addr = (spot && spot.address) || R.addr.trim() || (spot ? spot.lat.toFixed(4) + ", " + spot.lon.toFixed(4) : "");
+    var th = R.files.slice(0, 4).map(function (it) { return it.video ? '<span class="mt">' + icon("video") + "</span>" : '<img alt="" src="' + esc(it.objUrl) + '">'; }).join("");
+    return '<h2 class="wz-h" id="r-h" tabindex="-1">' + esc(T("q_send")) + '</h2><div class="card sumc">' +
+      '<div class="kv"><span>' + esc(T("sum_issue")) + '</span><span class="v">' + esc(c.label) + '</span></div>' +
+      '<div class="kv"><span>' + esc(T("sum_photos")) + '</span><span class="v">' + (th ? '<span class="mths">' + th + "</span>" : esc(T("none"))) + '</span></div>' +
+      '<div class="kv"><span>' + esc(T("sum_place")) + '</span><span class="v">' + esc(addr) + "</span></div></div>" +
+      '<div class="section"><h2>' + esc(R.files.length ? T("details") : T("details_req")) + '</h2></div><div class="card fieldgroup"><label class="field" style="display:block;padding:6px 16px 0"><textarea id="r-desc" class="formin" rows="3" maxlength="500" aria-label="' + esc(T("details_req")) + '" placeholder="' + esc(T("details_ph")) + '">' + esc(R.desc) + '</textarea></label><div class="cnt" id="r-cnt">' + R.desc.length + "/500</div></div>" +
+      '<div class="card fieldgroup" style="margin-top:12px"><label class="field">' + icon("person-s") + '<input id="r-name" autocomplete="name" aria-label="' + esc(T("your_name")) + '" placeholder="' + esc(T("your_name")) + '" value="' + esc(R.name) + '"></label><label class="field">' + icon("phone") + '<input id="r-phone" type="tel" autocomplete="tel" inputmode="tel" aria-label="' + esc(T("your_phone")) + '" placeholder="' + esc(T("your_phone")) + '" value="' + esc(R.phone) + '"></label></div>';
+  }
+  function bindStep() {
+    var st = $("r-step");
+    Array.prototype.forEach.call(st.querySelectorAll("[data-cat]"), function (b) {
+      b.onclick = function () { buzz(15); R.category = b.dataset.cat; Array.prototype.forEach.call(st.querySelectorAll("[data-cat]"), function (x) { x.setAttribute("aria-checked", x === b); }); };
+    });
+    Array.prototype.forEach.call(st.querySelectorAll("[data-pick]"), function (b) { b.onclick = function () { if (blocked()) return toast("Reporting is paused until " + hhmm(R.blockedUntil) + ".", { error: true }); $("in-" + b.dataset.pick).click(); }; });
+    function findIt(id) { for (var i = 0; i < R.files.length; i++) if (R.files[i].id === +id) return R.files[i]; }
+    Array.prototype.forEach.call(st.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { removeFile(findIt(b.dataset.rm)); }; });
+    Array.prototype.forEach.call(st.querySelectorAll("[data-retake]"), function (b) { b.onclick = function () { var it = findIt(b.dataset.retake); removeFile(it, true); $(it.video ? "in-video" : "in-photo").click(); }; });
+    Array.prototype.forEach.call(st.querySelectorAll("[data-retry]"), function (b) { b.onclick = function () { var it = findIt(b.dataset.retry); runCheck(it); paintStep(); }; });
+    if ($("r-locate")) $("r-locate").onclick = function () { buzz(15); locBusy = true; paintStep(); locate(true).then(function () { locBusy = false; paintStep(); }); };
+    if ($("r-addr")) $("r-addr").oninput = function () { R.addr = this.value; paintBar(); };
+    if ($("r-desc")) $("r-desc").oninput = function () { R.desc = this.value; $("r-cnt").textContent = this.value.length + "/500"; paintBar(); };
+    if ($("r-name")) $("r-name").oninput = function () { R.name = this.value; };
+    if ($("r-phone")) $("r-phone").oninput = function () { R.phone = this.value; };
+    Array.prototype.forEach.call(st.querySelectorAll("input, textarea"), function (i) { i.addEventListener("focus", function () { setTimeout(function () { try { i.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {} }, 300); }); });
   }
   function blocked() { return R.blockedUntil && Date.now() < R.blockedUntil; }
   function hhmm(t) { var d = new Date(t); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
@@ -660,7 +789,7 @@
       var it = { id: ++R.seq, file: f, state: "checking", res: null, err: "", objUrl: URL.createObjectURL(f), video: isVideoFile(f) };
       R.files.push(it); runCheck(it);
     });
-    paintFiles(); paintSubmit();
+    buzz(20); paintStep();
   }
   function runCheck(it) {
     it.state = "checking"; it.err = "";
@@ -670,84 +799,33 @@
       it.res = j; it.state = j.verdict === "pass" ? "pass" : "fail";
       if (j.warning && String(j.warning).trim()) R.warning = j.warning;
       if (j.verdict === "rate_limited") { R.blockedUntil = j.blocked_until ? new Date(j.blocked_until).getTime() : Date.now() + 3600000; R.blockedReason = j.reason || ""; }
-      paintFiles(); paintSubmit();
+      buzz(it.state === "pass" ? 25 : [30, 40, 30]); if (R.step === 1) paintStep(); else paintBar();
     }, function (e) {
       if (!R || R.files.indexOf(it) < 0) return;
-      it.state = "error"; it.err = e.status === 0 ? "No connection to the server. Tap Retry when you are online." : e.message; paintFiles(); paintSubmit();
+      it.state = "error"; it.err = friendly(e); if (R.step === 1) { paintStep(); toast(it.err, { error: true }); } else paintBar();
     });
   }
   function headline(r) {
     var dm = r.damage || [];
-    if (r.verdict !== "pass" || !dm.length) return r.reason || "Road damage found";
+    if (r.verdict !== "pass" || !dm.length) return r.reason || T("ai_ok");
     var top = dm.reduce(function (a, b) { return (b.confidence || 0) > (a.confidence || 0) ? b : a; });
     var name = nice(top["class"] || "damage"), pct = Math.round((top.confidence != null ? top.confidence : r.max_confidence || 0) * 100);
-    return cap(name) + " found, " + pct + "% sure" + (dm.length > 1 ? " and " + (dm.length - 1) + " more" : "");
+    return cap(name) + " " + pct + "%" + (dm.length > 1 ? " +" + (dm.length - 1) : "");
   }
-  function paintFiles() {
-    if (!R || !$("r-files")) return;
-    $("r-count").textContent = R.files.length + "/" + MAX_FILES;
-    $("r-paused").innerHTML = blocked() ? '<div class="banner err" style="margin-bottom:12px">' + icon("xcircle") + "<div><b>Reporting paused until " + hhmm(R.blockedUntil) + "</b>" + esc(R.blockedReason || "Too many photos without road damage. Try again later with a clear photo of the damage.") + "</div></div>" : "";
-    $("r-warn").innerHTML = R.warning && !blocked() ? '<div class="banner" style="margin-top:12px">' + icon("warn") + "<div>" + esc(R.warning) + "</div></div>" : "";
-    var box = $("r-files");
-    if (!R.files.length) {
-      box.innerHTML = '<div class="card flush shot"><div class="pic"><img src="assets/photos/goodshot.jpg" alt="Example of a good photo: a pothole with some road around it in frame"><span class="tag">' + icon("check") + 'Good shot</span></div><p class="sub">Step back about a metre so the whole pothole and a bit of road around it are in frame.</p><div class="pickrow"><button type="button" class="pick primary" data-pick="photo">' + icon("camera") + 'Photo</button><button type="button" class="pick" data-pick="video">' + icon("video") + 'Video</button><button type="button" class="pick" data-pick="lib">' + icon("photo") + "Library</button></div></div>";
-    } else {
-      box.innerHTML = '<div class="list">' + R.files.map(function (it) {
-        var r = it.res, col, ic, title, detail;
-        if (it.state === "checking") { col = "blue"; ic = "target"; title = "Checking for road damage..."; detail = it.video ? "Videos take a few seconds." : "This takes a second or two."; }
-        else if (it.state === "pass") { col = "green"; ic = "seal"; title = headline(r); detail = "Ready to send."; }
-        else if (it.state === "fail") { col = "red"; ic = "xcircle"; title = r && r.verdict === "rate_limited" ? "Reporting paused" : "No road damage found"; detail = (r && r.reason) || "Take a closer photo of the damage."; }
-        else { col = "orange"; ic = "wifi-off"; title = "Check did not finish"; detail = it.err; }
-        var prev = it.state === "pass" && r && r.preview_url ? '<img alt="" src="' + esc(url(r.preview_url)) + '" onerror="this.remove()">' : "";
-        var base = it.video ? '<video src="' + esc(it.objUrl) + '#t=0.1" muted playsinline preload="metadata"></video>' + icon("play") : '<img alt="" src="' + esc(it.objUrl) + '">';
-        return '<div class="card checkcard" role="group" aria-label="' + esc(it.file.name) + '"><div class="prev">' + base + prev + (it.state === "checking" ? '<span class="over"><span class="spinner" style="color:#fff"></span></span>' : "") + '</div><div class="info"><div class="tt" style="--ct:var(--' + col + '-t)">' + icon(ic) + "<span>" + esc(title) + '</span></div><div class="dd">' + esc(detail) + '</div><div class="acts">' +
-          (it.state === "fail" && !(r && r.verdict === "rate_limited") ? '<button type="button" class="chipbtn" data-retake="' + it.id + '">' + icon("camera") + "Retake</button>" : "") +
-          (it.state === "error" ? '<button type="button" class="chipbtn" data-retry="' + it.id + '">' + icon("refresh") + "Retry</button>" : "") +
-          (it.state !== "checking" ? '<button type="button" class="chipbtn neutral" data-rm="' + it.id + '" aria-label="Remove ' + esc(it.file.name) + '">' + icon("trash") + "Remove</button>" : "") + "</div></div></div>";
-      }).join("") + "</div>" + (R.files.length < MAX_FILES && !blocked() ? '<button type="button" class="addmore" data-pick="lib">' + icon("plus") + "Add another photo or video <span class=\"caption\">" + R.files.length + "/" + MAX_FILES + "</span></button>" : "");
-    }
-    Array.prototype.forEach.call(box.querySelectorAll("[data-pick]"), function (b) { b.onclick = function () { if (blocked()) return toast("Reporting is paused until " + hhmm(R.blockedUntil) + ".", { error: true }); $("in-" + b.dataset.pick).click(); }; });
-    function findIt(id) { for (var i = 0; i < R.files.length; i++) if (R.files[i].id === +id) return R.files[i]; }
-    Array.prototype.forEach.call(box.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { removeFile(findIt(b.dataset.rm)); }; });
-    Array.prototype.forEach.call(box.querySelectorAll("[data-retake]"), function (b) { b.onclick = function () { var it = findIt(b.dataset.retake); removeFile(it); $(it.video ? "in-video" : "in-photo").click(); }; });
-    Array.prototype.forEach.call(box.querySelectorAll("[data-retry]"), function (b) { b.onclick = function () { var it = findIt(b.dataset.retry); runCheck(it); paintFiles(); paintSubmit(); }; });
+  function removeFile(it, silent) {
+    if (!it) return; var i = R.files.indexOf(it); if (i < 0) return; R.files.splice(i, 1); buzz(15);
+    paintStep();
+    if (silent) { try { URL.revokeObjectURL(it.objUrl); } catch (e) {} return; }
+    toast(T("removed"), { ms: 6000, action: { label: T("undo"), fn: function () { if (!R) return; R.files.splice(Math.min(i, R.files.length), 0, it); buzz(10); if (R.step === 1) paintStep(); else paintBar(); } } });
   }
-  function removeFile(it) { if (!it) return; var i = R.files.indexOf(it); if (i >= 0) R.files.splice(i, 1); try { URL.revokeObjectURL(it.objUrl); } catch (e) {} paintFiles(); paintSubmit(); }
   function canSubmit() {
     if (!R || R.sending) return false;
     if (!R.files.length) return (R.desc || "").trim().length >= 5;
     return R.files.every(function (f) { return f.state === "pass"; });
   }
-  function submitHint() {
-    if (!R || R.sending || canSubmit()) return "";
-    if (!R.files.length) return "Add a photo or video of the damage, or describe it in a few words.";
-    if (R.files.some(function (f) { return f.state === "checking"; })) return "Checking your photos and videos for road damage...";
-    return "Remove or retake the items that did not pass the check.";
-  }
-  function paintSubmit() {
-    var b = $("r-submit"); if (!b || !R) return;
-    var ok = canSubmit();
-    b.className = "btn big block progress " + (ok || R.sending ? "primary" : "");
-    if (ok || R.sending) b.removeAttribute("aria-disabled"); else b.setAttribute("aria-disabled", "true");
-    $("r-hint").textContent = submitHint();
-    $("r-prog").style.width = R.sending ? Math.round(Math.max(5, R.progress * 100)) + "%" : "0";
-    $("r-sub-t").innerHTML = R.sending ? '<span class="spinner" style="color:#fff"></span>' + (R.progress < 0.5 ? "Uploading..." : "AI is analysing...") : "Submit report";
-  }
-  function paintLoc() {
-    var box = $("r-loc"); if (!box) return;
-    var has = !!spot || !!R.addr.trim();
-    var title = locBusy && !spot ? "Finding your location..." : spot ? (spot.address || "Pinned at your location") : R.addr.trim() ? R.addr.trim() : "No location yet";
-    var sub = spot ? "Within about " + Math.round(spot.acc || 0) + " m. Helps crews find the spot." : locErr || "Pinning the exact spot helps crews find it.";
-    var map = spot ? '<iframe title="Your location on a map" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=' + [spot.lon - 0.003, spot.lat - 0.002, spot.lon + 0.003, spot.lat + 0.002].join("%2C") + "&layer=mapnik&marker=" + spot.lat + "%2C" + spot.lon + '"></iframe>' : '<div>' + icon("pin-off", "ic-big") + "<br>Map preview appears when we have your location.</div>";
-    var focused = document.activeElement && document.activeElement.id === "r-addr";
-    box.innerHTML = '<div class="card flush"><div class="locmap" ' + (spot ? "" : 'role="img" aria-label="No location yet"') + ">" + map + '</div><div class="locrow">' + badgeIcon(spot ? "pin" : "pin-off", spot ? "green" : locErr ? "orange" : "blue", 40) + '<div class="grow"><div class="headline">' + esc(title) + '</div><div class="sub" style="font-size:12.5px">' + esc(sub) + '</div></div><button type="button" class="btn" id="r-locate" ' + (locBusy ? "disabled" : "") + ' aria-label="Use my current location">' + (locBusy ? '<span class="spinner"></span>' : icon("target")) + '</button></div><label class="field" style="border-top:.5px solid var(--sep)">' + icon("pin") + '<input id="r-addr" aria-label="Street or landmark" placeholder="Or type the street or landmark" autocomplete="street-address" value="' + esc(R.addr) + '"></label></div>';
-    $("r-locate").onclick = function () { locate(true).then(function () { paintLoc(); if (locErr) toast(locErr, { error: true }); }); paintLoc(); };
-    $("r-addr").oninput = function () { R.addr = this.value; };
-    if (focused) $("r-addr").focus();
-  }
   function submitReport() {
     if (!R || R.sending) return;
-    if (!canSubmit()) return toast(submitHint() || "Add a photo, a video or a short description.");
+    if (!canSubmit()) return toast(stepHint() || T("e_need"));
     prefs.name = R.name; prefs.phone = R.phone;
     var f = { category: R.category, description: R.desc.trim(), device_id: device };
     if (R.name.trim()) f.citizen_name = R.name.trim(); if (R.phone.trim()) f.citizen_phone = R.phone.trim();
@@ -757,38 +835,59 @@
     if (toks.length) f.screening_tokens = toks.join(",");
     var fd = new FormData(); Object.keys(f).forEach(function (k) { fd.append(k, f[k]); });
     R.files.forEach(function (x) { fd.append("files", x.file, x.file.name); });
-    R.sending = true; R.progress = 0.05; paintSubmit();
+    R.sending = true; R.progress = 0.05; buzz(30); paintBar();
     if (!navigator.onLine) return queueIt(f);
-    upload("/api/complaints", fd, { timeout: 600000, onProgress: function (p) { if (R) { R.progress = Math.max(R.progress, p * 0.5); paintSubmit(); } } }).then(function (c) {
-      R.sending = false; R.done = c; complaints = null; lsSet("rw-last", c.ticket || "");
+    upload("/api/complaints", fd, { timeout: 600000, onProgress: function (p) { if (R) { R.progress = Math.max(R.progress, p * 0.5); paintBar(); } } }).then(function (c) {
+      R.sending = false; R.done = c; lsSet("rw-last", c.ticket || "");
+      if (Array.isArray(complaints)) complaints = [c].concat(complaints.filter(function (x) { return x.id !== c.id; })); else complaints = null;
       var snap = lsJson("rw-snap", {}) || {}; snap[c.id] = c.status || "submitted"; lsSetJson("rw-snap", snap);
       go("#/report/done");
     }, function (e) {
       if (e.status === 0 || e.status === -1) return queueIt(f, e);
-      R.sending = false; paintSubmit(); toast(e.message, { error: true, ms: 9000 });
+      R.sending = false; paintBar(); toast(friendly(e), { error: true, ms: 9000 });
     });
-    var tick = setInterval(function () { if (!R || !R.sending) return clearInterval(tick); if (R.progress >= 0.5 && R.progress < 0.95) { R.progress += 0.02; paintSubmit(); } }, 800);
+    var tick = setInterval(function () { if (!R || !R.sending) return clearInterval(tick); if (R.progress >= 0.5 && R.progress < 0.95) { R.progress += 0.02; paintBar(); } }, 800);
   }
   function queueIt(fields, err) {
     var files = R.files.map(function (x) { return x.file; });
     delete fields.screening_tokens;
     enqueueReport(fields, files).then(function (r) {
       R.sending = false;
-      if (!r.ok) { paintSubmit(); return toast("There is no connection and this device has no room to save the report. Try again when you are online.", { error: true, ms: 9000 }); }
+      if (!r.ok) { paintBar(); return toast(T("e_offline"), { error: true, ms: 9000 }); }
       R.queued = { dropped: r.dropped }; go("#/report/done");
     });
+  }
+  function copyText(t) {
+    function fb() { var a = document.createElement("textarea"); a.value = t; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) {} a.remove(); }
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).catch(fb);
+    fb(); return Promise.resolve();
+  }
+  function a2hsHtml() {
+    if (isStandalone() || lsGet("rw-a2hs", "") === "1") return "";
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    return '<div class="a2hs" id="a2hs">' + icon("install") + '<div class="grow"><b>' + esc(T("a2hs")) + "</b>" + (installEvt ? "" : "<span>" + esc(T("a2hs_ios")) + "</span>") + '</div>' + (installEvt ? '<button type="button" class="btn primary" id="a2hs-go">' + esc(T("a2hs_btn")) + "</button>" : "") + '<button type="button" class="btn ghost" id="a2hs-x">' + esc(T("dismiss")) + "</button></div>";
+  }
+  function bindA2hs() {
+    var x = $("a2hs-x"); if (x) x.onclick = function () { lsSet("rw-a2hs", "1"); $("a2hs").remove(); };
+    var g = $("a2hs-go"); if (g) g.onclick = doInstall;
   }
   function viewDone() {
     var c = R.done, q = R.queued;
     if (q) {
-      view.innerHTML = '<div class="success"><div class="seal" style="background:linear-gradient(135deg,#ff9f0a,#d97706);box-shadow:0 16px 40px rgba(255,159,10,.33)">' + icon("wifi-off") + '</div><h1 class="large-title" style="font-size:30px">Saved on this device</h1><p class="sub" style="font-size:16px;margin:8px 0 24px">You are offline. We will send your report as soon as you are back online.' + (q.dropped ? " " + q.dropped + " large file" + (q.dropped > 1 ? "s were" : " was") + " too big to keep offline, so please add it again later." : "") + '</p><a class="btn primary big block" href="#/home">Back to Home</a></div>';
-      R.queued = q; return;
+      view.innerHTML = '<div class="success"><div class="seal" style="background:linear-gradient(135deg,#ff9f0a,#d97706);box-shadow:0 16px 40px rgba(255,159,10,.33)">' + icon("wifi-off") + '</div><h1 class="large-title" id="r-h" tabindex="-1" style="font-size:30px">' + esc(T("saved_title")) + '</h1><p class="sub" style="font-size:16px;margin:8px 0 24px">' + esc(T("saved_sub")) + (q.dropped ? " " + q.dropped + " large file" + (q.dropped > 1 ? "s were" : " was") + " too big to keep." : "") + '</p><a class="btn primary big block" href="#/home">OK</a></div>';
+      var d0 = R; if ($("r-h")) $("r-h").focus({ preventScroll: true }); return function () { if (R === d0) R = null; };
     }
     var n = (c.findings || []).length, pending = (c.media || []).some(function (m) { return m.status === "running" || m.status === "processing"; });
-    view.innerHTML = '<div class="success"><div class="seal">' + icon("check") + '</div><h1 class="large-title" style="font-size:30px">Report submitted</h1><p class="sub" style="font-size:16px;margin:8px 0 24px">Thanks for making your streets safer.</p>' +
-      '<div class="card" style="text-align:left"><div class="kv"><span>Ticket</span><span style="font-weight:700">' + esc(c.ticket) + '</span></div><div class="kv"><span>Category</span><span>' + esc(catOf(c.category).label) + '</span></div><div class="kv"><span>AI check</span><span>' + esc(pending ? "Analysing video..." : n === 0 ? ((c.media || []).length ? "Sent for manual review" : "No media") : n + " defect" + (n === 1 ? "" : "s") + " detected") + "</span></div></div>" +
-      '<div style="height:24px"></div><a class="btn primary big block" href="#/c/' + c.id + '">Track this report</a><div style="height:8px"></div><a class="btn ghost block" href="#/home">Done</a></div>';
-    try { navigator.vibrate && navigator.vibrate(60); } catch (e) {}
+    var dots = ""; for (var i = 0; i < 14; i++) dots += '<i style="--a:' + (i * 26) + "deg;--d:" + (60 + (i % 4) * 14) + "px;--c:" + ["#F2CC8F", "#81B29A", "#F4F1DE", "#E07A5F"][i % 4] + ';--t:' + (i % 5) * 40 + 'ms"></i>';
+    view.innerHTML = '<div class="success"><div class="burst" aria-hidden="true">' + dots + '</div><div class="seal pop">' + icon("check") + '</div><h1 class="large-title" id="r-h" tabindex="-1" style="font-size:30px">' + esc(T("ok_title")) + '</h1><p class="sub" style="font-size:16px;margin:8px 0 20px">' + esc(T("ok_sub")) + "</p>" +
+      '<div class="ticketbox"><span class="caption">' + esc(T("ticket")) + '</span><b class="tno" id="tno">' + esc(c.ticket) + '</b><div class="tact"><button type="button" class="btn" id="t-copy">' + esc(T("copy")) + '</button><button type="button" class="btn" id="t-share">' + esc(T("share")) + "</button></div></div>" +
+      '<div class="card" style="text-align:left;margin-top:14px"><div class="kv"><span>' + esc(T("sum_issue")) + '</span><span>' + esc(catOf(c.category).label) + '</span></div><div class="kv"><span>AI</span><span>' + esc(pending ? "..." : n === 0 ? ((c.media || []).length ? "Manual review" : "-") : n + " defect" + (n === 1 ? "" : "s")) + "</span></div></div>" +
+      '<div style="height:20px"></div><a class="btn primary big block" href="#/c/' + c.id + '">' + esc(T("track")) + '</a><div style="height:8px"></div><button type="button" class="btn big block" id="t-again">' + esc(T("another")) + "</button>" + a2hsHtml() + "</div>";
+    buzz([40, 50, 80]);
+    $("t-copy").onclick = function () { var b = this; copyText(c.ticket).then(function () { b.textContent = T("copied"); buzz(12); setTimeout(function () { b.textContent = T("copy"); }, 1800); }); };
+    $("t-share").onclick = function () { var t = T("share_text", { t: c.ticket }); if (navigator.share) navigator.share({ title: "Disha AI", text: t, url: location.origin + location.pathname + "#/c/" + c.id }).catch(function () {}); else copyText(t).then(function () { toast(T("copied")); }); };
+    $("t-again").onclick = function () { R = null; go("#/report"); };
+    bindA2hs(); $("r-h").focus({ preventScroll: true });
     var done = R; return function () { if (R === done) R = null; };
   }
 
@@ -878,14 +977,14 @@
   var mapLoaded = false, coachDismissed = false;
   function viewMap(p) {
     var frame = $("mapframe"), err = $("map-err");
-    var hash = p.q.lat && p.q.lon ? "#" + p.q.lat + "," + p.q.lon : "";
+    var hash = p.q.lat && p.q.lon ? "#" + p.q.lat + "," + p.q.lon : "", ml = I18N.get() === "hi" ? "hi" : "en", mp = "/map?lang=" + ml;
     $("map-coach").hidden = !(p.q.dir === "1" && !coachDismissed);
     function load() {
       err.hidden = true;
       if (!navigator.onLine) { $("map-err-t").textContent = "You are offline. Connect to the internet to see the map."; err.hidden = false; return; }
       fetch(API + "/map", { mode: "no-cors", cache: "no-store" }).then(function () {
-        if (!mapLoaded || frame.getAttribute("data-api") !== API) { frame.src = API + "/map" + hash; frame.setAttribute("data-api", API); mapLoaded = true; }
-        else if (hash && frame.contentWindow) { try { frame.contentWindow.location.replace(API + "/map" + hash); } catch (e) { frame.src = API + "/map" + hash; } }
+        if (!mapLoaded || frame.getAttribute("data-api") !== API + mp) { frame.src = API + mp + hash; frame.setAttribute("data-api", API + mp); mapLoaded = true; }
+        else if (hash && frame.contentWindow) { try { frame.contentWindow.location.replace(API + mp + hash); } catch (e) { frame.src = API + mp + hash; } }
       }, function () { mapLoaded = false; $("map-err-t").textContent = "The Disha AI server at " + API + " is not answering. Check that it is running, or fix the address under Profile."; err.hidden = false; });
     }
     $("map-retry").onclick = load; $("coach-x").onclick = function () { coachDismissed = true; $("map-coach").hidden = true; };
@@ -913,6 +1012,10 @@
   }
 
   /* ================= PROFILE ================= */
+  function setLang(c) {
+    I18N.set(c); buzz(12); toast(I18N.langs.filter(function (l) { return l.code === c; })[0].native);
+    if (current === "map") { mapLoaded = false; renderRoute(); } else renderRoute(true);
+  }
   function viewProfile() {
     var init = prefs.name.trim() ? prefs.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w[0].toUpperCase(); }).join("") : "?";
     var perm = notifPerm(), nOn = notifWanted();
@@ -924,7 +1027,7 @@
       '<div class="caption group-t">YOUR DETAILS</div><div class="card group">' +
       row("person-s", "blue", '<input class="formin" id="p-name" aria-label="Name" placeholder="Name" autocomplete="name" value="' + esc(prefs.name) + '">') +
       row("phone", "green", '<input class="formin" id="p-phone" aria-label="Mobile" placeholder="Mobile" type="tel" autocomplete="tel" value="' + esc(prefs.phone) + '">') + "</div>" +
-      '<div class="caption group-t">LANGUAGE</div><div class="card group">' + row("bubble", "teal", "App language", '<span class="val">English</span>') + '</div><p class="sub" style="padding:8px 6px 0;font-size:12.5px">The helpline answers in Hindi and English. More app languages are coming.</p>' +
+      '<div class="caption group-t">' + esc(T("lang").toUpperCase()) + '</div><div class="card group langs" role="radiogroup" aria-label="' + esc(T("lang")) + '">' + I18N.langs.map(function (l) { return '<button type="button" class="langrow" role="radio" data-lg="' + l.code + '" aria-checked="' + (I18N.get() === l.code) + '"><b>' + esc(l.native) + "</b>" + icon("check") + "</button>"; }).join("") + "</div>" +
       '<div class="caption group-t">NOTIFICATIONS</div><div class="card group">' +
       row("bell", "red", '<label for="p-notif">Browser notifications</label>', '<span class="switch"><input id="p-notif" type="checkbox" role="switch"' + (nOn ? " checked" : "") + (perm === "unsupported" ? " disabled" : "") + '><i></i></span>') +
       row("speaker", "orange", '<label for="p-sound">Emergency siren sound</label>', '<span class="switch"><input id="p-sound" type="checkbox" role="switch"' + (soundOn ? " checked" : "") + '><i></i></span>') +
@@ -935,6 +1038,7 @@
       '<div class="caption group-t">HELP</div><div class="card group"><a class="grow-row" style="text-decoration:none;color:inherit" href="tel:' + esc(helpline.replace(/\s/g, "")) + '">' + badgeIcon("wave", "indigo", 30) + '<div class="lbl">Call Disha AI agent</div><span class="val">' + esc(prettyPhone(helpline)) + "</span>" + icon("chev-r") + "</a></div>" +
       '<div class="caption group-t">SERVER</div><div class="card group">' + row("route", "teal", '<input class="formin" id="p-api" aria-label="Server address" placeholder="http://192.168.x.x:8000" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(lsGet("rw-api", "")) + '">') + '</div><p class="sub" style="padding:8px 6px 0;font-size:12.5px">Leave empty to use ' + esc(location.protocol + "//" + location.hostname + ":8000") + ". Point this to the Disha AI backend. On a phone use your computer's network address.</p>" +
       '<div style="height:24px"></div><button type="button" class="btn primary big block" id="p-save">Save</button><p class="caption" style="text-align:center;margin-top:20px;font-weight:500">Disha AI Citizen 1.1 (web)</p>';
+    Array.prototype.forEach.call(view.querySelectorAll("[data-lg]"), function (b) { b.onclick = function () { setLang(b.dataset.lg); }; });
     $("p-notif").onchange = function () {
       var el = this;
       if (el.checked) { askNotifPermission().then(function (r) { if (r !== "granted") { el.checked = false; lsSet("rw-notify", "0"); } }); }
@@ -1078,6 +1182,12 @@
   }
   applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark", false);
   $("theme-btn").onclick = function () { applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark", true); };
+  $("lang-btn").onclick = function () {
+    sheet('<h2 class="headline" style="margin:4px 0 12px">' + esc(T("lang")) + '</h2><div class="card group langs" role="radiogroup">' + I18N.langs.map(function (l) { return '<button type="button" class="langrow" role="radio" data-lg="' + l.code + '" aria-checked="' + (I18N.get() === l.code) + '"><b>' + esc(l.native) + "</b>" + icon("check") + "</button>"; }).join("") + "</div>", function (bg, close) {
+      Array.prototype.forEach.call(bg.querySelectorAll("[data-lg]"), function (b) { b.onclick = function () { close(); setLang(b.dataset.lg); }; });
+    });
+  };
+  I18N.apply();
   renderRoute();
   syncConfig();
   connectWs();

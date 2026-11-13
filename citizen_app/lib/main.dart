@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'api.dart';
+import 'i18n.dart';
 import 'location.dart';
 import 'notifications.dart';
 import 'realtime.dart';
@@ -34,6 +35,7 @@ final refreshTick = ValueNotifier<int>(0);
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   prefs = await Prefs.load();
+  await loadLang();
   api = Api(prefs);
   if (previewScreen != null) await prefs.setSkippedAuth(true);
   if (prefs.supabaseUrl.isEmpty) {
@@ -111,7 +113,7 @@ void _onEvent(String type, Map<String, dynamic> data) {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text('$ticket is now ${st.label.toLowerCase()}',
+            Text('$ticket: ${st.label}',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
             Text(
               (data['admin_note'] as String?)?.isNotEmpty == true ? data['admin_note'] : 'Status updated by the city',
@@ -129,13 +131,18 @@ class CitizenApp extends StatelessWidget {
   const CitizenApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Disha AI',
-      debugShowCheckedModeBanner: false,
-      scaffoldMessengerKey: messengerKey,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
-      home: const AuthGate(),
+    return ValueListenableBuilder<String>(
+      valueListenable: langNotifier,
+      builder: (context, l, _) => MaterialApp(
+        title: 'Disha AI',
+        debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: messengerKey,
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        // rebuild the whole tree on language change; the open tab is kept in _ShellState.lastTab
+        builder: (context, child) => KeyedSubtree(key: ValueKey(l), child: child ?? const SizedBox.shrink()),
+        home: const AuthGate(),
+      ),
     );
   }
 }
@@ -176,7 +183,8 @@ class Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<Shell> {
-  int _tab = switch (previewScreen) { 'reports' => 1, 'profile' => 2, _ => 0 };
+  static int lastTab = 0;
+  int _tab = switch (previewScreen) { 'reports' => 1, 'profile' => 2, _ => lastTab };
 
   @override
   void initState() {
@@ -187,7 +195,7 @@ class _ShellState extends State<Shell> {
     }
   }
 
-  void go(int i) => setState(() => _tab = i);
+  void go(int i) => setState(() => (_tab = i, lastTab = i));
 
   @override
   Widget build(BuildContext context) {
@@ -213,11 +221,11 @@ class _ShellState extends State<Shell> {
               child: SizedBox(
                 height: 58,
                 child: Row(children: [
-                  _tabItem(0, CupertinoIcons.house_fill, 'Home'),
-                  _actionItem(CupertinoIcons.map_fill, 'Map',
+                  _tabItem(0, CupertinoIcons.house_fill, tr('nav_home')),
+                  _actionItem(CupertinoIcons.map_fill, tr('nav_map'),
                       () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const NavMapScreen(startOnDirections: true)))),
-                  _tabItem(1, CupertinoIcons.doc_text_fill, 'My Reports'),
-                  _tabItem(2, CupertinoIcons.person_crop_circle_fill, 'Profile'),
+                  _tabItem(1, CupertinoIcons.doc_text_fill, tr('nav_reports')),
+                  _tabItem(2, CupertinoIcons.person_crop_circle_fill, tr('nav_profile')),
                 ]),
               ),
             ),

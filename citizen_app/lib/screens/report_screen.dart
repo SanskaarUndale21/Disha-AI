@@ -4,13 +4,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../api.dart';
+import '../i18n.dart';
 import '../location.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'detail_screen.dart';
+import 'home_screen.dart' show friendlyError;
 
 const _maxFiles = 8;
 
@@ -170,7 +173,7 @@ class _ReportScreenState extends State<ReportScreen> {
         _check(f);
       }
     } catch (_) {
-      if (mounted) toast(context, 'Could not open camera or gallery', error: true);
+      if (mounted) toast(context, tr('err_generic'), error: true);
     }
   }
 
@@ -182,9 +185,9 @@ class _ReportScreenState extends State<ReportScreen> {
   /// Why Submit is disabled, in plain words; null when it is enabled.
   String? get _submitHint {
     if (_sending || _canSubmit) return null;
-    if (_files.isEmpty) return 'Add a photo or video of the damage, or describe it in a few words.';
-    if (_anyChecking) return 'Checking your photos and videos for road damage...';
-    return 'Remove or retake the items that did not pass the check.';
+    if (_files.isEmpty) return tr('hint_photo');
+    if (_anyChecking) return tr('hint_checking');
+    return tr('hint_fix');
   }
 
   Future<void> _submit() async {
@@ -216,192 +219,374 @@ class _ReportScreenState extends State<ReportScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _sending = false);
-        toast(context, '$e', error: true);
+        toast(context, e is ApiException ? e.message : friendlyError('$e'), error: true);
       }
+    }
+  }
+
+  int _step = 0;
+  bool _autoCam = false;
+
+  bool get _stepOk => switch (_step) {
+        1 => _files.isEmpty || _allPassed,
+        _ => true,
+      };
+
+  String? get _stepHint {
+    if (_step != 1) return null;
+    if (_anyChecking) return tr('hint_checking');
+    if (_files.isNotEmpty && !_allPassed) return tr('hint_fix');
+    return null;
+  }
+
+  void _go(int s) {
+    FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
+    setState(() => _step = s);
+    if (s == 1 && _files.isEmpty && !_autoCam && !_blocked) {
+      _autoCam = true; // camera first: open it once when the photo step appears
+      Future.delayed(const Duration(milliseconds: 450), () {
+        if (mounted && _step == 1 && _files.isEmpty) _pick(0);
+      });
+    }
+  }
+
+  Future<bool> _confirmExit() async {
+    if (_sending) return false;
+    if (_files.isEmpty && _desc.text.trim().isEmpty) return true;
+    final r = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(tr('cancel')),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('back'))),
+          CupertinoDialogAction(
+              isDestructiveAction: true, onPressed: () => Navigator.pop(ctx, true), child: Text(tr('cancel'))),
+        ],
+      ),
+    );
+    return r == true;
+  }
+
+  Widget _progressBar() {
+    final c = AppColors.of(context);
+    final names = [tr('step_issue'), tr('step_photo'), tr('step_location'), tr('step_send')];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+      child: Column(children: [
+        Row(children: [
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: 5,
+                decoration: BoxDecoration(
+                  color: i <= _step ? AppColors.blue : c.fill,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 6),
+        Row(children: [
+          for (var i = 0; i < 4; i++)
+            Expanded(
+              child: Text(names[i],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: i == _step ? FontWeight.w700 : FontWeight.w500,
+                      color: i == _step ? AppColors.blue : c.textTertiary)),
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _stepBody() {
+    final c = AppColors.of(context);
+    switch (_step) {
+      case 0:
+        return Column(key: const ValueKey(0), crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _label(tr('whats_issue')),
+          GridView.count(
+            crossAxisCount: 3,
+            childAspectRatio: 0.95,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            children: [for (final cat in categories) _categoryTile(cat)],
+          ),
+        ]);
+      case 1:
+        return Column(key: const ValueKey(1), crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _label(tr('photo_title'), trailing: '${_files.length}/$_maxFiles'),
+          if (_blocked) _pausedBanner(),
+          if (_files.isEmpty) _shotGuide() else _checkedList(),
+          if (_warning != null && !_blocked) _warningBanner(_warning!),
+        ]);
+      case 2:
+        final noFix = _spot == null && locator.error != null;
+        return Column(key: const ValueKey(2), crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _label(tr('where')),
+          if (noFix) _warningBanner(tr('err_gps')),
+          if (noFix) const SizedBox(height: 12),
+          _locationCard(),
+          _label(tr('details')),
+          CardBox(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: TextField(
+              controller: _desc,
+              onChanged: (_) => setState(() {}),
+              minLines: 3,
+              maxLines: 6,
+              maxLength: 500,
+              textCapitalization: TextCapitalization.sentences,
+              style: T.body(context),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: tr('details_hint'),
+                hintStyle: T.body(context).copyWith(color: c.textTertiary),
+                counterStyle: T.caption(context),
+              ),
+            ),
+          ),
+        ]);
+      default:
+        final signedIn = Api.accessToken != null && prefs.name.isNotEmpty;
+        final cat = categoryOf(_category);
+        return Column(key: const ValueKey(3), crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _label(tr('summary')),
+          CardBox(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                IconBadge(cat.icon, cat.color, size: 36),
+                const SizedBox(width: 12),
+                Expanded(child: Text(cat.label, style: T.headline(context))),
+                TextButton(onPressed: () => _go(0), child: Text(tr('step_issue'))),
+              ]),
+              Divider(height: 18, thickness: 0.5, color: c.separator),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: _files.isEmpty
+                      ? Text(tr('no_photos'), style: T.sub(context))
+                      : SizedBox(
+                          height: 60,
+                          child: ListView(scrollDirection: Axis.horizontal, children: [
+                            for (final f in _files)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: SizedBox(width: 60, height: 60, child: LocalThumb(f, isVideo: Api.isVideo(f))),
+                                ),
+                              ),
+                          ]),
+                        ),
+                ),
+                TextButton(onPressed: () => _go(1), child: Text(tr('step_photo'))),
+              ]),
+              Divider(height: 18, thickness: 0.5, color: c.separator),
+              Row(children: [
+                Icon(CupertinoIcons.location_fill, size: 18, color: _spot != null ? AppColors.green : c.textTertiary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _spot == null
+                        ? tr('tap_map')
+                        : (_spot!.address?.isNotEmpty == true ? _spot!.address! : tr('pinned')),
+                    maxLines: 3,
+                    style: T.body(context).copyWith(fontSize: 15),
+                  ),
+                ),
+                TextButton(onPressed: () => _go(2), child: Text(tr('step_location'))),
+              ]),
+              if (_desc.text.trim().isNotEmpty) ...[
+                Divider(height: 18, thickness: 0.5, color: c.separator),
+                Text(_desc.text.trim(), style: T.sub(context)),
+              ],
+            ]),
+          ),
+          if (signedIn)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
+              child: Row(children: [
+                const Icon(CupertinoIcons.person_crop_circle_fill_badge_checkmark, size: 18, color: AppColors.green),
+                const SizedBox(width: 8),
+                Expanded(child: Text(prefs.name, style: T.sub(context))),
+              ]),
+            )
+          else ...[
+            _label(tr('contact')),
+            CardBox(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(children: [
+                _field(_name, tr('name'), CupertinoIcons.person_fill, TextInputType.name),
+                Divider(height: 1, thickness: 0.5, color: c.separator, indent: 34),
+                _field(_phone, tr('mobile'), CupertinoIcons.phone_fill, TextInputType.phone),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+              child: Text(tr('contact_hint'), style: T.sub(context).copyWith(fontSize: 12.5)),
+            ),
+          ],
+        ]);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final signedIn = Api.accessToken != null && prefs.name.isNotEmpty;
-    return Scaffold(
-      backgroundColor: c.bg,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(52),
-        child: Glass(
-          child: SafeArea(
-            bottom: false,
-            child: SizedBox(
-              height: 52,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Text('New Report', style: T.headline(context)),
-                  Positioned(
-                    left: 4,
-                    child: CupertinoButton(
-                      onPressed: _sending ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+    final last = _step == 3;
+    final hint = last ? _submitHint : _stepHint;
+    final canNext = last ? _canSubmit : _stepOk && !_anyChecking;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_step > 0 && !_sending) return _go(_step - 1);
+        if (await _confirmExit() && context.mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        backgroundColor: c.bg,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Glass(
+            child: SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 52,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(tr('new_report'), style: T.headline(context)),
+                    Positioned(
+                      left: 4,
+                      child: CupertinoButton(
+                        minimumSize: const Size(48, 48),
+                        onPressed: _sending
+                            ? null
+                            : () async {
+                                if (await _confirmExit() && context.mounted) Navigator.pop(context);
+                              },
+                        child: Text(tr('cancel')),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 140),
-          children: [
-            _label('What\'s the issue?'),
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              children: [for (final cat in categories) _categoryTile(cat)],
-            ),
-            _label('Photos & videos', trailing: '${_files.length}/$_maxFiles'),
-            if (_blocked) _pausedBanner(),
-            if (_files.isEmpty) _shotGuide() else _checkedList(),
-            if (_warning != null && !_blocked) _warningBanner(_warning!),
-            _label('Location'),
-            _locationCard(),
-            _label('Details'),
-            CardBox(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-              child: TextField(
-                controller: _desc,
-                onChanged: (_) => setState(() {}),
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 500,
-                textCapitalization: TextCapitalization.sentences,
-                style: T.body(context),
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'e.g. Deep pothole near the bus stop, two-wheelers swerving into traffic',
-                  hintStyle: T.body(context).copyWith(color: c.textTertiary),
-                  counterStyle: T.caption(context),
-                ),
-              ),
-            ),
-            if (signedIn)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
-                child: Row(
-                  children: [
-                    const Icon(
-                      CupertinoIcons.person_crop_circle_fill_badge_checkmark,
-                      size: 18,
-                      color: AppColors.green,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Filing as ${prefs.name}. You\'ll get live status updates.', style: T.sub(context)),
-                    ),
-                  ],
-                ),
-              )
-            else ...[
-              _label('Your contact'),
-              CardBox(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    _field(_name, 'Full name', CupertinoIcons.person_fill, TextInputType.name),
-                    Divider(height: 1, thickness: 0.5, color: c.separator, indent: 34),
-                    _field(_phone, 'Mobile number', CupertinoIcons.phone_fill, TextInputType.phone),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                child: Text(
-                  'Used only to send you repair updates. Optional.',
-                  style: T.sub(context).copyWith(fontSize: 12.5),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      bottomNavigationBar: Glass(
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_submitHint != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                      _submitHint!,
-                      textAlign: TextAlign.center,
-                      style: T.sub(context).copyWith(fontSize: 13.5),
-                    ),
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Column(children: [
+            _progressBar(),
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOut,
+                    child: _stepBody(),
                   ),
-                Pressable(
-                  onTap: _sending ? null : _submit,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      color: _canSubmit || _sending ? AppColors.blue : c.fill,
-                      boxShadow: _canSubmit
-                          ? const [BoxShadow(color: Color(0x550A84FF), blurRadius: 20, offset: Offset(0, 8))]
-                          : null,
+                ],
+              ),
+            ),
+          ]),
+        ),
+        bottomNavigationBar: Glass(
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(hint, textAlign: TextAlign.center, style: T.sub(context).copyWith(fontSize: 13)),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Stack(
-                        children: [
-                          if (_sending)
-                            AnimatedFractionallySizedBox(
-                              duration: const Duration(milliseconds: 400),
-                              widthFactor: _progress.clamp(0.05, 1),
-                              child: Container(color: Colors.white.withValues(alpha: 0.18)),
-                            ),
-                          Center(
-                            child: _sending
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const CupertinoActivityIndicator(color: Colors.white),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        _progress < 0.5 ? 'Uploading...' : 'AI is analysing...',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Text(
-                                    'Submit report',
-                                    style: TextStyle(
-                                      color: _canSubmit ? Colors.white : c.textTertiary,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                  Row(children: [
+                    if (_step > 0 && !_sending) ...[
+                      Pressable(
+                        onTap: () => _go(_step - 1),
+                        child: Container(
+                          height: 56,
+                          constraints: const BoxConstraints(minWidth: 88),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(color: c.fill, borderRadius: BorderRadius.circular(18)),
+                          child: Text(tr('back'),
+                              style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Pressable(
+                        onTap: _sending
+                            ? null
+                            : () {
+                                if (last) { _submit(); return; }
+                                if (!canNext) { toast(context, hint ?? tr('hint_photo')); return; }
+                                _go(_step + 1);
+                              },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            color: canNext || _sending ? AppColors.blue : c.fill,
+                            boxShadow: canNext
+                                ? const [BoxShadow(color: Color(0x550A84FF), blurRadius: 20, offset: Offset(0, 8))]
+                                : null,
                           ),
-                        ],
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(children: [
+                              if (_sending)
+                                AnimatedFractionallySizedBox(
+                                  duration: const Duration(milliseconds: 400),
+                                  widthFactor: _progress.clamp(0.05, 1),
+                                  child: Container(color: Colors.white.withValues(alpha: 0.18)),
+                                ),
+                              Center(
+                                child: _sending
+                                    ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                        const CupertinoActivityIndicator(color: Colors.white),
+                                        const SizedBox(width: 10),
+                                        Text(_progress < 0.5 ? tr('uploading') : tr('analysing'),
+                                            style: const TextStyle(
+                                                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+                                      ])
+                                    : Text(
+                                        last
+                                            ? tr('submit')
+                                            : (_step == 1 && _files.isEmpty ? tr('next') : tr('next')),
+                                        style: TextStyle(
+                                            color: canNext ? Colors.white : c.textTertiary,
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w600)),
+                              ),
+                            ]),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -468,7 +653,7 @@ class _ReportScreenState extends State<ReportScreen> {
           Pressable(
             onTap: _addMedia,
             child: Container(
-              height: 54,
+              height: 56,
               decoration: BoxDecoration(
                 color: AppColors.blue.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
@@ -479,9 +664,9 @@ class _ReportScreenState extends State<ReportScreen> {
                 children: [
                   const Icon(CupertinoIcons.plus_circle_fill, color: AppColors.blue, size: 20),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Add another photo or video',
-                    style: TextStyle(color: AppColors.blue, fontWeight: FontWeight.w600, fontSize: 15),
+                  Text(
+                    tr('add_more'),
+                    style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w600, fontSize: 15),
                   ),
                   const SizedBox(width: 8),
                   Text('${_files.length}/$_maxFiles', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
@@ -546,6 +731,28 @@ class _ReportScreenState extends State<ReportScreen> {
                       color: Colors.black38,
                       child: const CupertinoActivityIndicator(color: Colors.white),
                     ),
+                  Positioned(
+                    left: 5,
+                    right: 5,
+                    bottom: 5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(99)),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          switch (state) {
+                            _CheckState.checking => tr('ai_checking'),
+                            _CheckState.pass => 'AI ${tr('ai_ok')}',
+                            _CheckState.fail => 'AI ${tr('ai_fail')}',
+                            _CheckState.error => tr('ai_retry'),
+                          },
+                          maxLines: 1,
+                          style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -571,13 +778,13 @@ class _ReportScreenState extends State<ReportScreen> {
                 Row(
                   children: [
                     if (state == _CheckState.fail && r?.rateLimited != true)
-                      _smallButton('Retake', CupertinoIcons.camera_fill, AppColors.blue, () => _retake(f)),
+                      _smallButton(tr('retake'), CupertinoIcons.camera_fill, AppColors.blue, () => _retake(f)),
                     if (state == _CheckState.error)
-                      _smallButton('Retry', CupertinoIcons.arrow_clockwise, AppColors.blue, () => _check(f)),
+                      _smallButton(tr('retry'), CupertinoIcons.arrow_clockwise, AppColors.blue, () => _check(f)),
                     if (state != _CheckState.checking) ...[
                       const SizedBox(width: 8),
                       _smallButton(
-                        'Remove',
+                        tr('remove'),
                         CupertinoIcons.trash,
                         AppColors.of(context).textSecondary,
                         () => _remove(f),
@@ -596,7 +803,8 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget _smallButton(String label, IconData icon, Color color, VoidCallback onTap) => Pressable(
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      constraints: const BoxConstraints(minHeight: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(99)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -707,19 +915,23 @@ class _ReportScreenState extends State<ReportScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Step back about a metre so the whole pothole and a bit of road around it are in frame.',
+              tr('photo_sub'),
               style: T.sub(context),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(child: _pickButton(CupertinoIcons.camera_fill, 'Photo', () => _pick(0), primary: true)),
-                const SizedBox(width: 8),
-                Expanded(child: _pickButton(CupertinoIcons.videocam_fill, 'Video', () => _pick(1))),
-                const SizedBox(width: 8),
-                Expanded(child: _pickButton(CupertinoIcons.photo_on_rectangle, 'Library', () => _pick(2))),
+                _pickButton(CupertinoIcons.camera_fill, tr('take_photo'), () => _pick(0), primary: true, tall: true),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _pickButton(CupertinoIcons.videocam_fill, tr('record_video'), () => _pick(1))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _pickButton(CupertinoIcons.photo_on_rectangle, tr('library'), () => _pick(2))),
+                  ],
+                ),
               ],
             ),
           ),
@@ -728,12 +940,13 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Widget _pickButton(IconData icon, String label, VoidCallback onTap, {bool primary = false}) {
+  Widget _pickButton(IconData icon, String label, VoidCallback onTap, {bool primary = false, bool tall = false}) {
     final c = AppColors.of(context);
     return Pressable(
       onTap: onTap,
       child: Container(
-        height: 60,
+        height: tall ? 68 : 60,
+        width: double.infinity,
         decoration: BoxDecoration(color: primary ? AppColors.blue : c.fill, borderRadius: BorderRadius.circular(14)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -742,7 +955,9 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 3),
             Text(
               label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primary ? Colors.white : c.text),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: primary ? Colors.white : c.text),
             ),
           ],
         ),
@@ -801,10 +1016,10 @@ class _ReportScreenState extends State<ReportScreen> {
                     children: [
                       Text(
                         locator.busy && !has
-                            ? 'Finding your location...'
+                            ? tr('finding_loc')
                             : has
-                            ? (s.address?.isNotEmpty == true ? s.address! : 'Pinned on the map')
-                            : 'Tap the map to place a pin',
+                            ? (s.address?.isNotEmpty == true ? s.address! : tr('pinned'))
+                            : tr('tap_map'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: T.headline(context).copyWith(fontSize: 15.5),
@@ -813,9 +1028,9 @@ class _ReportScreenState extends State<ReportScreen> {
                       Text(
                         has
                             ? (_pinMoved
-                                  ? 'Placed by you. Tap the map to adjust.'
-                                  : '±${s.accuracy?.round() ?? '?'} m. Tap the map to adjust.')
-                            : (locator.error ?? 'Pinning the exact spot helps crews find it'),
+                                  ? tr('adjust_map')
+                                  : '±${s.accuracy?.round() ?? '?'} m. ${tr('adjust_map')}')
+                            : (locator.error ?? tr('err_gps')),
                         style: T.sub(context).copyWith(fontSize: 12.5),
                       ),
                     ],
@@ -825,7 +1040,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     ? const Padding(padding: EdgeInsets.all(8), child: CupertinoActivityIndicator())
                     : CupertinoButton(
                         padding: const EdgeInsets.all(8),
-                        minimumSize: Size.zero,
+                        minimumSize: const Size(48, 48),
                         onPressed: _useMyLocation,
                         child: const Icon(CupertinoIcons.location_circle, size: 24),
                       ),
@@ -877,101 +1092,130 @@ class _SuccessScreenState extends State<_SuccessScreen> with SingleTickerProvide
     super.dispose();
   }
 
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.complaint.ticket));
+    HapticFeedback.mediumImpact();
+    if (mounted) toast(context, tr('copied'));
+  }
+
+  Future<void> _share() async {
+    HapticFeedback.selectionClick();
+    try {
+      await SharePlus.instance.share(ShareParams(text: tr('share_text', {'t': widget.complaint.ticket})));
+    } catch (_) {
+      if (mounted) toast(context, tr('err_generic'), error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.complaint;
+    final colors = AppColors.of(context);
     final n = c.findings.length;
     final pending = c.media.any((m) => m.processing);
-    final scale = CurvedAnimation(
-      parent: _ac,
-      curve: const Interval(0, 0.6, curve: Curves.elasticOut),
-    );
-    final fade = CurvedAnimation(
-      parent: _ac,
-      curve: const Interval(0.35, 1, curve: Curves.easeOut),
-    );
+    final scale = CurvedAnimation(parent: _ac, curve: const Interval(0, 0.6, curve: Curves.elasticOut));
+    final fade = CurvedAnimation(parent: _ac, curve: const Interval(0.35, 1, curve: Curves.easeOut));
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              ScaleTransition(
-                scale: scale,
-                child: Container(
-                  width: 110,
-                  height: 110,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: [Color(0xFF4CD964), Color(0xFF28B446)]),
-                    boxShadow: [BoxShadow(color: Color(0x5530D158), blurRadius: 40, offset: Offset(0, 16))],
-                  ),
-                  child: const Icon(CupertinoIcons.checkmark_alt, color: Colors.white, size: 60),
-                ),
-              ),
-              const SizedBox(height: 28),
-              FadeTransition(
-                opacity: fade,
-                child: Column(
-                  children: [
-                    Text('Report submitted', style: T.largeTitle(context).copyWith(fontSize: 30)),
-                    const SizedBox(height: 8),
-                    Text('Thanks for making your streets safer.', style: T.sub(context).copyWith(fontSize: 16)),
-                    const SizedBox(height: 24),
-                    CardBox(
-                      child: Column(
-                        children: [
-                          _row(context, 'Ticket', c.ticket, bold: true),
-                          _row(context, 'Category', categoryOf(c.category).label),
-                          _row(
-                            context,
-                            'AI check',
-                            pending
-                                ? 'Analysing video...'
-                                : (n == 0
-                                      ? (c.media.isEmpty ? 'No media' : 'Sent for manual review')
-                                      : '$n defect${n == 1 ? '' : 's'} detected'),
-                          ),
-                        ],
-                      ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height - 120),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 24),
+                ScaleTransition(
+                  scale: scale,
+                  child: Container(
+                    width: 104,
+                    height: 104,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [Color(0xFF4CD964), Color(0xFF28B446)]),
+                      boxShadow: [BoxShadow(color: Color(0x5530D158), blurRadius: 40, offset: Offset(0, 16))],
                     ),
-                  ],
-                ),
-              ),
-              const Spacer(flex: 3),
-              Pressable(
-                onTap: () => Navigator.of(context).pushReplacement(
-                  CupertinoPageRoute(
-                    builder: (_) => DetailScreen(id: c.id, initial: c),
+                    child: const Icon(CupertinoIcons.checkmark_alt, color: Colors.white, size: 58),
                   ),
                 ),
-                child: Container(
-                  height: 56,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(18)),
-                  child: const Text(
-                    'Track this report',
-                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
+                const SizedBox(height: 24),
+                FadeTransition(
+                  opacity: fade,
+                  child: Column(children: [
+                    Text(tr('success_title'), textAlign: TextAlign.center, style: T.largeTitle(context).copyWith(fontSize: 30)),
+                    const SizedBox(height: 8),
+                    Text(tr('success_text'), textAlign: TextAlign.center, style: T.sub(context).copyWith(fontSize: 16)),
+                    const SizedBox(height: 22),
+                    CardBox(
+                      child: Column(children: [
+                        Text(tr('ticket'), style: T.caption(context)),
+                        const SizedBox(height: 4),
+                        SelectableText(c.ticket,
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(child: _action(CupertinoIcons.doc_on_doc, tr('copy'), _copy)),
+                          const SizedBox(width: 10),
+                          Expanded(child: _action(CupertinoIcons.share, tr('share'), _share)),
+                        ]),
+                        Divider(height: 24, thickness: 0.5, color: colors.separator),
+                        _row(context, tr('issue'), categoryOf(c.category).label),
+                        _row(
+                          context,
+                          'AI',
+                          pending
+                              ? tr('analysing')
+                              : (n == 0 ? (c.media.isEmpty ? tr('no_photos') : tr('submitted')) : '$n x ${tr('ai_ok')}'),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 28),
+                Pressable(
+                  onTap: () => Navigator.of(context).pushReplacement(
+                    CupertinoPageRoute(builder: (_) => DetailScreen(id: c.id, initial: c)),
+                  ),
+                  child: Container(
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: AppColors.blue, borderRadius: BorderRadius.circular(18)),
+                    child: Text(tr('track'),
+                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              ),
-              CupertinoButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
-            ],
+                const SizedBox(height: 4),
+                CupertinoButton(
+                    minimumSize: const Size(48, 48),
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(tr('done'))),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _row(BuildContext context, String k, String v, {bool bold = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
-    child: Row(
-      children: [
-        Text(k, style: T.sub(context)),
-        const Spacer(),
-        Text(v, style: T.body(context).copyWith(fontWeight: bold ? FontWeight.w700 : FontWeight.w500)),
-      ],
-    ),
-  );
+  Widget _action(IconData icon, String label, VoidCallback onTap) => Pressable(
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(color: AppColors.of(context).fill, borderRadius: BorderRadius.circular(14)),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 18, color: AppColors.blue),
+            const SizedBox(width: 8),
+            Text(label, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w600, fontSize: 15)),
+          ]),
+        ),
+      );
+
+  Widget _row(BuildContext context, String k, String v) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Text(k, style: T.sub(context)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(v, textAlign: TextAlign.right, style: T.body(context).copyWith(fontWeight: FontWeight.w500))),
+        ]),
+      );
 }

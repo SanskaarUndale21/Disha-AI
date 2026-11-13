@@ -1,3 +1,4 @@
+import '../i18n.dart' as i18n;
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -70,7 +71,7 @@ class CallScreen extends StatefulWidget {
 class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   _Phase _phase = _Phase.pick;
   _Mode _mode = _Mode.idle;
-  _Lang _lang = _langs.first;
+  _Lang _lang = _langs.firstWhere((l) => l.code == i18n.lang, orElse: () => _langs.first);
 
   final _stt = SpeechToText();
   final _tts = FlutterTts();

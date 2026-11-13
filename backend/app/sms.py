@@ -50,6 +50,12 @@ def twilio_configured() -> bool:
 
 
 def configured() -> bool:
+    try:
+        from . import telegram
+        if telegram.configured():
+            return True
+    except Exception:
+        pass
     return gateway_configured() or twilio_configured()
 
 
@@ -95,10 +101,19 @@ def _send_gateway(num: str, body: str, client=None) -> dict:
 
 
 def send_sms(to: str, body: str) -> dict:
+    """Notify a phone number: Telegram first if that number linked the bot (free, instant), then the phone gateway, then Twilio."""
     c = _cfg()
     num = normalize(to)
     if not num:
         return {"ok": False, "error": "invalid phone number"}
+    try:
+        from . import telegram
+        if telegram.configured() and telegram.chat_for_phone(num):
+            r = telegram.send_to_phone(num, body)
+            if r.get("ok"):
+                return r
+    except Exception as e:  # never let a chat problem block the SMS fallback
+        print("[sms] telegram attempt failed:", repr(e))
     if not configured():
         return {"ok": False, "error": "SMS is not configured (set SMSGATE_USER and SMSGATE_PASS, or TWILIO_FROM, in backend/.env)"}
     if gateway_configured():

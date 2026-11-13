@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../api.dart';
+import '../i18n.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -73,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _greeting {
     final h = DateTime.now().hour;
-    final part = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+    final part = h < 12 ? tr('good_morning') : (h < 17 ? tr('good_afternoon') : tr('good_evening'));
     final first = prefs.name.split(' ').first;
     return first.isEmpty ? part : '$part, $first';
   }
@@ -106,29 +107,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 const IconBadge(CupertinoIcons.location_north_fill, AppColors.blue, size: 38),
               ]),
               const SizedBox(height: 20),
-              _HeroCard(onTap: () => _report()),
+              if (_items != null && items.isNotEmpty)
+                _LatestCard(items.first)
+              else if (_items == null && _error == null)
+                const Skeleton(height: 150, radius: 24)
+              else
+                _HeroCard(onTap: () => _report()),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: _QuickAction(CupertinoIcons.camera_fill, tr('qa_report'), AppColors.blue, () => _report())),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _QuickAction(CupertinoIcons.location_north_fill, tr('qa_trip'), AppColors.green,
+                        () => NavMapScreen.open(context, startOnDirections: true))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _QuickAction(CupertinoIcons.mic_fill, tr('qa_talk'), AppColors.teal,
+                        () => openCallScreen(context))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _QuickAction(CupertinoIcons.bell_fill, tr('qa_alerts'), AppColors.orange,
+                        () => Navigator.of(context)
+                            .push(CupertinoPageRoute(builder: (_) => const NotificationsScreen())))),
+              ]),
               const SizedBox(height: 14),
               _CallCard(number: prefs.helpline),
-              const SizedBox(height: 10),
-              Pressable(
-                onTap: () => openCallScreen(context),
-                child: CardBox(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-                  child: Row(children: [
-                    const IconBadge(CupertinoIcons.mic_fill, AppColors.teal, size: 48),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Talk to Disha in the app', style: T.headline(context)),
-                        const SizedBox(height: 2),
-                        Text('Voice and camera, 4 languages', style: T.sub(context).copyWith(fontSize: 13)),
-                      ]),
-                    ),
-                    const Icon(CupertinoIcons.chevron_right, size: 18),
-                  ]),
-                ),
-              ),
-              const SectionLabel('More ways to help'),
+              const SectionLabel('Drive, scan, explore'),
               Row(children: [
                 Expanded(
                     child: _ToolTile(
@@ -156,27 +160,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => Navigator.of(context)
                             .push(CupertinoPageRoute(builder: (_) => const NavMapScreen())))),
               ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(
-                    child: _ToolTile(
-                        icon: CupertinoIcons.location_north_fill,
-                        color: AppColors.blue,
-                        title: 'Plan a safe trip',
-                        detail: 'Routes that avoid potholes',
-                        onTap: () => Navigator.of(context).push(CupertinoPageRoute(
-                            builder: (_) => const NavMapScreen(startOnDirections: true))))),
-                const SizedBox(width: 10),
-                const Expanded(child: SizedBox.shrink()),
-              ]),
-              SectionLabel('Near you',
+              SectionLabel(tr('near_you'),
                   trailing: locator.spot?.area?.isNotEmpty == true
                       ? Flexible(
                           child: Text(locator.spot!.area!,
                               maxLines: 1, overflow: TextOverflow.ellipsis, style: T.sub(context)))
                       : null),
               _nearbyMap(items),
-              const SectionLabel('Quick report'),
+              SectionLabel(tr('quick_report')),
               SizedBox(
                 height: 118,
                 child: ListView.separated(
@@ -204,22 +195,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(child: _Stat(value: '$resolved', label: 'Fixed', color: AppColors.green)),
                 ]),
               ],
-              SectionLabel('Recent reports',
+              SectionLabel(tr('recent_reports'),
                   trailing: items.length > 3
                       ? CupertinoButton(
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,
                           onPressed: widget.onSeeAll,
-                          child: const Text('See all', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                          child: Text(tr('see_all'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
                         )
                       : null),
               if (_items == null && _error == null)
-                const Padding(padding: EdgeInsets.all(30), child: CupertinoActivityIndicator())
+                const Column(children: [
+                  Skeleton(height: 88, radius: 20),
+                  SizedBox(height: 10),
+                  Skeleton(height: 88, radius: 20),
+                ])
               else if (_error != null && items.isEmpty)
                 _Empty(
                     icon: CupertinoIcons.wifi_exclamationmark,
-                    title: 'Offline',
-                    text: _error!,
+                    title: tr('retry'),
+                    text: friendlyError(_error!),
                     color: c.textTertiary)
               else if (items.isEmpty)
                 const _FirstReport()
@@ -383,19 +378,19 @@ class _HeroCard extends StatelessWidget {
               padding: const EdgeInsets.all(22),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Spacer(),
-                const Text('Spotted a bad road?',
+                Text(tr('hero_title'),
                     style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
                 const SizedBox(height: 4),
-                Text('Snap a photo or video. AI checks it and routes it to the repair crew.',
+                Text(tr('hero_sub'),
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 14.5, height: 1.3)),
                 const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(99)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(CupertinoIcons.plus, size: 16, color: AppColors.blue),
-                    SizedBox(width: 6),
-                    Text('Report an issue',
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(CupertinoIcons.plus, size: 16, color: AppColors.blue),
+                    const SizedBox(width: 6),
+                    Text(tr('report_issue'),
                         style: TextStyle(color: AppColors.blue, fontWeight: FontWeight.w700, fontSize: 14.5)),
                   ]),
                 ),
@@ -516,9 +511,9 @@ class _FirstReport extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('No reports yet', style: T.headline(context)),
+              Text(tr('empty_title'), style: T.headline(context)),
               const SizedBox(height: 3),
-              Text('Your complaints and their repair status will show up here.', style: T.sub(context)),
+              Text(tr('empty_text'), style: T.sub(context)),
             ]),
           ),
         ]),
@@ -541,4 +536,132 @@ class _Empty extends StatelessWidget {
           Text(text, textAlign: TextAlign.center, style: T.sub(context)),
         ]),
       );
+}
+
+/// Plain-language message for a raw error string.
+String friendlyError(String raw) {
+  final r = raw.toLowerCase();
+  if (r.contains('socket') || r.contains('network') || r.contains('failed host') || r.contains('connection') ||
+      r.contains('offline') || r.contains('timeout') || r.contains('reach')) {
+    return tr('err_offline');
+  }
+  if (r.contains('500') || r.contains('502') || r.contains('503') || r.contains('server')) {
+    return tr('err_server');
+  }
+  return tr('err_generic');
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction(this.icon, this.label, this.color, this.onTap);
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Pressable(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 84),
+          child: CardBox(
+            radius: 18,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              IconBadge(icon, color, size: 38),
+              const SizedBox(height: 7),
+              Text(label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.15)),
+            ]),
+          ),
+        ),
+      );
+}
+
+/// Latest report with a four stage stepper and how long it has been open.
+class _LatestCard extends StatelessWidget {
+  const _LatestCard(this.c);
+  final Complaint c;
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final cat = categoryOf(c.category);
+    final closed = c.status == 'rejected';
+    final idx = switch (c.status) { 'in_review' => 1, 'in_progress' => 2, 'resolved' => 3, 'rejected' => 3, _ => 0 };
+    final days = DateTime.now().difference(c.createdAt).inDays;
+    final fixed = c.status == 'resolved';
+    final openText = fixed
+        ? tr('closed_fixed')
+        : closed
+            ? tr('closed')
+            : days <= 0
+                ? tr('today_open')
+                : (days == 1 ? tr('one_day_open') : tr('days_open', {'n': '$days'}));
+    final labels = [tr('st_reported'), tr('st_verified'), tr('st_repairing'), tr('st_fixed')];
+    return Pressable(
+      onTap: () => Navigator.of(context).push(CupertinoPageRoute(builder: (_) => DetailScreen(id: c.id, initial: c))),
+      child: CardBox(
+        radius: 24,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(tr('latest_report'), style: T.caption(context))),
+            Text(c.ticket, style: T.caption(context)),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            IconBadge(cat.icon, cat.color, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(cat.label, style: T.headline(context)),
+                const SizedBox(height: 2),
+                Text(openText, style: T.sub(context).copyWith(fontSize: 13)),
+              ]),
+            ),
+            StatusPill(c.status),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            for (var i = 0; i < 4; i++) ...[
+              if (i > 0)
+                Expanded(
+                  child: Container(
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: i <= idx ? AppColors.green : colors.separator,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i <= idx ? AppColors.green : colors.card,
+                  border: Border.all(color: i <= idx ? AppColors.green : colors.textTertiary, width: 2),
+                ),
+                child: i <= idx ? const Icon(Icons.check, size: 11, color: Colors.white) : null,
+              ),
+            ],
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            for (var i = 0; i < 4; i++)
+              Expanded(
+                child: Text(labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: i == 0 ? TextAlign.left : (i == 3 ? TextAlign.right : TextAlign.center),
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: i == idx ? FontWeight.w700 : FontWeight.w500,
+                        color: i <= idx ? colors.text : colors.textTertiary)),
+              ),
+          ]),
+        ]),
+      ),
+    );
+  }
 }
