@@ -1,0 +1,81 @@
+/* RoadWatch citizen website theme: calm, soft, nature inspired.
+   Palette: Charcoal #3D405B, Sage #81B29A, Peach #F2CC8F, Ivory #F4F1DE. Loaded after style.css; delete the link to revert. */
+:root, :root:not([data-theme="light"]) {
+  --charcoal: #3D405B; --sage: #81B29A; --peach: #F2CC8F; --ivory: #F4F1DE;
+  --sage-deep: #3F7A60; --charcoal-deep: #2F3249; --terra: #D9826A;
+  --bg: #F4F1DE; --card: #FBF9EF; --card-alt: #EFEBD6;
+  --text: #3D405B; --text2: #5E617A; --sep: rgba(61, 64, 91, .13); --fill: rgba(61, 64, 91, .08);
+  --btn: #81B29A; --on-btn: #2F3249; --link: #3F7A60;
+  --blue: #81B29A; --indigo: #B3B6D6; --green: #81B29A; --orange: #F2CC8F; --red: #D9826A; --teal: #81B29A; --purple: #C2B8D6; --yellow: #F2CC8F;
+  --blue-t: #3F7A60; --indigo-t: #3D405B; --green-t: #3F7A60; --orange-t: #8A5F14; --red-t: #A9503A; --teal-t: #3F7A60; --purple-t: #5E5A82; --yellow-t: #7E5E12;
+  --shadow: 0 10px 30px rgba(61, 64, 91, .08), 0 2px 6px rgba(61, 64, 91, .05);
+  --glass: rgba(244, 241, 222, .86); --icon-cut: #FBF9EF; --r-card: 20px;
+  --font: "Plus Jakarta Sans", "Nunito Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+body { letter-spacing: -.1px; background: var(--bg); }
+h1, h2, h3 { color: var(--charcoal); letter-spacing: -.4px; }
+.hero h2, .hero p, .dhero h1, .dhero h2 { color: #FBF9EF; }
+:focus-visible { outline: 3px solid var(--peach); outline-offset: 2px; }
+
+/* soft surfaces: cards sit on the ivory page with a quiet shadow instead of hard borders */
+.card, .tile, .row-card, .list, .group, .sheet, .panel { box-shadow: var(--shadow); }
+.tabbar { background: var(--glass); border-top: 1px solid var(--sep); backdrop-filter: blur(14px); }
+.tab { color: var(--text2); }
+.tab[aria-current="page"] { color: var(--charcoal); }
+.tab[aria-current="page"] .ic { color: var(--sage-deep); transform: scale(1.06); }
+
+/* the central Report action is the one peach call to action */
+.tab-report { color: var(--charcoal); }
+.tab-report .fab { background: var(--peach); color: var(--charcoal); box-shadow: 0 8px 18px rgba(242, 204, 143, .55), 0 2px 4px rgba(61, 64, 91, .12); transition: transform .2s ease, box-shadow .2s ease; }
+.tab-report:hover .fab { transform: translateY(-2px); box-shadow: 0 12px 22px rgba(242, 204, 143, .65), 0 2px 6px rgba(61, 64, 91, .14); }
+
+/* buttons: rounded, sage primary, smooth hover */
+.btn { border-radius: 999px; transition: background .2s ease, box-shadow .2s ease, transform .15s ease, filter .2s ease; }
+.btn.primary { background: var(--sage); color: var(--charcoal-deep); font-weight: 700; box-shadow: 0 4px 12px rgba(129, 178, 154, .35); }
+.btn.primary:hover { filter: brightness(1.04); transform: translateY(-1px); box-shadow: 0 8px 18px rgba(129, 178, 154, .45); }
+.btn.primary:active { transform: translateY(0); }
+.btn.primary.big { box-shadow: 0 8px 20px rgba(129, 178, 154, .4); }
+.btn.ghost { color: var(--sage-deep); }
+.btn.danger { background: color-mix(in srgb, var(--terra) 16%, transparent); color: var(--red-t); }
+.btn:not(.primary):not(.ghost):not(.danger) { background: var(--fill); color: var(--charcoal); }
+.btn:not(.primary):not(.ghost):not(.danger):hover { background: rgba(61, 64, 91, .13); }
+.btn.big { border-radius: 22px; }
+
+/* hero: photo softened with charcoal, peach call to action */
+.hero { border-radius: 26px; box-shadow: 0 18px 40px rgba(61, 64, 91, .22); }
+.hero::before { background: linear-gradient(135deg, rgba(129, 178, 154, .28), rgba(61, 64, 91, .78)); }
+.hero::after { background: linear-gradient(180deg, transparent 35%, rgba(47, 50, 73, .55)); }
+.hero .cta { background: var(--peach); color: var(--charcoal-deep); box-shadow: 0 6px 16px rgba(0, 0, 0, .16); transition: transform .15s ease, box-shadow .2s ease; }
+.hero .cta:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0, 0, 0, .2); }
+.hero .glass { background: rgba(244, 241, 222, .28); }
+
+/* icon tiles: quiet tinted squares with charcoal glyphs instead of saturated gradients */
+.iconbadge { color: var(--charcoal); background: color-mix(in srgb, var(--c) 30%, var(--ivory)); }
+.callbtn { background: var(--sage); color: var(--charcoal-deep); box-shadow: 0 6px 16px rgba(129, 178, 154, .45); }
+.badge { background: var(--terra); }
+.bell { color: var(--charcoal); }
+
+/* segmented controls, switches, chips */
+.segmented button[aria-pressed="true"] { background: var(--card); color: var(--charcoal); box-shadow: 0 2px 8px rgba(61, 64, 91, .12); }
+.switch input:checked + i { background: var(--sage); }
+.switch i { background: rgba(61, 64, 91, .28); }
+.nearby .chip { background: rgba(251, 249, 239, .92); color: var(--charcoal); }
+.cat .tick { color: var(--sage-deep); }
+.skel { background: linear-gradient(100deg, var(--fill) 30%, rgba(61, 64, 91, .03) 50%, var(--fill) 70%); background-size: 200% 100%; }
+
+/* form fields */
+input, textarea, select { background: var(--card); border-color: var(--sep); border-radius: 14px; }
+input:focus, textarea:focus, select:focus { border-color: var(--sage); box-shadow: 0 0 0 3px rgba(129, 178, 154, .28); outline: none; }
+
+/* status colours stay readable but calm */
+.netbar.ok { background: var(--sage-deep); }
+.netbar.warn { background: #8A5F14; }
+.emergency { background: #A9503A; }
+@keyframes flash { 0% { background: #A9503A; } 50% { background: #7F3A28; } 100% { background: #A9503A; } }
+.em-btn.solid { color: #7F3A28; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.avatar { background: linear-gradient(135deg, var(--sage), #6FA38A); color: var(--charcoal-deep); box-shadow: 0 10px 24px rgba(129, 178, 154, .4); }
+.success .seal { background: var(--sage); color: var(--charcoal-deep); box-shadow: 0 14px 30px rgba(129, 178, 154, .45); }

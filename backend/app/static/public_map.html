@@ -5,19 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RoadWatch Maps</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <style>
-:root{--ink:#1f2328;--muted:#5f6670;--line:#e3e5e8;--card:#fff;--blue:#1a73e8;--red:#d92d20;--amber:#f0a30a;--green:#1e9e57}
+:root{--ink:#3D405B;--muted:#5E617A;--line:#E4DFC8;--card:#FBF9EF;--blue:#3F7A60;--red:#C9573F;--amber:#E0A94E;--green:#5E9C7E}
 *{box-sizing:border-box}
-html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-serif;color:var(--ink)}
+html,body{height:100%;margin:0;font:15px/1.4 "Plus Jakarta Sans","Segoe UI",Roboto,system-ui,sans-serif;color:var(--ink)}
 #map{position:absolute;inset:0}
-.panel{position:absolute;top:12px;left:12px;width:392px;max-height:calc(100% - 24px);background:var(--card);border-radius:14px;box-shadow:0 2px 14px rgba(0,0,0,.28);display:flex;flex-direction:column;z-index:5;overflow:hidden}
+.panel{position:absolute;top:12px;left:12px;width:392px;max-height:calc(100% - 24px);background:var(--card);border-radius:20px;box-shadow:0 10px 30px rgba(61,64,91,.18);display:flex;flex-direction:column;z-index:5;overflow:hidden}
 .search{display:flex;align-items:center;gap:6px;padding:8px 10px}
 .search input{flex:1;border:0;outline:0;font:inherit;font-size:16px;padding:8px 4px;min-width:0;background:transparent}
 .ib{border:0;background:none;width:38px;height:38px;border-radius:50%;cursor:pointer;display:grid;place-items:center;color:var(--blue);flex:none}
-.ib:hover{background:#f1f3f4}.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ib:hover{background:#EFEBD6}.ib svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .sugg{border-top:1px solid var(--line);max-height:260px;overflow:auto}
 .sugg button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 14px;cursor:pointer;font:inherit}
-.sugg button:hover{background:#f6f7f8}.sugg small{color:var(--muted);display:block}
+.sugg button:hover{background:#EFEBD6}.sugg small{color:var(--muted);display:block}
 .dir{padding:10px 12px;border-top:1px solid var(--line);display:none;gap:8px}
 .dir.on{display:grid}
 .fld{display:flex;align-items:center;gap:8px}
@@ -25,35 +27,35 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
 .fld .dot.b{border-color:var(--red);background:var(--red)}
 .fld input{flex:1;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;min-width:0}
 .body{overflow:auto;flex:1}
-.banner{margin:10px 12px 0;padding:10px 12px;border-radius:10px;background:#e8f5ec;color:#145a32;font-weight:600}
+.banner{margin:10px 12px 0;padding:10px 12px;border-radius:14px;background:#DDEBE2;color:#2F5C47;font-weight:600}
 .banner.warn{background:#fff3e0;color:#8a4b00}.banner.bad{background:#fdecea;color:#8c1d14}
-.route{margin:8px 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
-.route.sel{border-color:var(--blue);background:#f5f9ff}
+.route{margin:8px 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:16px;cursor:pointer}
+.route.sel{border-color:#81B29A;background:#EEF4EA}
 .route .t{display:flex;justify-content:space-between;align-items:baseline;font-size:17px;font-weight:600}
 .route .t span{color:var(--muted);font-weight:400;font-size:14px}
 .route .d{margin-top:4px;font-size:14px;color:var(--muted)}
 .chip{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;margin-right:4px;background:#eef0f2;color:#3c4043}
-.chip.rec{background:var(--green);color:#fff}.chip.bad{background:#fdecea;color:#8c1d14}.chip.ok{background:#e8f5ec;color:#145a32}
+.chip.rec{background:#81B29A;color:#2F3249}.chip.bad{background:#fdecea;color:#8c1d14}.chip.ok{background:#DDEBE2;color:#2F5C47}
 .card{padding:14px 16px;border-top:1px solid var(--line)}
 .card h3{margin:0 0 2px;font-size:19px}
 .card .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;font:600 14px inherit;cursor:pointer;color:var(--blue)}
-.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn{border:1px solid var(--line);background:#FBF9EF;border-radius:999px;padding:8px 16px;font:600 14px inherit;cursor:pointer;color:var(--blue)}
+.btn.p{background:#81B29A;border-color:#81B29A;color:#2F3249}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-top:8px;font-size:14px}.kv b{color:var(--muted);font-weight:500}
 .layers{position:absolute;top:12px;left:428px;display:flex;gap:8px;z-index:4;flex-wrap:wrap}
-.pill{background:#fff;border:0;border-radius:999px;padding:8px 14px;box-shadow:0 1px 6px rgba(0,0,0,.3);font:600 14px inherit;cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:7px}
+.pill{background:#FBF9EF;border:0;border-radius:999px;padding:8px 14px;box-shadow:0 1px 6px rgba(0,0,0,.3);font:600 14px inherit;cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:7px}
 .pill i{width:10px;height:10px;border-radius:50%;background:#bbb}.pill.on i{background:var(--green)}
-.pill.on{background:#e8f0fe;color:#174ea6}
-.legend{position:absolute;left:12px;bottom:26px;background:#fff;border-radius:10px;padding:8px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:12.5px;z-index:3;display:flex;gap:12px;align-items:center}
+.pill.on{background:#DDEBE2;color:#2F5C47}
+.legend{position:absolute;left:12px;bottom:26px;background:#FBF9EF;border-radius:10px;padding:8px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:12.5px;z-index:3;display:flex;gap:12px;align-items:center}
 .legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:16px;height:6px;border-radius:3px}
-.live{position:absolute;right:12px;top:12px;background:#fff;border-radius:999px;padding:6px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:13px;font-weight:600;z-index:4;display:flex;gap:6px;align-items:center}
+.live{position:absolute;right:12px;top:12px;background:#FBF9EF;border-radius:999px;padding:6px 12px;box-shadow:0 1px 6px rgba(0,0,0,.3);font-size:13px;font-weight:600;z-index:4;display:flex;gap:6px;align-items:center}
 .live i{width:9px;height:9px;border-radius:50%;background:#9aa1aa}.live.on i{background:var(--green);box-shadow:0 0 0 3px rgba(30,158,87,.25)}
 #toasts{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;z-index:9;display:grid;gap:8px;width:min(440px,calc(100vw - 24px))}
-.toast{background:#202124;color:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:14px}
+.toast{background:#3D405B;color:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:14px}
 .stat3{display:flex;gap:10px;align-items:baseline;margin-top:6px}.stat3 b{font-size:34px;line-height:1}.stat3 span{color:var(--muted)}
 .dl{display:grid;gap:2px;margin-top:8px;max-height:260px;overflow:auto}
 .dl button{display:flex;gap:8px;align-items:center;border:0;background:none;text-align:left;padding:6px 4px;border-radius:8px;cursor:pointer;font:inherit;font-size:14px}
-.dl button:hover{background:#f1f3f4}.dl em{font-style:normal;color:var(--muted);min-width:52px}.dl .sv{margin-left:auto;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:#fff3e0;color:#8a4b00}.dl .sv.hi{background:#fdecea;color:#8c1d14}
+.dl button:hover{background:#EFEBD6}.dl em{font-style:normal;color:var(--muted);min-width:52px}.dl .sv{margin-left:auto;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;background:#fff3e0;color:#8a4b00}.dl .sv.hi{background:#fdecea;color:#8c1d14}
 .pin{width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .maplibregl-ctrl-bottom-right{bottom:12px}
 @media (max-width:760px){
@@ -86,7 +88,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
   <button class="pill" id="p3d"><i></i>3D view</button>
 </div>
 <div class="live" id="live"><i></i><span>Connecting</span></div>
-<div class="legend"><span><i style="background:#1a73e8"></i>Clear road</span><span><i style="background:#f0a30a"></i>Damaged</span><span><i style="background:#d92d20"></i>Severe</span></div>
+<div class="legend"><span><i style="background:#3F7A60"></i>Clear road</span><span><i style="background:#E0A94E"></i>Damaged</span><span><i style="background:#C9573F"></i>Severe</span></div>
 <div id="toasts"></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -94,7 +96,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
 (function () {
   var NAMES = { pothole: "Pothole", alligator_crack: "Alligator cracks", longitudinal_crack: "Long crack", transverse_crack: "Cross crack",
     manhole: "Manhole", speed_breaker: "Speed breaker", debris: "Debris", barricade: "Barricade" };
-  var COL = { red: "#d92d20", yellow: "#f0a30a", green: "#1e9e57" };
+  var COL = { red: "#C9573F", yellow: "#E0A94E", green: "#1e9e57" };
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function $(id) { return document.getElementById(id); }
   function toast(t) { var e = document.createElement("div"); e.className = "toast"; e.textContent = t; $("toasts").appendChild(e); setTimeout(function () { e.remove(); }, 6500); }
@@ -124,7 +126,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     return { type: "FeatureCollection", features: defects.filter(function (d) { return d.lat != null; }).map(function (d) {
       return { type: "Feature", geometry: { type: "Point", coordinates: [d.lon, d.lat] },
         properties: { uid: d.uid, number: d.number, cls: d["class"], sev: d.severity || "", status: d.status || "active", reports: d.reports || 1,
-          c: d.status === "repaired" ? "#1e9e57" : (/crit|sev/i.test(d.severity || "") ? "#d92d20" : "#f0a30a") } };
+          c: d.status === "repaired" ? "#1e9e57" : (/crit|sev/i.test(d.severity || "") ? "#C9573F" : "#E0A94E") } };
     }) };
   }
   function setDefects() { if (ready) map.getSource("defects").setData(defectFC()); }
@@ -140,7 +142,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     map.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 11 } });
     map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "c"], "line-width": 7 } });
     map.addLayer({ id: "clusters", type: "circle", source: "defects", filter: ["has", "point_count"],
-      paint: { "circle-color": "#d92d20", "circle-opacity": 0.88, "circle-stroke-color": "#fff", "circle-stroke-width": 2, "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 24] } });
+      paint: { "circle-color": "#C9573F", "circle-opacity": 0.88, "circle-stroke-color": "#fff", "circle-stroke-width": 2, "circle-radius": ["step", ["get", "point_count"], 14, 10, 18, 40, 24] } });
     map.addLayer({ id: "cluster-n", type: "symbol", source: "defects", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] }, paint: { "text-color": "#fff" } });
     map.addLayer({ id: "pts", type: "circle", source: "defects", filter: ["!", ["has", "point_count"]],
       paint: { "circle-color": ["get", "c"], "circle-radius": 7, "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
@@ -221,7 +223,7 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
   var pm = null;
   function placeCard(pt, full) {
     if (pm) pm.remove();
-    pm = new maplibregl.Marker({ color: "#d92d20" }).setLngLat([pt.lon, pt.lat]).addTo(map);
+    pm = new maplibregl.Marker({ color: "#C9573F" }).setLngLat([pt.lon, pt.lat]).addTo(map);
     var near = defects.filter(function (d) { return d.lat != null && dist(d.lat, d.lon, pt.lat, pt.lon) < 300 && d.status !== "repaired"; }).length;
     $("body").innerHTML = "<div class='card'><h3>" + esc(pt.name) + "</h3><div style='color:#5f6670'>" + esc(full || "") + "</div>" +
       "<div class='row'><span class='chip " + (near ? "bad" : "ok") + "'>" + (near ? near + " reported road defects within 300 m" : "No reported road damage nearby") + "</span></div>" +
@@ -358,15 +360,15 @@ html,body{height:100%;margin:0;font:15px/1.4 "Segoe UI",Roboto,system-ui,sans-se
     for (var i = 0; i < g.length - 1; i++) {
       var mid = [(g[i][0] + g[i + 1][0]) / 2, (g[i][1] + g[i + 1][1]) / 2], worst = 0;
       for (var k = 0; k < r.defects.length; k++) { var h = r.defects[k]; if (dist(mid[0], mid[1], h.lat, h.lon) < 28) worst = Math.max(worst, h.risk >= 70 ? 2 : 1); }
-      feats.push({ type: "Feature", geometry: { type: "LineString", coordinates: [[g[i][1], g[i][0]], [g[i + 1][1], g[i + 1][0]]] }, properties: { c: worst === 2 ? "#d92d20" : worst === 1 ? "#f0a30a" : "#1a73e8" } });
+      feats.push({ type: "Feature", geometry: { type: "LineString", coordinates: [[g[i][1], g[i][0]], [g[i + 1][1], g[i + 1][0]]] }, properties: { c: worst === 2 ? "#C9573F" : worst === 1 ? "#E0A94E" : "#3F7A60" } });
     }
     map.getSource("route").setData({ type: "FeatureCollection", features: feats });
     r.defects.forEach(function (h) {
-      var el = document.createElement("div"); el.className = "pin"; el.style.background = h.risk >= 70 ? "#d92d20" : "#f0a30a";
+      var el = document.createElement("div"); el.className = "pin"; el.style.background = h.risk >= 70 ? "#C9573F" : "#E0A94E";
       markers.push(new maplibregl.Marker({ element: el }).setLngLat([h.lon, h.lat]).setPopup(new maplibregl.Popup({ offset: 18 }).setHTML("<b>" + esc(NAMES[h["class"]] || "Road damage") + " " + esc(h.number) + "</b><br>Risk " + Math.round(h.risk))).addTo(map));
     });
-    markers.push(new maplibregl.Marker({ color: "#1a73e8" }).setLngLat([res.origin.lon, res.origin.lat]).addTo(map));
-    markers.push(new maplibregl.Marker({ color: "#d92d20" }).setLngLat([res.destination.lon, res.destination.lat]).addTo(map));
+    markers.push(new maplibregl.Marker({ color: "#3F7A60" }).setLngLat([res.origin.lon, res.origin.lat]).addTo(map));
+    markers.push(new maplibregl.Marker({ color: "#C9573F" }).setLngLat([res.destination.lon, res.destination.lat]).addTo(map));
     if (fit) {
       var b = new maplibregl.LngLatBounds();
       g.forEach(function (p) { b.extend([p[1], p[0]]); });
