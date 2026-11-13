@@ -40,7 +40,7 @@ Future<void> _showRunning(int found) async {
   try {
     await _notifications.show(
       id: 7,
-      title: 'RoadWatch Drive Mode is recording',
+      title: 'Disha AI Drive Mode is recording',
       body: found == 0 ? 'Scanning the road ahead.' : 'Potholes found this drive: $found',
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(

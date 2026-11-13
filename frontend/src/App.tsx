@@ -105,7 +105,7 @@ export default function App() {
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [menu])
-  const title = NAV_GROUPS.flatMap((g) => g.items).find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to)))?.label ?? 'RoadWatch'
+  const title = NAV_GROUPS.flatMap((g) => g.items).find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to)))?.label ?? 'Disha AI'
 
   return (
     <div className="shell">
@@ -125,7 +125,7 @@ export default function App() {
         <div className="brand">
           <img src="/logo.svg" alt="" />
           <div>
-            <b>RoadWatch</b>
+            <b>Disha AI</b>
             <small>Admin panel</small>
           </div>
         </div>

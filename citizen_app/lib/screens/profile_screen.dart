@@ -142,7 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _group('HELP', [
             Pressable(
               onTap: () => callAgent(context, prefs.helpline),
-              child: _row(CupertinoIcons.waveform, AppColors.indigo, 'Call RoadWatch agent', prettyPhone(prefs.helpline),
+              child: _row(CupertinoIcons.waveform, AppColors.indigo, 'Call Disha AI agent', prettyPhone(prefs.helpline),
                   chevron: true),
             ),
           ]),
@@ -151,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]),
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
-            child: Text('Point this to the RoadWatch backend. On a real phone use your computer\'s LAN IP.',
+            child: Text('Point this to the Disha AI backend. On a real phone use your computer\'s LAN IP.',
                 style: T.sub(context).copyWith(fontSize: 12.5)),
           ),
           const SizedBox(height: 24),
@@ -165,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Center(child: Text('RoadWatch Citizen 1.1', style: TextStyle(fontSize: 12, color: c.textTertiary))),
+          Center(child: Text('Disha AI Citizen 1.1', style: TextStyle(fontSize: 12, color: c.textTertiary))),
         ],
       ),
     );

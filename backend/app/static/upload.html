@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RoadWatch photo upload</title>
+<title>Disha AI photo upload</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -90,7 +90,7 @@
       </div>
       <label class="gallery">Choose from gallery<input type="file" accept="image/*,video/*" multiple data-src="gallery"></label>
       <div class="thumbs" id="thumbs"></div>
-      <button class="btn" id="send" type="button" disabled>Send to RoadWatch</button>
+      <button class="btn" id="send" type="button" disabled>Send to Disha AI</button>
       <div class="bar" id="bar"><i id="bar-fill"></i></div>
       <div class="status" id="status"></div>
     </div>
@@ -157,7 +157,7 @@
       box.appendChild(d);
     });
     $("send").disabled = files.length === 0;
-    $("send").textContent = files.length ? "Send " + files.length + " file" + (files.length > 1 ? "s" : "") + " to RoadWatch" : "Send to RoadWatch";
+    $("send").textContent = files.length ? "Send " + files.length + " file" + (files.length > 1 ? "s" : "") + " to Disha AI" : "Send to Disha AI";
   }
 
   Array.prototype.forEach.call(document.querySelectorAll("input[type=file]"), function (inp) {

@@ -1,7 +1,7 @@
-/* RoadWatch service worker: caches the app shell so it opens offline. API calls are never cached. */
-var CACHE = "rw-shell-v2";
+/* Disha AI service worker: caches the app shell so it opens offline. API calls are never cached. */
+var CACHE = "rw-shell-v3";
 var SHELL = [
-  "./", "index.html", "style.css", "theme.css", "app.js", "manifest.webmanifest",
+  "./", "index.html", "style.css", "theme.css", "road3d.js", "app.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png",
   "assets/photos/street.jpg", "assets/photos/goodshot.jpg",
   "assets/photos/pothole_sq.jpg", "assets/photos/crack_sq.jpg", "assets/photos/waterlogging_sq.jpg",

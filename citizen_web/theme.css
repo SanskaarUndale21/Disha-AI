@@ -1,4 +1,4 @@
-/* RoadWatch citizen website theme: calm, soft, nature inspired.
+/* Disha AI citizen website theme: calm, soft, nature inspired.
    Palette: Charcoal #3D405B, Sage #81B29A, Peach #F2CC8F, Ivory #F4F1DE. Loaded after style.css; delete the link to revert. */
 :root, :root:not([data-theme="light"]) {
   --charcoal: #3D405B; --sage: #81B29A; --peach: #F2CC8F; --ivory: #F4F1DE;
@@ -79,3 +79,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--sage); box-shado
 
 .avatar { background: linear-gradient(135deg, var(--sage), #6FA38A); color: var(--charcoal-deep); box-shadow: 0 10px 24px rgba(129, 178, 154, .4); }
 .success .seal { background: var(--sage); color: var(--charcoal-deep); box-shadow: 0 14px 30px rgba(129, 178, 154, .45); }
+
+/* 3D road background: canvas behind everything, a soft ivory veil keeps text calm and readable */
+html { background: #F4F1DE; }
+body { background: transparent; }
+#bg3d { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; image-rendering: auto; }
+.bg-veil { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(244, 241, 222, .55), rgba(244, 241, 222, .30) 55%, rgba(244, 241, 222, .12)); }
+.shell { z-index: 1; background: transparent; }
+.stage, main { background: transparent; }
+.view { background: rgba(244, 241, 222, .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+@media (min-width: 900px) { .view { border-radius: 26px; margin-top: 12px; min-height: calc(100% - 12px); box-shadow: 0 20px 60px rgba(61, 64, 91, .14); } }

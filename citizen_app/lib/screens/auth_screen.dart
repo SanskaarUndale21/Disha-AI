@@ -135,7 +135,7 @@ class _AuthScreenState extends State<AuthScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('RoadWatch', style: T.largeTitle(context)),
+                Text('Disha AI', style: T.largeTitle(context)),
                 const SizedBox(height: 6),
                 Text(
                   _signUp ? 'Create an account to track every report' : 'Sign in to track your reports anywhere',

@@ -29,7 +29,7 @@ from . import citizen
 from . import measure
 from . import zones, roadrecords, analysis_report
 
-app = FastAPI(title="RoadWatch AI", version="1.0.0")
+app = FastAPI(title="Disha AI AI", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

@@ -35,7 +35,7 @@ LEVELS = ("unverified", "corroborated", "photo_verified", "field_verified")
 RANK = {k: i for i, k in enumerate(LEVELS)}
 RADIUS_M = 150.0
 NOMINATIM = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "RoadWatch/1.0 (municipal road monitoring)"
+USER_AGENT = "Disha AI/1.0 (municipal road monitoring)"
 STATIC = Path(__file__).parent / "static"
 
 
@@ -589,7 +589,7 @@ def register(app):
             s.close()
         url = f"{_base(request)}/upload/{ticket}"
         return {"ticket": ticket, "upload_url": url,
-                "sms_text": f"RoadWatch ticket {ticket}: add a photo or video of the road problem here: {url}"}
+                "sms_text": f"Disha AI ticket {ticket}: add a photo or video of the road problem here: {url}"}
 
     @app.get("/upload/{ticket}", response_class=HTMLResponse)
     def upload_page(ticket: str):

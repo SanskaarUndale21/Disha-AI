@@ -48,7 +48,7 @@ DUP_SIM_THRESHOLD = float(os.getenv("RD_DUP_SIM", "0.75"))
 DUP_SIM_NO_GPS = float(os.getenv("RD_DUP_SIM_NO_GPS", "0.85"))
 REPAIR_RADIUS_M = float(os.getenv("RD_REPAIR_RADIUS_M", "8"))
 
-# citizen app: voice agent helpline (Sarvam RoadWatch agent)
+# citizen app: voice agent helpline (Sarvam Disha AI agent)
 HELPLINE_NUMBER = os.getenv("RD_HELPLINE", "+918064270577")
 
 # canonical class names (RDD2022 D00, D10, D20, D40)

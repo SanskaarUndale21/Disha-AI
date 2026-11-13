@@ -357,7 +357,7 @@ def evidence_pdf(ctx):
     maps = f"https://maps.google.com/?q={d.lat},{d.lon}" if d.lat is not None else "-"
     seen = [h for h in ctx["history"] if h.present]
     el = [_header(ctx, "Road Defect Evidence Record", ss), Spacer(1, 6),
-          Paragraph("This record documents when a road defect was first detected by RoadWatch, how often it was seen "
+          Paragraph("This record documents when a road defect was first detected by Disha AI, how often it was seen "
                     "or reported afterwards, and whether it was repaired. It is a timestamped log of automated "
                     "detections and citizen reports and is provided as supporting information only.", ss["Normal"]),
           Spacer(1, 8)]

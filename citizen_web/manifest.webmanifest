@@ -1,6 +1,6 @@
 {
-  "name": "RoadWatch",
-  "short_name": "RoadWatch",
+  "name": "Disha AI",
+  "short_name": "Disha AI",
   "description": "Report road damage, plan safer trips and follow repairs.",
   "id": "/",
   "start_url": "/#/home",

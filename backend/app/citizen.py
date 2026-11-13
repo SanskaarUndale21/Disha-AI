@@ -33,7 +33,7 @@ from . import auth, detector, events
 from .db import Base, Complaint, Defect, SessionLocal, engine, now
 from .geo import haversine_m
 
-UA = {"User-Agent": "RoadWatch/1.0 (municipal road monitoring)"}
+UA = {"User-Agent": "Disha AI/1.0 (municipal road monitoring)"}
 NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse"
 OVERPASS_URL = os.getenv("RD_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
 OVERPASS_TIMEOUT = float(os.getenv("RD_CITIZEN_OVERPASS_TIMEOUT", "15"))
@@ -433,7 +433,7 @@ def _compose(t, address_text, base):
         "Please arrange an inspection and repair, and share the expected repair date.",
         "",
         "Thank you.",
-        "Sent via RoadWatch",
+        "Sent via Disha AI",
     ]
     return subject, "\n".join(lines)
 

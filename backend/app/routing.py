@@ -26,7 +26,7 @@ from . import scoring
 from .db import Base, Defect, SessionLocal, engine, now
 
 OSRM_URL = os.getenv("RD_OSRM_URL", "https://router.project-osrm.org").rstrip("/")
-UA = "RoadWatch/1.0 (municipal road monitoring)"
+UA = "Disha AI/1.0 (municipal road monitoring)"
 CORRIDOR_M = float(os.getenv("RD_ROUTE_CORRIDOR_M", "15"))
 PENALTY_MIN_AT_FULL_RISK = float(os.getenv("RD_ROUTE_PENALTY_MIN", "4"))
 IGNORED = {"speed_breaker", "barricade"}

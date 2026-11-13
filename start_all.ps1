@@ -1,4 +1,4 @@
-# RoadWatch launcher: starts the API, the admin panel, the citizen portal and the feed panel, then keeps them alive.
+# Disha AI launcher: starts the API, the admin panel, the citizen portal and the feed panel, then keeps them alive.
 # Usage:  powershell -ExecutionPolicy Bypass -File start_all.ps1        (stop with stop_all.ps1)
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
@@ -25,7 +25,7 @@ $services = @(@("api",8000), @("admin",5173), @("citizen",5174), @("feed",5175))
 foreach ($s in $services) { Start-Svc $s[0] $s[1] }
 Start-Sleep 20
 Write-Host ""
-Write-Host "RoadWatch is running:"
+Write-Host "Disha AI is running:"
 Write-Host "  Admin panel     http://localhost:5173"
 Write-Host "  Citizen portal  http://localhost:5174"
 Write-Host "  Feed panel      http://localhost:5175"

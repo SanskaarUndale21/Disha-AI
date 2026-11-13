@@ -1,4 +1,4 @@
-"""Stress and robustness test for the RoadWatch backend. Run: python tests/stress.py [base_url]
+"""Stress and robustness test for the Disha AI backend. Run: python tests/stress.py [base_url]
 Phases: read load, websocket fan-out, complaint flood, fake-image screening, concurrent image and video analysis,
 person-down alarm over websocket, route planner burst, malformed-input fuzzing. Prints PASS/FAIL per phase."""
 import asyncio

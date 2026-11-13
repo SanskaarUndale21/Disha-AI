@@ -99,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(_greeting, style: T.sub(context).copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
               Row(children: [
-                Expanded(child: Text('RoadWatch', style: T.largeTitle(context))),
+                Expanded(child: Text('Disha AI', style: T.largeTitle(context))),
                 const NotificationBell(),
                 const SizedBox(width: 4),
                 const IconBadge(CupertinoIcons.location_north_fill, AppColors.blue, size: 38),
@@ -405,7 +405,7 @@ class CallCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Call RoadWatch agent', style: T.headline(context)),
+              Text('Call Disha AI agent', style: T.headline(context)),
               const SizedBox(height: 2),
               Text(subtitle ?? '${prettyPhone(number)}  ·  Hindi & English',
                   style: T.sub(context).copyWith(fontSize: 13)),

@@ -213,7 +213,7 @@ class Api {
     } on ApiException {
       rethrow;
     } catch (_) {
-      throw ApiException("Can't reach the RoadWatch server. Check your connection or the server address in Profile.");
+      throw ApiException("Can't reach the Disha AI server. Check your connection or the server address in Profile.");
     }
   }
 
@@ -355,7 +355,7 @@ class Api {
         } catch (_) {}
       }
       throw ApiException(
-          "Can't reach the RoadWatch server at ${prefs.server}. Put your phone on the same Wi-Fi as the computer "
+          "Can't reach the Disha AI server at ${prefs.server}. Put your phone on the same Wi-Fi as the computer "
           'running it, or set the address in Profile > Server.');
     }
   }
@@ -371,7 +371,7 @@ class Api {
     } on ApiException {
       rethrow;
     } catch (_) {
-      throw ApiException("Can't reach the RoadWatch server. Check your internet connection.");
+      throw ApiException("Can't reach the Disha AI server. Check your internet connection.");
     }
   }
 

@@ -130,7 +130,7 @@ class CitizenApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'RoadWatch',
+      title: 'Disha AI',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: messengerKey,
       theme: buildTheme(Brightness.light),

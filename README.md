@@ -1,4 +1,4 @@
-# RoadWatch AI: Road Damage and Pothole Detection (PS 02)
+# Disha AI AI: Road Damage and Pothole Detection (PS 02)
 
 Upload road photos or dashcam clips, detect potholes and cracks with YOLO, track each defect with a unique ID
 across video frames, merge repeat reports of the same defect, score risk, let an admin verify/correct results,
@@ -9,7 +9,7 @@ and monitor how each location changes over time.
 | Requirement | How it is done |
 |---|---|
 | **Real-time detection** | `Live detection` page: phone/webcam camera or a local video streamed over WebSocket (`/ws/live`). Per-session ByteTrack, class-coloured borders with corner brackets (thicker = more severe, glowing = high risk), ID tags like `PH#3`, unconfirmed tracks dashed. Live FPS / latency / unique counts; "Save session" pushes the unique defects into the registry (with dedup) |
-| **Voice helpline** | Sarvam voice agent "RoadWatch Pothole Helpline" (English + Hindi): greets the caller, asks if they want to report a pothole, confirms the complaint is noted. Agent id `RoadWatch-P-c22eb265-2f9b` |
+| **Voice helpline** | Sarvam voice agent "Disha AI Pothole Helpline" (English + Hindi): greets the caller, asks if they want to report a pothole, confirms the complaint is noted. Agent id `Disha AI-P-c22eb265-2f9b` |
 | Upload images / videos | Drag and drop or phone camera capture (`Analyze` page) |
 | Detect potholes and other damage | YOLOv8m fine-tuned on RDD2022 (+ Indian pothole data): longitudinal crack D00, transverse crack D10, alligator crack D20, pothole D40 |
 | Bounding boxes | Annotated image / H.264 video with class, confidence, severity and defect ID |
@@ -109,4 +109,4 @@ Ultralytics YOLO is AGPL-3.0.
 - Public pothole datasets on Kaggle and Roboflow Universe (Chitholian / Roboflow pothole set, road-anomaly, potholes-detection-yolov8 and others) used for fine-tuning.
 - PotholeNet (YOLO11m, Indian roads) as the starting checkpoint for the pothole specialist.
 - Product ideas for citizen drive mode, jurisdiction routing and the public map were inspired by
-  [coding-parrot/pothole-reporter](https://github.com/coding-parrot/pothole-reporter) (MIT). No code was copied; RoadWatch implements them in its own Flutter / FastAPI stack with its own detection models.
+  [coding-parrot/pothole-reporter](https://github.com/coding-parrot/pothole-reporter) (MIT). No code was copied; Disha AI implements them in its own Flutter / FastAPI stack with its own detection models.

@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="description" content="Report road damage, plan safer trips and follow repairs.">
-<title>RoadWatch</title>
+<title>Disha AI</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -18,6 +18,8 @@
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
+<canvas id="bg3d" aria-hidden="true"></canvas>
+<div class="bg-veil" aria-hidden="true"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
     <symbol id="i-house" viewBox="0 0 24 24"><path d="M12 2.8 2.6 10.6a1 1 0 0 0 .64 1.77H5V20a1.5 1.5 0 0 0 1.5 1.5H10v-6h4v6h3.5A1.5 1.5 0 0 0 19 20v-7.63h1.76a1 1 0 0 0 .64-1.77z" fill="currentColor"/></symbol>
@@ -89,7 +91,7 @@
 
 <div class="shell" id="shell">
   <nav class="tabbar" id="tabbar" aria-label="Main">
-    <div class="side-brand"><img src="icons/icon-192.png" alt="" width="36" height="36"><b>RoadWatch</b></div>
+    <div class="side-brand"><img src="icons/icon-192.png" alt="" width="36" height="36"><b>Disha AI</b></div>
     <a class="tab" href="#/home" data-tab="home"><svg class="ic" aria-hidden="true"><use href="#i-house"/></svg><span>Home</span></a>
     <a class="tab" href="#/reports" data-tab="reports"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg><span>My Reports</span></a>
     <a class="tab tab-report" href="#/report" data-tab="report" aria-label="New report"><span class="fab"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span>Report</span></a>
@@ -109,10 +111,10 @@
       <div id="map-err" class="map-err" hidden>
         <svg class="ic" aria-hidden="true"><use href="#i-wifi-off"/></svg>
         <b>The map could not load</b>
-        <span id="map-err-t">Check that the RoadWatch server is running and reachable.</span>
+        <span id="map-err-t">Check that the Disha AI server is running and reachable.</span>
         <button type="button" class="btn primary" id="map-retry">Try again</button>
       </div>
-      <iframe id="mapframe" title="RoadWatch map with directions and damage zones" allow="geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <iframe id="mapframe" title="Disha AI map with directions and damage zones" allow="geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe>
     </section>
   </div>
 </div>
@@ -120,7 +122,8 @@
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 <div id="sheet-root"></div>
 
-<noscript><p style="padding:24px;font-family:sans-serif">RoadWatch needs JavaScript. Please turn it on, or call the helpline at 080 6427 0577.</p></noscript>
+<noscript><p style="padding:24px;font-family:sans-serif">Disha AI needs JavaScript. Please turn it on, or call the helpline at 080 6427 0577.</p></noscript>
+<script src="road3d.js" defer></script>
 <script src="app.js"></script>
 </body>
 </html>

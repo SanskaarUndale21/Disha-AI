@@ -1,4 +1,4 @@
-"""Generate a plain-language PDF that walks through how RoadWatch scores one real photo, step by step.
+"""Generate a plain-language PDF that walks through how Disha AI scores one real photo, step by step.
 
 usage: python ml/explain_confidence.py [--image path] [--out docs/how_confidence_works.pdf]
 Uses the live models and the same code as the app, so every number in the PDF is real.
@@ -146,16 +146,16 @@ def main():
 
     pct = lambda v: "not found" if v is None else f"{v * 100:.0f}%"
     E = []
-    E += [Paragraph("How RoadWatch decides how sure it is", H1),
+    E += [Paragraph("How Disha AI decides how sure it is", H1),
           Paragraph("A step-by-step walk through one real photo, in plain words. Every number in this document was "
-                    "produced by the actual RoadWatch models on this photo.", B),
+                    "produced by the actual Disha AI models on this photo.", B),
           Paragraph(f"The photo: <b>{Path(a.image).name}</b> ({w} x {h} pixels). It comes from our test set, which the "
                     "model never saw while it was learning, so the results are a fair test.", B),
           pic("1_original.jpg", 12 * cm, "Step 0: the photo exactly as a citizen or officer would upload it."),
           Paragraph("The short version", H2),
           Paragraph("Think of it like asking four experienced road inspectors to look at the same photo. Each one points "
                     "at what they think is a pothole and says how sure they are, from 0% (no idea) to 100% (certain). "
-                    "RoadWatch keeps only the points where they agree, and the final confidence is the average of how "
+                    "Disha AI keeps only the points where they agree, and the final confidence is the average of how "
                     "sure they were. Then it measures how bad the hole is and how dangerous it is.", BOX),
           PageBreak()]
 
@@ -184,7 +184,7 @@ def main():
           PageBreak()]
 
     E += [Paragraph("Step 3. Ask for second opinions", H2),
-          Paragraph("One inspector can be fooled by a shadow or a patch of wet road. So RoadWatch asks three more times:", B),
+          Paragraph("One inspector can be fooled by a shadow or a patch of wet road. So Disha AI asks three more times:", B),
           Paragraph("&bull; <b>The same model, mirrored photo.</b> The photo is flipped left to right and checked again. A real "
                     "pothole still looks like a pothole when mirrored; a lucky guess often does not.<br/>"
                     "&bull; <b>A second, different model</b> (PotholeNet, trained separately on Indian streets), on the "
@@ -209,7 +209,7 @@ def main():
               Paragraph("Anything whose final confidence is under 25% is not reported. When a citizen submits a "
                         "complaint, the photo must reach at least 35% for a pothole, otherwise it is refused as "
                         "\"no road damage found\". That is how fake photos of plain road are stopped.", B)]
-    E += [PageBreak(), pic("4_final.jpg", 13 * cm, "Step 4 result: the potholes RoadWatch reports, with final confidence "
+    E += [PageBreak(), pic("4_final.jpg", 13 * cm, "Step 4 result: the potholes Disha AI reports, with final confidence "
                                                    "and severity.")]
 
     if r0:
@@ -243,13 +243,13 @@ def main():
     E += [Paragraph("What confidence is and is not", H2),
           Paragraph("&bull; It is a measure of how much the photo matches what the models learned, combined across four "
                     "looks.<br/>&bull; It is not an exact probability. To know how trustworthy it is, we test on photos the "
-                    "model never saw: at these settings RoadWatch is right about 80% of the time when it says pothole "
+                    "model never saw: at these settings Disha AI is right about 80% of the time when it says pothole "
                     "(precision) and finds about 65% to 72% of the real potholes in a photo (recall).<br/>"
                     "&bull; Every AI decision can be confirmed, corrected or rejected by an officer in Review detections, "
                     "and those corrections are saved to retrain the model.", B)]
 
     doc = SimpleDocTemplate(str(out), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=1.8 * cm,
-                            bottomMargin=1.8 * cm, title="How RoadWatch decides how sure it is")
+                            bottomMargin=1.8 * cm, title="How Disha AI decides how sure it is")
     doc.build(E)
     print("wrote", out)
 

@@ -32,7 +32,7 @@ from . import auth, config, events, reports, scoring
 from .db import Base, Defect, DefectHistory, Detection, Inspection, SessionLocal, engine, now
 from .geo import haversine_m
 
-UA = {"User-Agent": "RoadWatch/1.0 (municipal road monitoring)"}
+UA = {"User-Agent": "Disha AI/1.0 (municipal road monitoring)"}
 HTTP_TIMEOUT = float(os.getenv("RD_OPS_HTTP_TIMEOUT", "12"))
 OVERPASS_URL = os.getenv("RD_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
 OVERPASS_TIMEOUT = float(os.getenv("RD_OVERPASS_TIMEOUT", "45"))  # public Overpass is often slow

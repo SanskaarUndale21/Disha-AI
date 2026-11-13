@@ -77,7 +77,7 @@ def _footer(canvas, doc):
     canvas.line(36, 30, doc.pagesize[0] - 36, 30)
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(colors.HexColor("#4b5563"))
-    canvas.drawString(36, 19, "RoadWatch | AI-assisted road damage analysis | Detections may contain errors")
+    canvas.drawString(36, 19, "Disha AI | AI-assisted road damage analysis | Detections may contain errors")
     canvas.drawRightString(doc.pagesize[0] - 36, 19, f"Page {doc.page}")
     canvas.restoreState()
 

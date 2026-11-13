@@ -1,4 +1,4 @@
-/* RoadWatch citizen web app. Mirrors the Flutter citizen app screens, with PWA, notifications and an offline queue. */
+/* Disha AI citizen web app. Mirrors the Flutter citizen app screens, with PWA, notifications and an offline queue. */
 (function () {
   "use strict";
 
@@ -71,7 +71,7 @@
   /* ================= network ================= */
   function ApiError(msg, status, body) { this.message = msg; this.status = status; this.body = body; }
   ApiError.prototype = Object.create(Error.prototype);
-  function netMsg() { return "Can't reach the RoadWatch server at " + API + ". Check your internet, or set the right address under Profile."; }
+  function netMsg() { return "Can't reach the Disha AI server at " + API + ". Check your internet, or set the right address under Profile."; }
   function errText(j, status) {
     var d = j && (j.detail || j.message || j.error);
     if (Array.isArray(d)) d = d.map(function (x) { return x && x.msg ? x.msg : String(x); }).join(". ");
@@ -206,14 +206,14 @@
   /* ================= notification center ================= */
   var notifs = lsJson("rw-notifs", []);
   if (!Array.isArray(notifs)) notifs = [];
-  var KIND = { safety: { icon: "warn", color: "red", label: "Safety" }, repair: { icon: "seal", color: "green", label: "Repair" }, defect: { icon: "hex", color: "orange", label: "Road damage" }, report: { icon: "doc", color: "blue", label: "Citizen report" }, status: { icon: "paper", color: "indigo", label: "Your report" }, system: { icon: "info", color: "blue", label: "RoadWatch" } };
+  var KIND = { safety: { icon: "warn", color: "red", label: "Safety" }, repair: { icon: "seal", color: "green", label: "Repair" }, defect: { icon: "hex", color: "orange", label: "Road damage" }, report: { icon: "doc", color: "blue", label: "Citizen report" }, status: { icon: "paper", color: "indigo", label: "Your report" }, system: { icon: "info", color: "blue", label: "Disha AI" } };
   function saveNotifs() { notifs = notifs.slice(0, 100); lsSetJson("rw-notifs", notifs); }
   function unreadCount() { var n = 0; notifs.forEach(function (a) { if (!a.read) n++; }); return n; }
   function refreshBadge() {
     var n = unreadCount(), b = $("bell-badge");
     b.hidden = !n; b.textContent = n > 9 ? "9+" : n;
     $("bell").setAttribute("aria-label", n ? "Notifications, " + n + " unread" : "Notifications");
-    document.title = (n ? "(" + n + ") " : "") + "RoadWatch";
+    document.title = (n ? "(" + n + ") " : "") + "Disha AI";
     try { if (navigator.setAppBadge) { n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } } catch (e) {}
   }
   function addNotif(kind, title, text, data, key, opts) {
@@ -384,7 +384,7 @@
   /* ================= install prompt ================= */
   var installEvt = null;
   window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installEvt = e; if (current === "home" || current === "profile") renderRoute(true); });
-  window.addEventListener("appinstalled", function () { installEvt = null; toast("RoadWatch is installed on this device.", { icon: "check", color: "green" }); renderRoute(true); });
+  window.addEventListener("appinstalled", function () { installEvt = null; toast("Disha AI is installed on this device.", { icon: "check", color: "green" }); renderRoute(true); });
   function doInstall() { if (!installEvt) return; installEvt.prompt(); installEvt.userChoice.then(function () { installEvt = null; renderRoute(true); }); }
   function isStandalone() { return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
 
@@ -440,7 +440,7 @@
     var scroll = soft ? main.scrollTop : 0;
     var fn = { home: viewHome, reports: viewReports, report: viewReport, c: viewDetail, alerts: viewAlerts, profile: viewProfile, drive: viewDrive }[name];
     var cl = fn(p, !!soft);
-    if (!soft) { cleanup = typeof cl === "function" ? cl : null; main.scrollTop = 0; main.focus({ preventScroll: true }); document.title = (unreadCount() ? "(" + unreadCount() + ") " : "") + "RoadWatch"; }
+    if (!soft) { cleanup = typeof cl === "function" ? cl : null; main.scrollTop = 0; main.focus({ preventScroll: true }); document.title = (unreadCount() ? "(" + unreadCount() + ") " : "") + "Disha AI"; }
     else if (typeof cl === "function") cleanup = cl;
     if (soft) main.scrollTop = scroll;
   }
@@ -490,12 +490,12 @@
     else if (!items.length) recent = '<div class="card rtile"><img class="thumb" style="width:72px;height:72px" alt="" src="assets/photos/pothole_sq.jpg"><div class="body"><div class="headline">No reports yet</div><div class="sub">Your complaints and their repair status will show up here.</div></div></div>';
     else recent = '<div class="list">' + items.slice(0, 3).map(tileHtml).join("") + "</div>";
     view.innerHTML =
-      '<div class="hello">' + esc(greeting()) + '</div><div class="page-head"><h1 class="large-title grow">RoadWatch</h1></div>' +
+      '<div class="hello">' + esc(greeting()) + '</div><div class="page-head"><h1 class="large-title grow">Disha AI</h1></div>' +
       '<div style="height:20px"></div>' +
       '<a class="hero pressable" href="#/report"><img src="assets/photos/street.jpg" alt=""><span class="glass">' + icon("camera") + '</span><div class="hero-in"><h2>Spotted a bad road?</h2><p>Snap a photo or video. AI checks it and routes it to the repair crew.</p><span class="cta">' + icon("plus") + "Report an issue</span></div></a>" +
       (q.length ? '<div class="banner info" style="margin-top:14px">' + icon("wifi-off") + "<div><b>" + q.length + " report" + (q.length > 1 ? "s" : "") + " waiting to send</b>Saved on this device. We send it as soon as you are online.<div class=\"btnrow\"><button type=\"button\" class=\"btn\" id=\"q-send\">Send now</button></div></div></div>" : "") +
-      (installEvt && !isStandalone() ? '<button type="button" class="card sm pressable rowlink" id="install" style="margin-top:14px;display:flex">' + badgeIcon("install", "blue", 40) + '<div class="grow"><div class="headline" style="font-size:15.5px">Install RoadWatch</div><div class="sub">Add it to your home screen for quick reports.</div></div>' + icon("chev-r") + "</button>" : "") +
-      '<a class="card callcard pressable" style="margin-top:14px" href="tel:' + esc(helpline.replace(/\s/g, "")) + '" aria-label="Call the RoadWatch agent on ' + esc(prettyPhone(helpline)) + '"><span class="ring">' + badgeIcon("wave", "indigo", 48) + '<i class="dot"></i></span><div class="grow"><div class="headline">Call RoadWatch agent</div><div class="sub" style="font-size:13px">' + esc(prettyPhone(helpline)) + '  ·  Hindi &amp; English</div></div><span class="callbtn">' + icon("phone") + "</span></a>" +
+      (installEvt && !isStandalone() ? '<button type="button" class="card sm pressable rowlink" id="install" style="margin-top:14px;display:flex">' + badgeIcon("install", "blue", 40) + '<div class="grow"><div class="headline" style="font-size:15.5px">Install Disha AI</div><div class="sub">Add it to your home screen for quick reports.</div></div>' + icon("chev-r") + "</button>" : "") +
+      '<a class="card callcard pressable" style="margin-top:14px" href="tel:' + esc(helpline.replace(/\s/g, "")) + '" aria-label="Call the Disha AI agent on ' + esc(prettyPhone(helpline)) + '"><span class="ring">' + badgeIcon("wave", "indigo", 48) + '<i class="dot"></i></span><div class="grow"><div class="headline">Call Disha AI agent</div><div class="sub" style="font-size:13px">' + esc(prettyPhone(helpline)) + '  ·  Hindi &amp; English</div></div><span class="callbtn">' + icon("phone") + "</span></a>" +
       '<a class="card tripcard pressable" href="#/map?dir=1" id="trip">' + badgeIcon("route", "blue", 48) + '<div class="grow"><div class="headline">Plan a safe trip</div><div class="sub" style="font-size:13px">Routes that steer clear of potholes and damaged roads.</div></div>' + icon("chev-r") + "</a>" +
       sectionHead("More ways to help") +
       '<div class="tools"><a class="card tool pressable" href="#/drive">' + badgeIcon("film", "orange", 36) + '<div class="headline">Dashcam</div><div class="sub">Scan a video or photo</div></a>' +
@@ -751,7 +751,7 @@
         ai + ev + sectionHead("Location") +
         '<div class="card flush">' + (c.lat != null ? '<div class="locmap" style="height:160px"><iframe title="Where this was reported" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=' + [c.lon - 0.003, c.lat - 0.002, c.lon + 0.003, c.lat + 0.002].join("%2C") + "&layer=mapnik&marker=" + c.lat + "%2C" + c.lon + '"></iframe></div>' : "") + '<div style="padding:16px">' + (c.description ? '<div style="font-size:16px;margin-bottom:6px">' + esc(c.description) + "</div>" : "") + '<div class="info-row">' + icon("pin") + "<span>" + esc(c.address || (c.lat != null ? c.lat.toFixed(5) + ", " + c.lon.toFixed(5) : "No location")) + '</span></div><div class="info-row">' + icon("check") + "<span>Updated " + esc(timeAgo(c.updated_at || c.created_at)) + "</span></div></div></div>" +
         '<button type="button" class="card pressable rowlink" id="d-mail" style="margin-top:16px;display:flex">' + badgeIcon("mail", "blue", 48) + '<div class="grow"><div class="headline">Email complaint</div><div class="sub" style="font-size:13px">Send it to the office responsible for this road</div></div>' + icon("chev-r") + "</button>" +
-        '<a class="card callcard pressable" style="margin-top:12px" href="tel:' + esc(helpline.replace(/\s/g, "")) + '"><span class="ring">' + badgeIcon("wave", "indigo", 48) + '<i class="dot"></i></span><div class="grow"><div class="headline">Call RoadWatch agent</div><div class="sub" style="font-size:13px">Questions? Quote ' + esc(c.ticket) + '</div></div><span class="callbtn">' + icon("phone") + "</span></a>";
+        '<a class="card callcard pressable" style="margin-top:12px" href="tel:' + esc(helpline.replace(/\s/g, "")) + '"><span class="ring">' + badgeIcon("wave", "indigo", 48) + '<i class="dot"></i></span><div class="grow"><div class="headline">Call Disha AI agent</div><div class="sub" style="font-size:13px">Questions? Quote ' + esc(c.ticket) + '</div></div><span class="callbtn">' + icon("phone") + "</span></a>";
       var ai2 = $("d-ai"); if (ai2) ai2.onclick = function () { showAi = !showAi; paint(); };
       Array.prototype.forEach.call(view.querySelectorAll("[data-ev]"), function (b) { b.onclick = function () { lightbox(c.media[+b.dataset.ev]); }; });
       $("d-mail").onclick = function () { emailComplaint(c, this); };
@@ -815,7 +815,7 @@
       fetch(API + "/map", { mode: "no-cors", cache: "no-store" }).then(function () {
         if (!mapLoaded || frame.getAttribute("data-api") !== API) { frame.src = API + "/map" + hash; frame.setAttribute("data-api", API); mapLoaded = true; }
         else if (hash && frame.contentWindow) { try { frame.contentWindow.location.replace(API + "/map" + hash); } catch (e) { frame.src = API + "/map" + hash; } }
-      }, function () { mapLoaded = false; $("map-err-t").textContent = "The RoadWatch server at " + API + " is not answering. Check that it is running, or fix the address under Profile."; err.hidden = false; });
+      }, function () { mapLoaded = false; $("map-err-t").textContent = "The Disha AI server at " + API + " is not answering. Check that it is running, or fix the address under Profile."; err.hidden = false; });
     }
     $("map-retry").onclick = load; $("coach-x").onclick = function () { coachDismissed = true; $("map-coach").hidden = true; };
     load();
@@ -825,7 +825,7 @@
   function viewAlerts() {
     var perm = notifPerm(), items = notifs;
     var notice = "";
-    if (perm === "default" && notifSupported() && window.isSecureContext) notice = '<div class="banner info" style="margin-bottom:12px">' + icon("bell") + '<div><b>Get alerts even when RoadWatch is closed</b>Allow notifications to hear about repairs and safety alerts.<div class="btnrow"><button type="button" class="btn primary" id="al-perm">Turn on notifications</button></div></div></div>';
+    if (perm === "default" && notifSupported() && window.isSecureContext) notice = '<div class="banner info" style="margin-bottom:12px">' + icon("bell") + '<div><b>Get alerts even when Disha AI is closed</b>Allow notifications to hear about repairs and safety alerts.<div class="btnrow"><button type="button" class="btn primary" id="al-perm">Turn on notifications</button></div></div></div>';
     else if (perm === "denied") notice = '<div class="banner" style="margin-bottom:12px">' + icon("warn") + "<div><b>Notifications are blocked</b>Allow them from the lock icon in the address bar to get alerts in the background.</div></div>";
     view.innerHTML = '<div class="page-head"><h1 class="large-title grow">Alerts</h1></div><div style="height:10px"></div><div class="btnrow" style="align-items:center;margin-bottom:14px"><span id="live-pill" class="pill ' + (wsOk ? "st-resolved" : "st-in_progress") + '">' + icon("target") + "<span>" + (wsOk ? "Live" : "Reconnecting") + '</span></span><span style="flex:1"></span>' + (items.length ? '<button type="button" class="btn" id="al-read"' + (unreadCount() ? "" : " disabled") + '>Mark all read</button><button type="button" class="btn danger" id="al-clear">Clear</button>' : "") + "</div>" + notice +
       (items.length ? '<div class="list" aria-live="polite">' + items.map(function (a, i) {
@@ -859,11 +859,11 @@
       row("speaker", "orange", '<label for="p-sound">Emergency siren sound</label>', '<span class="switch"><input id="p-sound" type="checkbox" role="switch"' + (soundOn ? " checked" : "") + '><i></i></span>') +
       '<div class="grow-row"><button type="button" class="btn danger" id="p-test" style="width:100%">Send a test emergency alert</button></div></div>' +
       '<p class="sub" style="padding:8px 6px 0;font-size:12.5px" id="p-nnote">' + esc(permNote) + " Browsers allow the siren only after you tap once on this page." + "</p>" +
-      (installEvt && !isStandalone() ? '<div class="caption group-t">APP</div><div class="card group"><button type="button" class="grow-row" id="p-install" style="width:100%;border:0;background:none;text-align:left">' + badgeIcon("install", "blue", 30) + '<div class="lbl">Install RoadWatch on this device</div>' + icon("chev-r") + "</button></div>" : "") +
+      (installEvt && !isStandalone() ? '<div class="caption group-t">APP</div><div class="card group"><button type="button" class="grow-row" id="p-install" style="width:100%;border:0;background:none;text-align:left">' + badgeIcon("install", "blue", 30) + '<div class="lbl">Install Disha AI on this device</div>' + icon("chev-r") + "</button></div>" : "") +
       (q.length ? '<div class="caption group-t">WAITING TO SEND</div><div class="card group">' + row("wifi-off", "orange", q.length + " saved report" + (q.length > 1 ? "s" : ""), '<button type="button" class="btn" id="p-flush">Send now</button>') + "</div>" : "") +
-      '<div class="caption group-t">HELP</div><div class="card group"><a class="grow-row" style="text-decoration:none;color:inherit" href="tel:' + esc(helpline.replace(/\s/g, "")) + '">' + badgeIcon("wave", "indigo", 30) + '<div class="lbl">Call RoadWatch agent</div><span class="val">' + esc(prettyPhone(helpline)) + "</span>" + icon("chev-r") + "</a></div>" +
-      '<div class="caption group-t">SERVER</div><div class="card group">' + row("route", "teal", '<input class="formin" id="p-api" aria-label="Server address" placeholder="http://192.168.x.x:8000" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(lsGet("rw-api", "")) + '">') + '</div><p class="sub" style="padding:8px 6px 0;font-size:12.5px">Leave empty to use ' + esc(location.protocol + "//" + location.hostname + ":8000") + ". Point this to the RoadWatch backend. On a phone use your computer's network address.</p>" +
-      '<div style="height:24px"></div><button type="button" class="btn primary big block" id="p-save">Save</button><p class="caption" style="text-align:center;margin-top:20px;font-weight:500">RoadWatch Citizen 1.1 (web)</p>';
+      '<div class="caption group-t">HELP</div><div class="card group"><a class="grow-row" style="text-decoration:none;color:inherit" href="tel:' + esc(helpline.replace(/\s/g, "")) + '">' + badgeIcon("wave", "indigo", 30) + '<div class="lbl">Call Disha AI agent</div><span class="val">' + esc(prettyPhone(helpline)) + "</span>" + icon("chev-r") + "</a></div>" +
+      '<div class="caption group-t">SERVER</div><div class="card group">' + row("route", "teal", '<input class="formin" id="p-api" aria-label="Server address" placeholder="http://192.168.x.x:8000" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(lsGet("rw-api", "")) + '">') + '</div><p class="sub" style="padding:8px 6px 0;font-size:12.5px">Leave empty to use ' + esc(location.protocol + "//" + location.hostname + ":8000") + ". Point this to the Disha AI backend. On a phone use your computer's network address.</p>" +
+      '<div style="height:24px"></div><button type="button" class="btn primary big block" id="p-save">Save</button><p class="caption" style="text-align:center;margin-top:20px;font-weight:500">Disha AI Citizen 1.1 (web)</p>';
     $("p-notif").onchange = function () {
       var el = this;
       if (el.checked) { askNotifPermission().then(function (r) { if (r !== "granted") { el.checked = false; lsSet("rw-notify", "0"); } }); }

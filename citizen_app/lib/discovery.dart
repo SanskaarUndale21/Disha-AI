@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Finds the RoadWatch backend when the saved address stops working
+/// Finds the Disha AI backend when the saved address stops working
 /// (laptop switched Wi-Fi, router gave it a new IP, wired vs wireless...).
 class ServerDiscovery {
   static const port = 8000;
@@ -16,7 +16,7 @@ class ServerDiscovery {
       .where((s) => s.isNotEmpty)
       .toList();
 
-  /// True when [base] answers like a RoadWatch backend.
+  /// True when [base] answers like a Disha AI backend.
   static Future<bool> ping(String base, {Duration timeout = const Duration(seconds: 3)}) async {
     try {
       final r = await http.get(Uri.parse('$base/api/citizen/config')).timeout(timeout);

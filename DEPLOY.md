@@ -1,4 +1,4 @@
-# RoadWatch: run and deploy
+# Disha AI: run and deploy
 
 ## One command
 ```
