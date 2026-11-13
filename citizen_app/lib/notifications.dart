@@ -59,6 +59,7 @@ class NotificationService extends ChangeNotifier {
 
   /// Set while an emergency banner should be visible in the app.
   final emergencyBanner = ValueNotifier<AppNotification?>(null);
+  double? emergencyLat, emergencyLon;
 
   /// False when the user (or the system) blocked notifications; the UI shows a hint.
   final permissionGranted = ValueNotifier<bool>(true);
@@ -193,6 +194,8 @@ class NotificationService extends ChangeNotifier {
         if (h != null && lat != null && lon != null) {
           msg += ' About ${_dist(distanceKm(h.$1, h.$2, lat, lon))} from you.';
         }
+        emergencyLat = lat;
+        emergencyLon = lon;
         emergencyBanner.value = add(NotifKind.emergency, 'Emergency: fall detected', msg, show: true);
       case 'map.repair':
         if (!nearbyOn) return;

@@ -102,8 +102,40 @@ export const authHeaders = (h: Record<string, string> = {}) => {
   return t ? { ...h, Authorization: `Bearer ${t}` } : h
 }
 
+/** Background polls that must not raise the page-level notice. */
+const QUIET = /\/alerts\/summary|\/voice\/queue\/count|status=submitted|\/api\/public\//
+
+export class ApiError extends Error {
+  status: number
+  rwApi = true
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
+function plain(status: number, msg: string) {
+  if (status === 401 || status === 403) return 'Sign in with an officer account to see this data.'
+  if (status === 404) return 'That item could not be found.'
+  if (status >= 500) return 'The server had a problem. Please try again in a moment.'
+  if (status === 0) return 'Cannot reach the server. Check your connection and try again.'
+  return msg || 'Something went wrong.'
+}
+
+function notify(url: string, status: number, msg: string) {
+  if (QUIET.test(url) || typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('rw-api-error', { detail: { status, message: plain(status, msg) } }))
+}
+
 async function req<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(url, { ...init, headers: authHeaders((init.headers as Record<string, string>) ?? {}) })
+  let r: Response
+  try {
+    r = await fetch(url, { ...init, headers: authHeaders((init.headers as Record<string, string>) ?? {}) })
+  } catch (e: any) {
+    if (e?.name === 'AbortError') throw e
+    notify(url, 0, '')
+    throw new ApiError(plain(0, ''), 0)
+  }
   if (!r.ok) {
     let msg = r.statusText
     try {
@@ -112,9 +144,15 @@ async function req<T>(url: string, init: RequestInit = {}): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+    const m = typeof msg === 'string' ? msg : JSON.stringify(msg)
+    notify(url, r.status, m)
+    throw new ApiError(r.status === 401 || r.status === 403 || r.status >= 500 ? plain(r.status, m) : m, r.status)
   }
-  return r.json()
+  try {
+    return await r.json()
+  } catch {
+    throw new ApiError('The server sent an unreadable answer.', r.status)
+  }
 }
 
 const json = (body: unknown, method = 'POST'): RequestInit => ({

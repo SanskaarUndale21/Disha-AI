@@ -55,6 +55,8 @@ dependencies:
   file_picker: ^13.3.3
   speech_to_text: ^7.4.0
   flutter_tts: ^4.2.5
+  webview_flutter: ^4.13.0
+  webview_flutter_android: ^4.10.0
 
 dev_dependencies:
   flutter_test:

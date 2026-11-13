@@ -17,6 +17,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from datetime import timedelta
 from math import cos, radians
 from pathlib import Path
 from typing import Any, Optional
@@ -346,7 +347,12 @@ def create_from_call(s, call: dict, base: str) -> dict:
         "id": c.id, "ticket": c.ticket, "category": c.category, "description": c.description, "lat": c.lat,
         "lon": c.lon, "address": c.address, "status": c.status, "source": "phone",
         "verification": m.verification, "urgency": m.urgency})
-    return _result(c, m, base)
+    res = _result(c, m, base)
+    res["sms"] = send_intake_sms(phone, c.ticket, res["upload_url"])
+    res["evidence_deadline"] = deadline_for(c, m).isoformat() + "Z"
+    m.evidence = list(m.evidence or []) + [f"intake SMS {'sent' if res['sms']['sent'] else 'not sent: ' + str(res['sms']['reason'])}"]
+    s.commit()
+    return res
 
 
 def _result(c, m, base):
@@ -370,6 +376,82 @@ def _needs_check(c, m):
     return m.verification in ("unverified", "corroborated") and c.status not in ("resolved", "rejected")
 
 
+# ---------- 6 hour evidence window ----------
+EVIDENCE_WINDOW_H = 6
+REMIND_AT_H = 5  # one reminder SMS an hour before the deadline
+
+
+def deadline_for(c: Complaint, m: Optional[ComplaintMeta]):
+    """Phone complaints must get a photo or video within 6 hours of the call, or they are cancelled."""
+    if m is None or m.source != "phone" or c.created_at is None:
+        return None
+    return c.created_at + timedelta(hours=EVIDENCE_WINDOW_H)
+
+
+def awaiting_evidence(c: Complaint, m: Optional[ComplaintMeta]) -> bool:
+    return bool(m and m.source == "phone" and c.status == "submitted" and not c.media)
+
+
+def sms_text_new(ticket: str, url: str) -> str:
+    return (f"Disha AI: your complaint {ticket} is filed. To verify the road damage, open this link and add a photo or "
+            f"video within {EVIDENCE_WINDOW_H} hours, otherwise the complaint is cancelled: {url}")
+
+
+def send_intake_sms(phone, ticket, url) -> dict:
+    from . import sms
+    if not phone:
+        return {"sent": False, "reason": "no phone number on the call"}
+    r = sms.send_sms(phone, sms_text_new(ticket, url))
+    return {"sent": bool(r.get("ok")), "reason": None if r.get("ok") else r.get("error")}
+
+
+def expire_overdue(now_=None) -> dict:
+    """Cancel phone complaints that got no photo or video within the window; remind one hour before. Idempotent."""
+    from . import sms
+    t = now_ or now()
+    out = {"cancelled": 0, "reminded": 0}
+    s = SessionLocal()
+    try:
+        rows = (s.query(Complaint, ComplaintMeta).join(ComplaintMeta, ComplaintMeta.complaint_id == Complaint.id)
+                .filter(ComplaintMeta.source == "phone", Complaint.status == "submitted").all())
+        for c, m in rows:
+            if c.media:
+                continue
+            age_h = (t - c.created_at).total_seconds() / 3600.0
+            ev = list(m.evidence or [])
+            if age_h >= EVIDENCE_WINDOW_H:
+                c.status = "cancelled"
+                c.admin_note = (c.admin_note or "") + f" Cancelled automatically: no photo or video was added within {EVIDENCE_WINDOW_H} hours."
+                c.updated_at = t
+                m.evidence = ev + ["cancelled: no evidence in 6 hours"]
+                s.commit()
+                events.publish("complaint.updated", {"id": c.id, "ticket": c.ticket, "status": c.status, "source": "phone"})
+                if c.citizen_phone:
+                    sms.send_sms(c.citizen_phone, f"Disha AI: complaint {c.ticket} was cancelled because no photo or video was added within "
+                                                  f"{EVIDENCE_WINDOW_H} hours. You can report the road again any time.")
+                out["cancelled"] += 1
+            elif age_h >= REMIND_AT_H and "reminder sent" not in ev and c.citizen_phone:
+                url = f"{os.getenv('RD_PUBLIC_URL', '').rstrip('/')}/upload/{c.ticket}"
+                sms.send_sms(c.citizen_phone, f"Disha AI: about 1 hour left to add a photo or video for complaint {c.ticket}, or it will be cancelled: {url}")
+                m.evidence = ev + ["reminder sent"]
+                s.commit()
+                out["reminded"] += 1
+    finally:
+        s.close()
+    return out
+
+
+def _expiry_loop():
+    while True:
+        try:
+            r = expire_overdue()
+            if r["cancelled"] or r["reminded"]:
+                print("[voice] evidence window:", r)
+        except Exception as e:
+            print("[voice] evidence window check failed:", repr(e))
+        time.sleep(300)
+
+
 # ---------- photo upload ----------
 MAX_UPLOAD_FILES = 5
 GPS_GOOD_M = 100.0
@@ -388,6 +470,9 @@ def handle_upload(ticket: str, files: list, lat, lon, accuracy) -> dict:
         c = s.query(Complaint).filter(Complaint.ticket == ticket).first()
         if c is None:
             raise HTTPException(404, "ticket not found")
+        if c.status == "cancelled":
+            raise HTTPException(410, "This report was cancelled because no photo or video was added within 6 hours. "
+                                     "Please call or report the road again.")
         meta = _meta_for(s, c, source="web")
         has_gps = lat is not None and lon is not None and -90 <= lat <= 90 and -180 <= lon <= 180
         if has_gps and (c.lat is None or (accuracy is not None and accuracy < GPS_GOOD_M)):
@@ -467,6 +552,7 @@ class ImportBody(BaseModel):
 
 def register(app):
     Base.metadata.create_all(engine, tables=[ComplaintMeta.__table__, GeocodeCache.__table__])
+    threading.Thread(target=_expiry_loop, daemon=True, name="evidence-window").start()
 
     @app.post("/api/voice/complaint")
     async def voice_complaint(request: Request):
@@ -589,7 +675,7 @@ def register(app):
             s.close()
         url = f"{_base(request)}/upload/{ticket}"
         return {"ticket": ticket, "upload_url": url,
-                "sms_text": f"Disha AI ticket {ticket}: add a photo or video of the road problem here: {url}"}
+                "sms_text": sms_text_new(ticket, url), "window_hours": EVIDENCE_WINDOW_H}
 
     @app.get("/upload/{ticket}", response_class=HTMLResponse)
     def upload_page(ticket: str):
@@ -597,6 +683,8 @@ def register(app):
         try:
             c = s.query(Complaint).filter(Complaint.ticket == ticket).first()
             m = s.get(ComplaintMeta, c.id) if c else None
+            dl = deadline_for(c, m) if c else None
+            state = "cancelled" if (c and c.status == "cancelled") else ("done" if (c and c.media) else "open")
             where = (m.location_text if m else None) or (c.address if c else None) or ""
             if m and m.landmark:
                 where = f"{where}, near {_clean_place(m.landmark)}" if where else f"Near {_clean_place(m.landmark)}"
@@ -605,5 +693,7 @@ def register(app):
         page = (STATIC / "upload.html").read_text(encoding="utf-8")
         page = (page.replace("{{TICKET}}", html.escape(ticket))
                 .replace("{{LOCATION}}", html.escape(where or "Location not recorded"))
-                .replace("{{FOUND}}", "1" if c else "0"))
+                .replace("{{FOUND}}", "1" if c else "0")
+                .replace("{{DEADLINE}}", (dl.isoformat() + "Z") if dl else "")
+                .replace("{{STATE}}", state))
         return HTMLResponse(page, status_code=200 if c else 404)

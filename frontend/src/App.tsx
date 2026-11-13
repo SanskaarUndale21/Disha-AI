@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import { ArrowSquareOut, BellRinging, ChatCircleText, DotsThreeOutline, MapPinArea, CaretLeft, CaretRight, MapTrifold, Moon, SignIn, SignOut, Sun, UsersThree, VideoCamera } from '@phosphor-icons/react'
 import { api, ops, panelUrl, voice } from './api'
@@ -21,6 +21,7 @@ import Users from './pages/Users'
 import Repairs from './pages/Repairs'
 import Alerts from './pages/Alerts'
 import PhoneQueue from './pages/PhoneQueue'
+import { DepthFX } from './depth'
 
 function Officer({ children }: { children: ReactNode }) {
   const { isOfficer, ready } = useAuth()
@@ -46,6 +47,54 @@ function AdminGate({ children }: { children: ReactNode }) {
   if (!ready) return null
   if (!isOfficer) return <Navigate to="/login" replace />
   return <>{children}</>
+}
+
+/** A page that throws shows a plain message instead of a blank screen. */
+class Boundary extends Component<{ children: ReactNode; onRetry: () => void }, { bad: boolean }> {
+  state = { bad: false }
+  static getDerivedStateFromError() { return { bad: true } }
+  componentDidCatch(e: unknown) { console.warn('page error', e) }
+  render() {
+    if (!this.state.bad) return this.props.children
+    return (
+      <div className="card empty" role="alert">
+        <b>This page could not be shown.</b>
+        <span>Something unexpected happened while loading it. Your data is safe.</span>
+        <button className="btn sm" onClick={() => { this.setState({ bad: false }); this.props.onRetry() }}>Try again</button>
+      </div>
+    )
+  }
+}
+
+/** Plain-language notice when a request fails, with a retry that reloads the current page's data. */
+function ApiNotice({ onRetry }: { onRetry: () => void }) {
+  const [msg, setMsg] = useState('')
+  const loc = useLocation()
+  useEffect(() => {
+    let t: any
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail
+      setMsg(d?.message || 'Something went wrong.')
+      clearTimeout(t)
+      t = setTimeout(() => setMsg(''), 20000)
+    }
+    window.addEventListener('rw-api-error', on)
+    return () => {
+      window.removeEventListener('rw-api-error', on)
+      clearTimeout(t)
+    }
+  }, [])
+  useEffect(() => setMsg(''), [loc.pathname])
+  if (!msg) return null
+  return (
+    <div className="api-notice" role="alert">
+      <span>{msg}</span>
+      <span className="spacer" />
+      {msg.startsWith('Sign in') && <Link className="btn sm" to="/login">Sign in</Link>}
+      <button className="btn sm" onClick={() => { setMsg(''); onRetry() }}>Retry</button>
+      <button className="icon-btn sm" onClick={() => setMsg('')} aria-label="Dismiss">x</button>
+    </div>
+  )
 }
 
 const TABS: { to: string; icon: any; short: string; badge?: string }[] = [
@@ -125,6 +174,23 @@ export default function App() {
   useEffect(loadBadges, [isOfficer])
   useLiveRefresh(['complaint.', 'detection.', 'inspection.', 'alert.'], loadBadges)
   useTableLabels('#main')
+  const [reload, setReload] = useState(0)
+  const [tip, setTip] = useState<{ t: string; x: number; y: number } | null>(null)
+  const showTip = (t: string) => (e: { currentTarget: HTMLElement }) => {
+    if (!rail && window.innerWidth > 1180) return
+    const r = e.currentTarget.getBoundingClientRect()
+    setTip({ t, x: r.right + 12, y: r.top + r.height / 2 })
+  }
+  const hideTip = () => setTip(null)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const bg = document.querySelector<HTMLElement>('.drawer-bg')
+      if (bg) bg.click()
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [])
   const initials = (profile?.full_name || profile?.email || '?').split(/[\s@.]/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
   const isMap = loc.pathname === '/map'
   const flush = isMap
@@ -147,6 +213,8 @@ export default function App() {
   return (
     <div className={`shell ${rail ? 'collapsed' : ''}`}>
       <a className="skip-link" href="#main">Skip to content</a>
+      <DepthFX />
+      {tip && <div className="rail-tip" role="tooltip" style={{ left: tip.x, top: tip.y }}>{tip.t}</div>}
       <aside className="rail" aria-label="Sidebar">
         <Link className="brandmark" to="/" aria-label="Disha AI home">
           <img src="/logo.svg" alt="" />
@@ -158,7 +226,7 @@ export default function App() {
               <h6 className="rl">{g.title}</h6>
               <nav aria-label={g.title}>
                 {g.items.filter((n) => !n.admin || isAdmin).map((n) => (
-                  <NavLink key={n.to} to={n.to} end={n.to === '/'} data-tip={n.label} aria-label={n.label}>
+                  <NavLink key={n.to} to={n.to} end={n.to === '/'} aria-label={n.label} onMouseEnter={showTip(n.label)} onFocus={showTip(n.label)} onMouseLeave={hideTip} onBlur={hideTip} onClick={hideTip}>
                     <n.icon size={20} weight="duotone" />
                     <span className="lbl rl">{n.label}</span>
                     {n.badge && badges[n.badge] ? <span className="nb">{badges[n.badge]}</span> : null}
@@ -261,9 +329,10 @@ export default function App() {
         </button>
       </nav>
       <main id="main" className={`main ${flush ? 'flush' : ''} ${isMap ? 'map-page' : ''}`}>
+        {!isMap && <ApiNotice onRetry={() => { setReload((n) => n + 1); loadBadges() }} />}
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="*" element={<AdminGate><AdminRoutes /></AdminGate>} />
+          <Route path="*" element={<AdminGate><Boundary key={loc.pathname + reload} onRetry={() => setReload((n) => n + 1)}><AdminRoutes /></Boundary></AdminGate>} />
         </Routes>
       </main>
       </div>

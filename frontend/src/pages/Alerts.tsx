@@ -110,12 +110,12 @@ export default function Alerts() {
       <div className="grid g4" style={{ marginBottom: 16 }}>
         <div className="card kpi al-kpi">
           <Tile icon={BellRinging} color="#a9abc0" size={34} />
-          <div><div className="l">Open</div><div className="v">{sum?.open ?? '-'}</div></div>
+          <div><div className="l">Open</div><div className="v">{sum?.open ?? (err ? 'n/a' : '··')}</div></div>
         </div>
         {levels.map(({ k, icon }) => (
           <div key={k} className="card kpi al-kpi">
             <Tile icon={icon} color={LEVEL_HEX[k]} size={34} />
-            <div><div className="l">{LEVEL_LABEL[k]}</div><div className="v" style={{ color: k === 'critical' ? 'var(--terra-t)' : k === 'warning' ? 'var(--peach-t)' : undefined }}>{sum?.[k] ?? '-'}</div></div>
+            <div><div className="l">{LEVEL_LABEL[k]}</div><div className="v" style={{ color: k === 'critical' ? 'var(--terra-t)' : k === 'warning' ? 'var(--peach-t)' : undefined }}>{sum?.[k] ?? (err ? 'n/a' : '··')}</div></div>
           </div>
         ))}
       </div>

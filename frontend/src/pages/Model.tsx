@@ -28,8 +28,8 @@ export default function Model() {
   const [m, setM] = useState<any>(null)
   const [health, setHealth] = useState<any>(null)
   useEffect(() => {
-    api.metrics().then(setM)
-    api.health().then(setHealth)
+    api.metrics().then(setM).catch(() => setM({ available: false }))
+    api.health().then(setHealth).catch(() => {})
   }, [])
   const models = health?.model?.models ?? []
 

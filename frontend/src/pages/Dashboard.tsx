@@ -7,6 +7,7 @@ import { api, label, pub, type Defect, type PublicSummary } from '../api'
 import { DefectDrawer, DefectMap } from '../components'
 import { useLiveRefresh, useRealtime, type RtEvent } from '../events'
 import { CLASS_HEX, RISK_HEX, Tile } from '../icons'
+import { Hero3D } from '../depth'
 
 const EVENT_UI: Record<string, { icon: any; color: string; title: (d: any) => string; sub: (d: any) => string }> = {
   'complaint.created': { icon: ChatCircleText, color: '#f2cc8f', title: (d) => `Complaint ${d.ticket ?? ''}`, sub: (d) => d.category ?? 'New report from a citizen' },
@@ -52,9 +53,13 @@ export default function Dashboard() {
   const [pubSum, setPubSum] = useState<PublicSummary | null>(null)
   const [today, setToday] = useState<number | null>(null)
   const { feed } = useRealtime()
+  const [statErr, setStatErr] = useState('')
+  const [defErr, setDefErr] = useState('')
+  const [busy, setBusy] = useState(true)
   const load = () => {
-    api.stats().then(setSt).catch(() => {})
-    api.defects().then(setDefects).catch(() => {})
+    setBusy(true)
+    api.stats().then((x) => { setSt(x); setStatErr('') }).catch((e) => setStatErr(e?.message || 'Could not load the numbers.')).finally(() => setBusy(false))
+    api.defects().then((x) => { setDefects(x); setDefErr('') }).catch((e) => setDefErr(e?.message || 'Could not load defects.'))
     pub.summary().then(setPubSum).catch(() => {})
     pub.complaints(100).then((rows) => {
       const d0 = new Date().toDateString()
@@ -71,7 +76,7 @@ export default function Dashboard() {
   const maxClass = Math.max(1, ...byClass.map(([, v]) => v))
   const events = feed.filter((e) => EVENT_UI[e.type]).slice(0, 12)
 
-  const num = (v: number | null | undefined) => (v == null ? '-' : v)
+  const num = (v: number | null | undefined) => (v == null ? (busy && !statErr ? <i className="skel num-skel" /> : '·') : v)
   const complaints = pubSum?.complaints_today ?? today
   return (
     <div className="dash">
@@ -84,8 +89,19 @@ export default function Dashboard() {
             <a className="btn icon" href="/api/reports/defects.csv" title="Export CSV" aria-label="Export CSV"><DownloadSimple size={17} weight="bold" /></a>
           </div>
         </div>
-        <h1 className="hero-title">Every road, <span className="hl">seen</span> <em>as it happens.</em></h1>
-        <p className="hero-sub">Every patrol, upload and complaint appears here the moment it lands.</p>
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <h1 className="hero-title">Every road, <span className="hl">seen</span> <em>as it happens.</em></h1>
+            <p className="hero-sub">Every patrol, upload and complaint appears here the moment it lands.</p>
+          </div>
+          <Hero3D open={st?.active ?? null} serious={st?.high_risk ?? null} repaired={st?.repaired ?? null} ready={!!st} />
+        </div>
+        {statErr && !st && (
+          <div className="err retry-note" role="alert">
+            <span>{statErr === 'Failed to fetch' ? 'Cannot reach the server.' : statErr} The live numbers are not available yet.</span>
+            <button className="btn sm" onClick={load}>Retry</button>
+          </div>
+        )}
         <div className="statstrip">
           <div className="bigstat"><span className="lbl">Open defects</span><span className="num">{num(st?.active)}</span><span className="sub">Unique, merged by location</span></div>
           <div className="bigstat warn"><span className="lbl">Serious</span><span className="num">{num(st?.high_risk)}</span><span className="sub">High risk, act first</span></div>
@@ -136,7 +152,10 @@ export default function Dashboard() {
           <div className="card">
             <div className="card-h"><h3>Needs attention</h3><span className="eyebrow">{active.length} open</span></div>
             <div className="scroll">
-              {attention.length === 0 && (
+              {defErr && attention.length === 0 && (
+                <div className="empty"><Warning size={30} weight="fill" color="#e07a5f" />{defErr}<button className="btn sm" onClick={load}>Retry</button></div>
+              )}
+              {!defErr && attention.length === 0 && (
                 <div className="empty"><CheckCircle size={30} weight="fill" color="#81b29a" />No open defects. Start a patrol or upload road media to begin.</div>
               )}
               {attention.map((d) => (

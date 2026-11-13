@@ -134,11 +134,27 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
   }
 
   const top = alarms[0]
+  const alarmRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const root = document.documentElement
+    const el = alarmRef.current
+    if (!top || !el) {
+      root.style.setProperty('--alarm-h', '0px')
+      return
+    }
+    const set = () => root.style.setProperty('--alarm-h', `${el.offsetHeight}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.setProperty('--alarm-h', '0px')
+    }
+  }, [!!top])
   return (
     <Ctx.Provider value={{ enabled, enable, disable, test, testing }}>
-      {children}
       {top && (
-        <div className="fall-alarm" role="alertdialog" aria-live="assertive" aria-label="Fall emergency">
+        <div className="fall-alarm" ref={alarmRef} role="alertdialog" aria-live="assertive" aria-label="Fall emergency">
           <Siren size={38} weight="fill" className="fa-icon" />
           {top.snapshot_url && (
             <a href={top.snapshot_url} target="_blank" rel="noopener noreferrer"><img src={top.snapshot_url} alt="Snapshot of the fall" /></a>
@@ -160,6 +176,7 @@ export function AlarmProvider({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
+      {children}
     </Ctx.Provider>
   )
 }

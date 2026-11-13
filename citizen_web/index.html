@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#F4F1DE" id="meta-theme">
-<script>(function(){var t="light";try{t=localStorage.getItem("rw-theme")==="dark"?"dark":"light";}catch(e){}document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("meta-theme");if(m)m.setAttribute("content",t==="dark"?"#1F2133":"#F4F1DE");})();</script>
+<meta name="theme-color" content="#1F2133" id="meta-theme">
+<script>(function(){var t="dark";try{t=localStorage.getItem("rw-theme")==="light"?"light":"dark";}catch(e){}document.documentElement.setAttribute("data-theme",t);var m=document.getElementById("meta-theme");if(m)m.setAttribute("content",t==="dark"?"#1F2133":"#F4F1DE");})();</script>
 <meta name="description" content="Report road damage, plan safer trips and follow repairs.">
 <title>Disha AI</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -17,10 +17,11 @@
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="callroom.css">
+<link rel="stylesheet" href="glass.css">
 </head>
 <body>
 <canvas id="bg3d" aria-hidden="true"></canvas>
-<video id="bgvid" class="bg-video" autoplay muted loop playsinline preload="auto" poster="assets/video/road.jpg" aria-hidden="true" tabindex="-1"><source src="assets/video/road.mp4" type="video/mp4"></video>
+<video id="bgvid" class="bg-video" autoplay muted loop playsinline preload="auto" disablepictureinpicture disableremoteplayback poster="assets/video/road.jpg" aria-hidden="true" tabindex="-1"><source src="assets/video/road.mp4" type="video/mp4"></video>
 <div class="bg-veil" aria-hidden="true"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
@@ -145,6 +146,7 @@
 
 <noscript><p style="padding:24px;font-family:sans-serif">Disha AI needs JavaScript. Please turn it on, or call the helpline at 080 6427 0577.</p></noscript>
 <script src="config.js"></script>
+<script src="glass3d.js"></script>
 <script src="road3d.js" defer></script>
 <script src="callroom.js" defer></script>
 <script src="app.js"></script>

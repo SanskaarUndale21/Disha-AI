@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLiveRefresh } from '../events'
+import { Skeleton } from '../components'
 import { api, CLASSES, fmtDate, label, type Detection } from '../api'
 import { Pill, Risk } from '../components'
 
@@ -79,7 +80,9 @@ function Item({ d, onDone }: { d: Detection; onDone: () => void }) {
 export default function Verify() {
   const [status, setStatus] = useState('pending')
   const [rows, setRows] = useState<Detection[]>([])
-  const load = () => api.queue(status).then(setRows)
+  const [err, setErr] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const load = () => api.queue(status).then((r) => { setRows(Array.isArray(r) ? r : []); setErr('') }).catch((e) => setErr(e?.message || 'Could not load the queue.')).finally(() => setLoaded(true))
   useLiveRefresh(['inspection.', 'detection.', 'defect.'], () => load())
   useEffect(() => {
     load()
@@ -100,7 +103,9 @@ export default function Verify() {
       </div>
       <div className="grid">
         {rows.map((d) => <Item key={`${d.id}-${d.verification}`} d={d} onDone={load} />)}
-        {rows.length === 0 && <div className="card muted">Queue is empty.</div>}
+        {err && <div className="card empty" role="alert">{err}<button className="btn sm" onClick={load}>Retry</button></div>}
+        {loaded && !err && rows.length === 0 && <div className="card muted">Queue is empty.</div>}
+        {!loaded && <div className="card"><Skeleton rows={3} h={64} /></div>}
       </div>
     </>
   )

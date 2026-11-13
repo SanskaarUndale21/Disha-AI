@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react'
 import { useLiveRefresh } from '../events'
 import { api, fmtDate, type Inspection } from '../api'
 import { InspectionResult } from './Analyze'
+import { Skeleton } from '../components'
 
 export default function Inspections() {
   const [rows, setRows] = useState<Inspection[]>([])
   const [open, setOpen] = useState<Inspection | null>(null)
-  const load = () => api.inspections().then(setRows)
+  const [err, setErr] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const load = () => api.inspections().then((r) => { setRows(Array.isArray(r) ? r : []); setErr('') }).catch((e) => setErr(e?.message || 'Could not load inspections.')).finally(() => setLoaded(true))
   useLiveRefresh(['inspection.', 'live.'], () => load())
   useEffect(() => {
     load()
   }, [])
-  const show = async (id: number) => setOpen(await api.inspection(id))
+  const show = async (id: number) => { try { setOpen(await api.inspection(id)) } catch (e: any) { setErr(e?.message || 'Could not open this inspection.') } }
   const del = async (id: number) => {
-    await api.deleteInspection(id)
+    try { await api.deleteInspection(id) } catch (e: any) { setErr(e?.message || 'Could not delete.'); return }
     setOpen(null)
     load()
   }
@@ -44,7 +47,9 @@ export default function Inspections() {
                 <td><a className="btn sm" href={`/api/reports/inspection/${i.id}.pdf`} onClick={(e) => e.stopPropagation()}>PDF</a></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={11} className="muted">No inspections yet.</td></tr>}
+            {!loaded && <tr><td colSpan={11}><Skeleton rows={5} /></td></tr>}
+            {loaded && err && <tr><td colSpan={11}><div className="empty">{err}<button className="btn sm" onClick={load}>Retry</button></div></td></tr>}
+            {loaded && !err && rows.length === 0 && <tr><td colSpan={11} className="muted">No inspections yet.</td></tr>}
           </tbody>
         </table>
       </div>

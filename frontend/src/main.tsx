@@ -15,6 +15,10 @@ if (_base) {
     _fetch(typeof input === 'string' && input.startsWith('/api') ? _base + input : input, init)) as typeof fetch
 }
 
+window.addEventListener('unhandledrejection', (e) => {
+  if ((e.reason as any)?.rwApi) e.preventDefault()
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

@@ -637,7 +637,7 @@ def model_reload(_u=Depends(auth.require_admin)):
 
 # ---------- citizen complaints (mobile app) ----------
 COMPLAINT_CATEGORIES = ("pothole", "crack", "waterlogging", "broken_road", "other")
-COMPLAINT_STATUSES = ("submitted", "in_review", "in_progress", "resolved", "rejected")
+COMPLAINT_STATUSES = ("submitted", "in_review", "in_progress", "resolved", "rejected", "cancelled")
 MAX_COMPLAINT_FILES = 8
 
 
@@ -845,6 +845,8 @@ from . import call as _call  # noqa: E402
 _call.register(app)
 from . import sms as _sms  # noqa: E402
 _sms.register(app)
+from . import nav as _nav  # noqa: E402
+_nav.register(app)
 
 # serve built frontend if present
 _dist = config.ROOT / "frontend" / "dist"

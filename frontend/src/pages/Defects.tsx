@@ -9,10 +9,11 @@ export default function Defects() {
   const [sel, setSel] = useState<number | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [hi, setHi] = useState(false)
+  const [err, setErr] = useState('')
   const [view, setView] = useState<'table' | 'map'>('table')
   const load = () => {
     const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as any).toString()
-    api.defects(q ? `?${q}` : '').then(setRows).finally(() => setLoaded(true))
+    api.defects(q ? `?${q}` : '').then((r) => { setRows(Array.isArray(r) ? r : []); setErr('') }).catch((e) => setErr(e?.message || 'Could not load defects.')).finally(() => setLoaded(true))
   }
   useLiveRefresh(['defect.', 'detection.'], () => load())
   useEffect(load, [f])
@@ -65,11 +66,12 @@ export default function Defects() {
                   <td className="mono">{d.report_count}</td>
                   <td className="mono note">{d.lat != null ? `${d.lat.toFixed(5)}, ${d.lon!.toFixed(5)}` : 'unknown'}</td>
                   <td>{fmtDay(d.last_seen)}</td>
-                  <td>{d.verified ? 'yes' : '-'}</td>
+                  <td>{d.verified ? 'yes' : 'no'}</td>
                 </tr>
               ))}
               {!loaded && <tr><td colSpan={12}><Skeleton rows={6} /></td></tr>}
-              {loaded && shown.length === 0 && <tr><td colSpan={12} className="muted">No defects match.</td></tr>}
+              {loaded && err && <tr><td colSpan={12}><div className="empty">{err}<button className="btn sm" onClick={load}>Retry</button></div></td></tr>}
+              {loaded && !err && shown.length === 0 && <tr><td colSpan={12} className="muted">No defects match these filters.</td></tr>}
             </tbody>
           </table>
         </div>

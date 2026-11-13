@@ -50,8 +50,8 @@ export function ScreeningPanel() {
   const [filter, setFilter] = useState<'' | 'pass' | 'fail' | 'rate_limited'>('')
   const [err, setErr] = useState('')
   const load = () => {
-    fetch('/api/screening/stats').then((r) => r.json()).then(setStats).catch(() => setErr('Screening data is not available.'))
-    fetch(`/api/screening/checks?limit=24${filter ? `&verdict=${filter}` : ''}`, { headers: authHeaders() }).then((r) => r.json()).then(setRows).catch(() => {})
+    fetch('/api/screening/stats', { headers: authHeaders() }).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() }).then((x) => { setStats(x); setErr('') }).catch(() => setErr('Screening data is not available. Sign in as an officer to see it.'))
+    fetch(`/api/screening/checks?limit=24${filter ? `&verdict=${filter}` : ''}`, { headers: authHeaders() }).then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() }).then((x) => setRows(Array.isArray(x) ? x : [])).catch(() => setRows([]))
   }
   useEffect(load, [filter])
   useLiveRefresh(['screening.'], load)
@@ -120,8 +120,8 @@ export function ScreeningPanel() {
       {stats && stats.flagged_devices.length > 0 && (
         <div className="scr-flags">
           <b>Devices sending photos without damage</b>
-          {stats.flagged_devices.map((d) => (
-            <span key={d.device} className="pill High">
+          {stats.flagged_devices.map((d, i) => (
+            <span key={`${d.device}-${i}`} className="pill High">
               {d.device}: {d.fails} refused{d.blocked_attempts ? `, ${d.blocked_attempts} blocked` : ''}
             </span>
           ))}

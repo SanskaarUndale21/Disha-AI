@@ -425,6 +425,7 @@
     return { name: parts[0] || "home", parts: parts, q: q };
   }
   var routeState = null;
+  var enterT = 0;
   function renderRoute(soft) {
     var p = routeState || parseHash();
     var name = TABS.hasOwnProperty(p.name) ? p.name : "home";
@@ -440,6 +441,7 @@
     if (name === "map") { main.hidden = true; $("mapview").hidden = false; viewMap(p); refreshBadge(); return; }
     main.hidden = false; $("mapview").hidden = true;
     var scroll = soft ? main.scrollTop : 0;
+    if (!soft) { view.classList.remove("enter"); void view.offsetWidth; view.classList.add("enter"); clearTimeout(enterT); enterT = setTimeout(function () { view.classList.remove("enter"); }, 500); }
     var fn = { home: viewHome, reports: viewReports, report: viewReport, c: viewDetail, alerts: viewAlerts, profile: viewProfile, drive: viewDrive }[name];
     var cl = fn(p, !!soft);
     if (!soft) { cleanup = typeof cl === "function" ? cl : null; main.scrollTop = 0; main.focus({ preventScroll: true }); document.title = (unreadCount() ? "(" + unreadCount() + ") " : "") + "Disha AI"; }
@@ -485,6 +487,7 @@
   /* public numbers for the hero strip and the latest-reports feed (no personal data) */
   var pub = { stats: null, summary: null, feed: null, err: false };
   function loadPublic() {
+    pub.err = false;
     var a = api("/api/public/stats").then(function (s) { pub.stats = s; }, function () { pub.err = true; });
     var b = api("/api/public/summary").then(function (s) { pub.summary = s; }, function () { pub.err = true; });
     var c = api("/api/public/complaints?limit=8").then(function (l) { pub.feed = Array.isArray(l) ? l : []; }, function () { pub.err = true; if (pub.feed == null) pub.feed = []; });
@@ -494,7 +497,7 @@
   function statStrip() {
     var s = pub.stats, m = pub.summary;
     var spots = m ? m.open_defects : s ? s.open : null, fixed = s ? s.repaired : m ? m.complaints_resolved : null, recent = s ? s.citizens_reports_last_30d : null;
-    function cell(v, l, hint) { return '<div class="stat-c"><b class="bignum">' + (v == null ? "--" : num(v)) + '</b><span class="mono">' + l + "</span><small>" + hint + "</small></div>"; }
+    function cell(v, l, hint) { var big = v != null ? '<b class="bignum">' + num(v) + "</b>" : pub.err ? '<b class="bignum">N/A</b>' : '<b class="bignum sk" role="status" aria-label="Loading"></b>'; return '<div class="stat-c">' + big + '<span class="mono">' + l + "</span><small>" + (v == null && pub.err ? "Could not reach the server" : hint) + "</small></div>"; }
     return cell(spots, "KNOWN DAMAGE SPOTS", "On the city map right now") + cell(fixed, "FIXED SPOTS", "Marked repaired by crews") + cell(recent, "REPORTS, LAST 30 DAYS", "Sent in by citizens like you");
   }
   function miniMap() {
@@ -523,6 +526,7 @@
   function feedHtml() {
     var f = pub.feed;
     if (f == null) return skel(56) + skel(56, "margin-top:8px") + skel(56, "margin-top:8px");
+    if (!f.length && pub.err) return '<div class="feed-empty"><b>Could not load reports</b><span>We could not reach the Disha AI server. Check your internet connection and try again in a moment.</span></div>';
     if (!f.length) return '<div class="feed-empty"><b>Nothing reported yet</b><span>Be the first to flag a bad stretch of road.</span></div>';
     return '<ul class="feed">' + f.slice(0, 6).map(function (c) {
       var cat = catOf(c.category);
@@ -1072,7 +1076,7 @@
     var b = $("theme-btn"); if (b) { b.setAttribute("aria-label", t === "dark" ? "Switch to light mode" : "Switch to dark mode"); b.setAttribute("aria-pressed", t === "dark" ? "true" : "false"); }
     if (save) lsSet("rw-theme", t);
   }
-  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light", false);
+  applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark", false);
   $("theme-btn").onclick = function () { applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark", true); };
   renderRoute();
   syncConfig();

@@ -9,11 +9,12 @@ export default function Progress() {
   const [radius, setRadius] = useState(50)
   const [res, setRes] = useState<any>(null)
   const [sel, setSel] = useState<number | null>(null)
+  const [err, setErr] = useState('')
   useEffect(() => {
-    api.defects().then(setAll)
+    api.defects().then((r) => { setAll(Array.isArray(r) ? r : []); setErr('') }).catch((e) => setErr(e?.message || 'Could not load defects.'))
   }, [])
   useEffect(() => {
-    if (pt) api.progress(pt[0], pt[1], radius).then(setRes)
+    if (pt) api.progress(pt[0], pt[1], radius).then(setRes).catch((e) => setErr(e?.message || 'Could not compare this spot.'))
   }, [pt, radius])
   const changed = all.filter((d) => ['worsening', 'improving', 'repaired', 'stable'].includes(d.trend))
   return (
@@ -24,6 +25,7 @@ export default function Progress() {
           <p>See whether a stretch of road is getting worse, improving or has been fixed, by comparing inspections over time.</p>
         </div>
       </div>
+      {err && <div className="err" role="alert" style={{ marginBottom: 14 }}>{err}</div>}
       <div className="grid g-wide">
         <div className="card">
           <div className="row" style={{ marginBottom: 8 }}>
