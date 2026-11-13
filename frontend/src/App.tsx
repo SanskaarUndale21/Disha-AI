@@ -21,6 +21,7 @@ import Users from './pages/Users'
 import Repairs from './pages/Repairs'
 import Alerts from './pages/Alerts'
 import PhoneQueue from './pages/PhoneQueue'
+import Insights from './pages/Insights'
 import { DepthFX } from './depth'
 
 function Officer({ children }: { children: ReactNode }) {
@@ -350,6 +351,7 @@ function AdminRoutes() {
           <Route path="/live" element={<Live />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/repairs" element={<Repairs />} />
+          <Route path="/insights" element={<Insights />} />
           <Route path="/complaints" element={<Officer><Complaints /></Officer>} />
           <Route path="/phone" element={<Officer><PhoneQueue /></Officer>} />
           <Route path="/analyze" element={<Analyze />} />

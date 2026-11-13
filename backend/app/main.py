@@ -847,6 +847,8 @@ from . import sms as _sms  # noqa: E402
 _sms.register(app)
 from . import nav as _nav  # noqa: E402
 _nav.register(app)
+from . import insights as _ins  # noqa: E402
+_ins.register(app)
 
 # serve built frontend if present
 _dist = config.ROOT / "frontend" / "dist"

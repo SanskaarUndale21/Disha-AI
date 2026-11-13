@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1F2133">
+<script>document.documentElement.setAttribute("data-theme","dark");</script>
+<title>Detection Studio - Disha AI</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="glass.css">
+<link rel="stylesheet" href="studio.css">
+<script src="config.js"></script>
+</head>
+<body class="studio">
+<video id="bgvid" class="bg-video" autoplay muted loop playsinline preload="auto" disablepictureinpicture disableremoteplayback poster="assets/video/road.jpg" aria-hidden="true" tabindex="-1"><source src="assets/video/road.mp4" type="video/mp4"></video>
+<div class="bg-veil" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="brand" href="index.html" aria-label="Disha AI home"><span class="dot"></span>Disha AI</a>
+  <nav aria-label="Studio sections">
+    <a href="#scan">Scan</a><a href="#dedupe">Unique</a><a href="#compare">Compare</a><a href="#ticket">Ticket</a><a href="#robust">Robustness</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="hero">
+  <p class="mono">DETECTION STUDIO</p>
+  <h1>Every pothole, <em>counted once.</em></h1>
+  <p class="lede">Drop a road video or photo. Watch the model scan it, merge duplicate sightings, and turn the result into a ticket the city can act on.</p>
+</section>
+
+<section id="scan" class="panel" aria-labelledby="h-scan">
+  <div class="sec-head"><span class="num mono">01</span><h2 id="h-scan">Upload and scan</h2></div>
+  <div class="scan-grid">
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop a road video or photo">
+      <input id="file" type="file" accept="video/*,image/*" hidden>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+      <strong>Drop a video or photo here</strong>
+      <span class="sub">or press to browse. MP4, MOV, JPG, PNG</span>
+      <button id="sample" class="btn ghost" type="button">Use sample clip</button>
+    </div>
+    <div class="stage-wrap">
+      <div id="preview" class="preview">
+        <div id="prevEmpty" class="empty mono">AWAITING MEDIA</div>
+        <video id="pvVid" muted loop playsinline hidden></video>
+        <img id="pvImg" alt="Uploaded media preview" hidden>
+        <div id="scanfx" class="scanfx" hidden aria-hidden="true">
+          <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+          <div class="sweep"></div>
+          <div class="hud"><span class="mono">RAW DETECTIONS</span><b id="rawCount">0</b></div>
+          <div class="bar"><span id="scanBar"></span></div>
+        </div>
+      </div>
+      <p id="status" class="status mono" role="status">IDLE</p>
+    </div>
+  </div>
+</section>
+
+<section id="dedupe" class="panel" aria-labelledby="h-dd" hidden>
+  <div class="sec-head"><span class="num mono">02</span><h2 id="h-dd">Raw sightings vs unique defects</h2></div>
+  <div class="funnel">
+    <div class="fn-col"><span class="mono">RAW SIGHTINGS</span><b id="fnRaw" class="big">0</b></div>
+    <div class="fn-mid" aria-hidden="true">
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M0 2 L100 14 L100 26 L0 38 Z" fill="currentColor" opacity=".18"/></svg>
+      <div class="fn-track"><div id="fnBar" class="fn-bar"></div></div>
+    </div>
+    <div class="fn-col"><span class="mono">UNIQUE DEFECTS</span><b id="fnUniq" class="big sage">0</b></div>
+  </div>
+  <p id="dupPct" class="dup serif"></p>
+  <div id="chips" class="chips" aria-label="Defects by class"></div>
+</section>
+
+<section id="compare" class="panel" aria-labelledby="h-cmp" hidden>
+  <div class="sec-head"><span class="num mono">03</span><h2 id="h-cmp">Before and after</h2>
+    <div class="seg" role="group" aria-label="Comparison mode">
+      <button id="tabOA" aria-pressed="true" type="button">Original vs detected</button>
+      <button id="tabTN" aria-pressed="false" type="button" hidden>Then vs now</button>
+    </div>
+  </div>
+  <div id="cmp" class="cmp" tabindex="0" role="slider" aria-label="Comparison divider, use arrow keys" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+    <div class="layer under"></div>
+    <div class="layer over"></div>
+    <span class="tag l mono" id="tagL">ORIGINAL</span><span class="tag r mono" id="tagR">DETECTED</span>
+    <div class="handle" aria-hidden="true"><span></span></div>
+  </div>
+  <div class="cmp-ctl"><button id="cmpPlay" class="btn ghost" type="button" hidden>Play both</button><span id="verdict" class="verdict mono" hidden></span></div>
+</section>
+
+<section id="ticket" class="panel" aria-labelledby="h-tk" hidden>
+  <div class="sec-head"><span class="num mono">04</span><h2 id="h-tk">Ticket and complaint letter</h2></div>
+  <div class="tk-actions">
+    <button id="fileC" class="btn" type="button">File this as a complaint</button>
+    <button id="pdfBtn" class="btn ghost" type="button">PDF report</button>
+    <span id="tkMsg" class="mono sub" role="status"></span>
+  </div>
+  <ol id="stepper" class="stepper" aria-label="Ticket progress">
+    <li data-i="0"><i></i><span>Reported</span></li><li data-i="1"><i></i><span>Verified</span></li><li data-i="2"><i></i><span>Scheduled</span></li><li data-i="3"><i></i><span>Repaired</span></li>
+  </ol>
+  <div class="tk-grid">
+    <div class="mail" id="mail">
+      <div class="mail-h"><span class="mono" id="mailState">DRAFT</span><span class="mono">Auto complaint letter</span></div>
+      <p><b>To:</b> Belagavi City Corporation, Roads Wing</p>
+      <p><b>Subject:</b> <span id="mSub">Road damage report</span></p>
+      <p id="mBody" class="mbody"></p>
+      <img id="mImg" alt="Detected road damage" hidden>
+      <p class="mono">Ticket: <span id="mTicket">pending</span></p>
+    </div>
+    <div class="qrbox"><div id="qr" aria-label="QR code for the public ticket link"></div><p id="qrHint" class="mono sub">QR appears once filed</p><a id="qrLink" class="mono" href="#" target="_blank" rel="noopener"></a></div>
+  </div>
+</section>
+
+<section id="robust" class="panel" aria-labelledby="h-rb">
+  <div class="sec-head"><span class="num mono">05</span><h2 id="h-rb">Night, fog and rain robustness</h2></div>
+  <div id="metrics" class="metrics"><p class="sub">Loading model metrics...</p></div>
+</section>
+</main>
+
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-label="PDF report preview">
+  <div class="modal-in">
+    <div class="modal-h"><strong>Analysis report</strong><span><a id="pdfDl" class="btn" href="#" download>Download</a> <button id="pdfX" class="btn ghost" type="button">Close</button></span></div>
+    <iframe id="pdfFrame" title="PDF report"></iframe>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="studio.js"></script>
+</body>
+</html>

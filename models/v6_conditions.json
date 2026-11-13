@@ -1,0 +1,114 @@
+{
+  "sets": [
+    "Day",
+    "Night",
+    "Fog",
+    "Smoke",
+    "Dust",
+    "Rain",
+    "Hard RDD day",
+    "Hard RDD night"
+  ],
+  "models": {
+    "pothole_wx_e2.pt": {
+      "Day": {
+        "precision": 0.7697,
+        "recall": 0.6896,
+        "f1": 0.7275,
+        "map50": 0.7696
+      },
+      "Night": {
+        "precision": 0.7156,
+        "recall": 0.5928,
+        "f1": 0.6485,
+        "map50": 0.6717
+      },
+      "Fog": {
+        "precision": 0.7494,
+        "recall": 0.5993,
+        "f1": 0.666,
+        "map50": 0.6876
+      },
+      "Smoke": {
+        "precision": 0.7626,
+        "recall": 0.6587,
+        "f1": 0.7069,
+        "map50": 0.7436
+      },
+      "Dust": {
+        "precision": 0.7629,
+        "recall": 0.6826,
+        "f1": 0.7205,
+        "map50": 0.7599
+      },
+      "Rain": {
+        "precision": 0.7679,
+        "recall": 0.6167,
+        "f1": 0.684,
+        "map50": 0.7111
+      },
+      "Hard RDD day": {
+        "precision": 0.549,
+        "recall": 0.4445,
+        "f1": 0.4912,
+        "map50": 0.4734
+      },
+      "Hard RDD night": {
+        "precision": 0.4125,
+        "recall": 0.2816,
+        "f1": 0.3347,
+        "map50": 0.248
+      }
+    },
+    "pothole_v6.pt": {
+      "Day": {
+        "precision": 0.7847,
+        "recall": 0.709,
+        "f1": 0.7449,
+        "map50": 0.7866
+      },
+      "Night": {
+        "precision": 0.7313,
+        "recall": 0.6272,
+        "f1": 0.6753,
+        "map50": 0.6931
+      },
+      "Fog": {
+        "precision": 0.7764,
+        "recall": 0.6248,
+        "f1": 0.6924,
+        "map50": 0.7167
+      },
+      "Smoke": {
+        "precision": 0.7723,
+        "recall": 0.6946,
+        "f1": 0.7314,
+        "map50": 0.77
+      },
+      "Dust": {
+        "precision": 0.7925,
+        "recall": 0.6898,
+        "f1": 0.7376,
+        "map50": 0.7836
+      },
+      "Rain": {
+        "precision": 0.7445,
+        "recall": 0.6516,
+        "f1": 0.695,
+        "map50": 0.7238
+      },
+      "Hard RDD day": {
+        "precision": 0.5479,
+        "recall": 0.4619,
+        "f1": 0.5013,
+        "map50": 0.4803
+      },
+      "Hard RDD night": {
+        "precision": 0.3918,
+        "recall": 0.2706,
+        "f1": 0.3201,
+        "map50": 0.2428
+      }
+    }
+  }
+}

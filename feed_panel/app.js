@@ -189,28 +189,26 @@
       "<p class=\"note\">" + esc(classes || "No classes") + "</p><div class=\"tlist\">" + list + "</div>" +
       ((i.summary && i.summary.falls && i.summary.falls.length) ? "<div class=\"toast\" style=\"border-left-color:#ff3b30\"><b>Person down detected</b> at " + i.summary.falls.map(function (f) { return f.time_s + " s"; }).join(", ") + " in this video.</div>" : "") + "<a class=\"btn3d primary\" style=\"text-align:center;text-decoration:none\" target=\"_blank\" href=\"" + API + "/api/reports/analysis/" + i.id + ".pdf\">Download PDF report</a></div></div>";
   }
-  $("vgo").onclick = function () {
-    var f = $("vfile").files[0];
-    if (!f) { $("vmsg").textContent = "Choose a video first."; return; }
-    $("vgo").disabled = true; $("vout").innerHTML = ""; $("vprog").classList.remove("hidden"); $("vbar").style.width = "6%";
-    $("vmsg").className = "note"; $("vmsg").textContent = "Uploading and analyzing in " + quality.toUpperCase() + " mode...";
-    post(form(f, true)).then(function (j) { return j.job_id ? pollJob(j.job_id, $("vbar")) : j; })
-      .then(function (i) { $("vout").innerHTML = resultHtml(i, true); $("vmsg").textContent = ""; loadRecent(); })
-      .catch(function (e) { $("vmsg").className = "note err"; $("vmsg").textContent = e.message; })
-      .then(function () { $("vgo").disabled = false; $("vprog").classList.add("hidden"); });
-  };
-  $("pgo").onclick = function () {
-    var fs = Array.prototype.slice.call($("pfile").files);
-    if (!fs.length) { $("pmsg").textContent = "Choose photo(s) first."; return; }
-    $("pgo").disabled = true; $("pout").innerHTML = ""; var n = 0;
+  // one button for photos and videos: each picked file is analysed in turn, videos get a progress bar
+  $("ufile").onchange = function () {
+    var fs = Array.prototype.slice.call(this.files || []);
+    this.value = "";
+    if (!fs.length) return;
+    $("vout").innerHTML = ""; $("pout").innerHTML = ""; $("upbtn").style.pointerEvents = "none"; $("upbtn").style.opacity = ".6";
+    var n = 0;
     fs.reduce(function (p, f) {
+      var isVid = (f.type || "").indexOf("video") === 0 || /\.(mp4|mov|avi|mkv|webm)$/i.test(f.name);
       return p.then(function () {
-        $("pmsg").className = "note"; $("pmsg").textContent = "Analyzing " + (++n) + " of " + fs.length + "...";
-        return post(form(f, false)).then(function (j) { return j.job_id ? pollJob(j.job_id) : j; })
-          .then(function (i) { $("pout").insertAdjacentHTML("beforeend", resultHtml(i, false)); })
-          .catch(function (e) { $("pout").insertAdjacentHTML("beforeend", "<p class=\"note err\">" + esc(f.name) + ": " + esc(e.message) + "</p>"); });
+        $("vmsg").className = "note"; $("vmsg").textContent = "Analyzing " + (++n) + " of " + fs.length + ": " + f.name + (isVid ? " (" + quality.toUpperCase() + " mode)" : "") + "...";
+        if (isVid) { $("vprog").classList.remove("hidden"); $("vbar").style.width = "6%"; }
+        return post(form(f, isVid)).then(function (j) { return j.job_id ? pollJob(j.job_id, isVid ? $("vbar") : null) : j; })
+          .then(function (i) { $(isVid ? "vout" : "pout").insertAdjacentHTML("beforeend", resultHtml(i, isVid)); })
+          .catch(function (e) { $("pout").insertAdjacentHTML("beforeend", "<p class=\"note err\">" + esc(f.name) + ": " + esc(e.message) + "</p>"); })
+          .then(function () { $("vprog").classList.add("hidden"); });
       });
-    }, Promise.resolve()).then(function () { $("pmsg").textContent = "Done."; $("pgo").disabled = false; loadRecent(); });
+    }, Promise.resolve()).then(function () {
+      $("vmsg").textContent = "Done."; $("upbtn").style.pointerEvents = ""; $("upbtn").style.opacity = ""; loadRecent();
+    });
   };
 
   // ---------- live camera

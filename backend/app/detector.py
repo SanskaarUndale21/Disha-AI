@@ -143,76 +143,126 @@ def _iou(a, b):
     return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1]) - inter + 1e-9)
 
 
-def infer(img, cracks=None, conf_floor=None, imgsz=None):
-    """Run the ensemble on one BGR frame. Returns Dets with unified class ids (config.CLASSES)."""
+def _drop_rim_cracks(d):
+    """A crack box that mostly overlaps a pothole box is the pothole's broken rim: drop it."""
+    if not len(d):
+        return d
+    pot = d.xyxy[d.cls == CLS_ID["pothole"]]
+    keep = np.ones(len(d), bool)
+    if len(pot):
+        for i in range(len(d)):
+            if d.cls[i] != CLS_ID["pothole"] and _iou(d.xyxy[i], pot).max() > 0.5:
+                keep[i] = False
+    return d[keep]
+
+
+def infer_batch(frames, cracks=None, conf_floor=None, imgsz=None):
+    """Run the ensemble on several BGR frames at once (one batched GPU call per model). Returns one Dets per frame
+    with unified class ids (config.CLASSES). Batching is what makes video analysis fast."""
     roles = _load()
     cracks = USE_CRACKS if cracks is None else cracks
-    boxes, confs, clss = [], [], []
+    n = len(frames)
+    acc = [([], [], []) for _ in range(n)]
     with _infer_lock:
         for r in roles:
             if r.role in ("cracks", "features") and not cracks:
                 continue
             c = r.conf if conf_floor is None else min(r.conf, conf_floor)
-            res = r.model.predict(img, conf=c, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE, quantize=16,
-                                  verbose=False)[0]
-            b = res.boxes
-            if b is None or not len(b):
-                continue
-            for xy, cf, k in zip(b.xyxy.cpu().numpy(), b.conf.cpu().numpy(), b.cls.cpu().numpy().astype(int)):
-                name = r.cmap.get(int(k))
-                if name is None:
+            results = r.model.predict(list(frames), conf=c, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE,
+                                      quantize=16, verbose=False, batch=max(1, n))
+            for k, res in enumerate(results):
+                b = res.boxes
+                if b is None or not len(b):
                     continue
-                boxes.append(xy)
-                confs.append(float(cf))
-                clss.append(CLS_ID[name])
-    d = Dets(boxes, confs, clss)
-    if len(d):
-        # a crack box that mostly overlaps a pothole box is the pothole's broken rim: drop it
-        pot = d.xyxy[d.cls == CLS_ID["pothole"]]
-        keep = np.ones(len(d), bool)
-        if len(pot):
-            for i in range(len(d)):
-                if d.cls[i] != CLS_ID["pothole"] and _iou(d.xyxy[i], pot).max() > 0.5:
-                    keep[i] = False
-        d = d[keep]
-    return d
+                for xy, cf, cl in zip(b.xyxy.cpu().numpy(), b.conf.cpu().numpy(), b.cls.cpu().numpy().astype(int)):
+                    name = r.cmap.get(int(cl))
+                    if name is None:
+                        continue
+                    acc[k][0].append(xy)
+                    acc[k][1].append(float(cf))
+                    acc[k][2].append(CLS_ID[name])
+    return [_drop_rim_cracks(Dets(*a)) for a in acc]
+
+
+def infer(img, cracks=None, conf_floor=None, imgsz=None):
+    """Run the ensemble on one BGR frame."""
+    return infer_batch([img], cracks=cracks, conf_floor=conf_floor, imgsz=imgsz)[0]
 
 
 FAR_PASS = os.getenv("RD_FAR_PASS", "1") != "0"
 
 
-def infer_far(img, imgsz=None):
-    """Second look at the distant road, where potholes are only a few pixels wide.
+def _tiles(w, h, mode):
+    """Overlapping crops (x1, y1, x2, y2) that magnify small, distant potholes. The old far pass enlarged one wide
+    crop and then shrank it back to the detector size, so it gave no extra detail; these tiles are small enough
+    that the detector sees them at 1.5 to 3 times the normal scale."""
+    tw = 0.42 * w
+    xs = [0.0, (w - tw) / 2, w - tw]
+    th = 0.42 * w * 0.62
+    if mode == "far":      # video: the band between the horizon and the middle of the road
+        bands = [(0.27, 0.27 + th / h)]
+    else:                  # photo: whole frame, two rows
+        bands = [(0.12, 0.12 + th / h), (0.50, 0.50 + th / h)]
+    out = []
+    for b0, b1 in bands:
+        y1, y2 = int(b0 * h), int(min(b1, 0.98) * h)
+        if y2 - y1 < 64:
+            y1, y2 = int(0.25 * h), int(0.7 * h)
+        for x in xs:
+            out.append((int(x), y1, int(x + tw), y2))
+    return out
 
-    The band of the frame between the horizon and the middle of the road is cropped, enlarged 2x and run through
-    the pothole model only; boxes are mapped back to full-frame coordinates. Potholes 10 to 30 m ahead become
-    large enough for the detector to see them.
-    """
-    h, w = img.shape[:2]
-    y1, y2 = int(h * 0.30), int(h * 0.68)
-    x1, x2 = int(w * 0.10), int(w * 0.90)
-    crop = img[y1:y2, x1:x2]
-    if crop.size == 0:
-        return Dets([], [], [])
-    up = cv2.resize(crop, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
-    boxes, confs = [], []
-    with _infer_lock:
-        for r in _load():
-            if r.role != "pothole":
-                continue
-            res = r.model.predict(up, conf=0.2, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE, quantize=16,
-                                  verbose=False)[0].boxes
-            if res is None or not len(res):
-                continue
-            for xy, cf, k in zip(res.xyxy.cpu().numpy(), res.conf.cpu().numpy(), res.cls.cpu().numpy().astype(int)):
-                if r.cmap.get(int(k)) != "pothole":
+
+def _nms_same(d, thr=0.5):
+    order = np.argsort(-d.conf)
+    keep = []
+    for i in order:
+        if all(_iou(d.xyxy[i], d.xyxy[[k]])[0] < thr for k in keep):
+            keep.append(int(i))
+    return d[np.array(keep, int)]
+
+
+def infer_tiles(frames, imgsz=None, mode="far"):
+    """Pothole-only detections from magnified tiles, mapped back to full-frame coordinates. One batched call."""
+    roles = [r for r in _load() if r.role == "pothole"]
+    if not roles or not len(frames):
+        return [Dets([], [], []) for _ in frames]
+    crops, owners = [], []
+    for fi, img in enumerate(frames):
+        h, w = img.shape[:2]
+        for (x1, y1, x2, y2) in _tiles(w, h, mode):
+            c = img[y1:y2, x1:x2]
+            if c.size:
+                crops.append(c)
+                owners.append((fi, x1, y1))
+    acc = [([], []) for _ in frames]
+    if crops:
+        with _infer_lock:
+            r = roles[0]
+            results = r.model.predict(crops, conf=0.2, iou=config.IOU_THRESHOLD, imgsz=imgsz or config.IMG_SIZE,
+                                      quantize=16, verbose=False, batch=min(12, max(1, len(crops))))
+            for (fi, ox, oy), res in zip(owners, results):
+                b = res.boxes
+                if b is None or not len(b):
                     continue
-                bx = xy / 2.0
-                bx[[0, 2]] += x1
-                bx[[1, 3]] += y1
-                boxes.append(bx)
-                confs.append(float(cf) * 0.95)  # tiny discount: the enlarged view is less certain
-    return Dets(boxes, confs, [CLS_ID["pothole"]] * len(boxes))
+                for xy, cf, cl in zip(b.xyxy.cpu().numpy(), b.conf.cpu().numpy(), b.cls.cpu().numpy().astype(int)):
+                    if r.cmap.get(int(cl)) != "pothole":
+                        continue
+                    bx = xy.copy()
+                    bx[[0, 2]] += ox
+                    bx[[1, 3]] += oy
+                    acc[fi][0].append(bx)
+                    acc[fi][1].append(float(cf) * 0.95)  # tiny discount: a tile sees less context
+    out = []
+    for bx, cf in acc:
+        d = Dets(bx, cf, [CLS_ID["pothole"]] * len(bx))
+        out.append(_nms_same(d) if len(d) else d)
+    return out
+
+
+def infer_far(img, imgsz=None):
+    """Single-frame far pass (live camera): horizon band tiles."""
+    return infer_tiles([img], imgsz, "far")[0]
 
 
 def merge_dets(a: Dets, b: Dets, iou_thr=0.45):
@@ -358,6 +408,11 @@ def detect_image(img):
     proc, enhanced = preprocess(img)
     t0 = time.time()
     d = infer_accurate(proc) if ACCURATE_UPLOADS else infer(proc)
+    if FAR_PASS:  # magnified tiles find small, far-away potholes the full-frame pass misses
+        far = infer_tiles([proc], mode="photo")[0]
+        ok = far.conf >= POTHOLE_CONF if len(far) else None
+        if len(far) and ok.any():
+            d = merge_dets(d, Dets(far.xyxy[ok], far.conf[ok], far.cls[ok]))
     rows = rows_from(img, d)
     return rows, {"enhanced": enhanced, "ms": int((time.time() - t0) * 1000)}
 
@@ -385,16 +440,20 @@ class Tracker:
             self.display[tid] = len(self.display) + 1
         return self.display[tid]
 
-    def step(self, frame, cracks=None, time_s=None):
-        """Detect + track one frame. Returns list of rows for the currently visible tracks."""
+    def step(self, frame, cracks=None, time_s=None, dets=None):
+        """Detect + track one frame. Returns list of rows for the currently visible tracks.
+        dets: detections already computed (batched video path); otherwise they are computed here."""
         self.h, self.w = frame.shape[:2]
-        proc, _ = preprocess(frame)
-        d = infer(proc, cracks=cracks, conf_floor=0.1, imgsz=self.imgsz)
-        if FAR_PASS and self.far and self.frame_idx % 2 == 0:
-            self._far = infer_far(proc, self.imgsz)
-        far = getattr(self, "_far", None)
-        if FAR_PASS and self.far and far is not None and len(far):
-            d = merge_dets(d, far)
+        if dets is not None:
+            proc, d = frame, dets
+        else:
+            proc, _ = preprocess(frame)
+            d = infer(proc, cracks=cracks, conf_floor=0.1, imgsz=self.imgsz)
+            if FAR_PASS and self.far and self.frame_idx % 2 == 0:
+                self._far = infer_far(proc, self.imgsz)
+            far = getattr(self, "_far", None)
+            if FAR_PASS and self.far and far is not None and len(far):
+                d = merge_dets(d, far)
         out = self.bt.update(d, proc) if len(d) else self.bt.update(Dets(np.zeros((0, 4)), [], []), proc)
         self.frame_idx += 1
         rows = []
@@ -453,6 +512,8 @@ class Tracker:
             b = dict(tr["best"])
             b["class_name"] = tr["classes"].most_common(1)[0][0]
             b.update(crop=tr["crop"], frames_seen=tr["hits"], track_id=self.display.get(tid, tid))
+            if b.get("tier") != "high" and tr["hits"] >= 6 and float(b.get("confidence") or 0) >= 0.32:
+                b["tier"] = "high"  # seen in many frames: repeat sightings count as confirmation
             rows.append(b)
         rows.sort(key=lambda r: r["track_id"])
         return rows
@@ -475,65 +536,134 @@ def normalize_quality(q):
     return "4k" if str(q or "").lower() in ("4k", "2160p", "uhd") else "2k"
 
 
+VIDEO_BATCH = int(os.getenv("RD_VIDEO_BATCH", "6"))
+MAX_PROCESS_FRAMES = int(os.getenv("RD_MAX_PROCESS_FRAMES", "650"))  # about 30 s of work on this laptop
+VIDEO_BUDGET_S = float(os.getenv("RD_VIDEO_BUDGET_S", "36"))  # analysis target in seconds, uploads finish inside 45 s
+SPARSE_EVERY = int(os.getenv("RD_SPARSE_EVERY", "3"))   # analyse 1 frame in N while nothing is seen
+DENSE_FRAMES = int(os.getenv("RD_DENSE_FRAMES", "24"))   # then analyse every frame for this many frames
+
+
 def detect_video(path, out_path, frame_cb=None, quality="2k", classes=None, falls=True):
-    """Track defects through a video. Returns (unique track rows, meta). Annotated H.264 video is written."""
+    """Track defects through a video. Returns (unique track rows, meta). Annotated H.264 video is written.
+
+    Speed: frames are read in chunks and run through the detector as one batch (far faster than frame by frame);
+    magnified tiles that find distant potholes run on every third frame (every second in 4K); the person/fall check
+    runs about 8 times per second. Every frame is analysed (stride 1) so tracks and confidence accumulate."""
     import imageio.v2 as iio
 
     cap = cv2.VideoCapture(str(path))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     stride = max(1, config.VIDEO_FRAME_STRIDE)
+    if total > MAX_PROCESS_FRAMES:  # long clips: analyse an evenly spaced subset so the wait stays short
+        stride = max(stride, -(-total // MAX_PROCESS_FRAMES))
     writer = iio.get_writer(str(out_path), fps=fps / stride, codec="libx264", quality=7, macro_block_size=8,
                             ffmpeg_log_level="error", pixelformat="yuv420p")
     quality = normalize_quality(quality)
     cfg = VIDEO_QUALITY[quality]
+    tile_every = 2 if quality == "4k" else 3
     tk = Tracker(imgsz=cfg["imgsz"], far=cfg["far"], allow=classes)
     idx = processed = 0
     t0 = time.time()
-    fm, fall_list = None, []
+    fm, fall_list, last_pose = None, [], -1.0
+    safety = None
     if falls:
         try:
             from . import safety
             fm = safety.FallMonitor()
         except Exception as e:
             print(f"[video] fall monitor unavailable: {e!r}")
-    try:
-        while True:
+            fm = None
+    far_held = None
+    last_shown, dense_left = [], 0
+    sparse_every, hurry, tb = SPARSE_EVERY, False, None
+
+    def read_chunk():
+        nonlocal idx
+        chunk = []
+        while len(chunk) < VIDEO_BATCH:
             ok, frame = cap.read()
             if not ok:
                 break
             if idx % stride:
                 idx += 1
                 continue
-            if processed >= config.VIDEO_MAX_FRAMES:
+            if processed + len(chunk) >= config.VIDEO_MAX_FRAMES:
                 break
             fh, fw = frame.shape[:2]
             if max(fh, fw) > cfg["max_side"]:
                 sc = cfg["max_side"] / float(max(fh, fw))
                 frame = cv2.resize(frame, (int(fw * sc) // 2 * 2, int(fh * sc) // 2 * 2), interpolation=cv2.INTER_AREA)
-            rows = tk.step(frame, time_s=idx / fps)
-            shown = [r for r in rows if r["confirmed"]]
-            ann = draw(frame, shown, label_track)
-            hud(ann, len(tk.unique()), tk.by_class())
-            if fm is not None:
-                try:
-                    pots = [(r["track_id"], [r["x1"], r["y1"], r["x2"], r["y2"]]) for r in shown if r.get("class_name") == "pothole" and r.get("track_id") is not None]
-                    people, evs = fm.observe(idx / fps, safety.detect_people(frame), pots)
-                    for pp in people:
-                        x1, y1, x2, y2 = [int(v) for v in pp["box"]]
-                        col = (48, 59, 255) if pp["fallen"] else (255, 255, 255)
-                        cv2.rectangle(ann, (x1, y1), (x2, y2), col, 3 if pp["fallen"] else 1)
-                        if pp["fallen"]:
-                            cv2.putText(ann, "PERSON DOWN", (x1, max(18, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
-                    for ev in evs:
-                        url = safety.snapshot(ann, ev)
-                        em = safety.record_emergency(ev, url)
-                        fall_list.append({"id": em["id"], "time_s": round(idx / fps, 1), "snapshot_url": url, "message": em["message"]})
-                except Exception as e:
-                    print(f"[video] fall check failed: {e!r}")
-            writer.append_data(cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
-            processed += 1
+            chunk.append((idx, frame))
             idx += 1
+        return chunk
+
+    try:
+        while True:
+            chunk = read_chunk()
+            if not chunk:
+                break
+            # adaptive sampling: while the road looks clear only every third frame is analysed; as soon as damage
+            # shows up every frame is analysed for the next stretch, so tracks and confidence build quickly
+            analyse = [k for k in range(len(chunk)) if (dense_left > 0 and not hurry) or k % sparse_every == 0]
+            procs = {k: preprocess(chunk[k][1])[0] for k in analyse}
+            dets_l = infer_batch([procs[k] for k in analyse], conf_floor=0.1, imgsz=cfg["imgsz"])
+            dets = dict(zip(analyse, dets_l))
+            want = [k for k in analyse if (chunk[k][0] // stride) % tile_every == 0] if FAR_PASS else []
+            if want:
+                far_res = infer_tiles([procs[k] for k in want], imgsz=cfg["imgsz"], mode="far")
+                far_by = dict(zip(want, far_res))
+            else:
+                far_by = {}
+            for k, (n, frame) in enumerate(chunk):
+                if k in dets:
+                    if k in far_by:
+                        far_held = far_by[k]
+                    d = dets[k]
+                    if far_held is not None and len(far_held):
+                        d = merge_dets(d, far_held)
+                    rows = tk.step(procs[k], time_s=n / fps, dets=d)
+                    shown = [r for r in rows if r["confirmed"]]
+                    last_shown = shown
+                    seen_damage = any(r.get("class_name") == "pothole" and float(r.get("confidence") or 0) >= 0.3 for r in rows)
+                    dense_left = DENSE_FRAMES if seen_damage else max(0, dense_left - 1)
+                else:
+                    shown = last_shown
+                    dense_left = max(0, dense_left - 1)
+                ann = draw(frame, shown, label_track)
+                hud(ann, len(tk.unique()), tk.by_class())
+                t_s = n / fps
+                if fm is not None and (t_s - last_pose >= 0.12 or last_pose < 0):
+                    last_pose = t_s
+                    try:
+                        pots = [(r["track_id"], [r["x1"], r["y1"], r["x2"], r["y2"]]) for r in shown
+                                if r.get("class_name") == "pothole" and r.get("track_id") is not None]
+                        people, evs = fm.observe(t_s, safety.detect_people(frame), pots)
+                        tk.people_last = people
+                        for ev in evs:
+                            url = safety.snapshot(ann, ev)
+                            em = safety.record_emergency(ev, url)
+                            fall_list.append({"id": em["id"], "time_s": round(t_s, 1), "snapshot_url": url, "message": em["message"]})
+                    except Exception as e:
+                        print(f"[video] fall check failed: {e!r}")
+                for pp in getattr(tk, "people_last", []) or []:
+                    x1, y1, x2, y2 = [int(v) for v in pp["box"]]
+                    col = (48, 59, 255) if pp["fallen"] else (255, 255, 255)
+                    cv2.rectangle(ann, (x1, y1), (x2, y2), col, 3 if pp["fallen"] else 1)
+                    if pp["fallen"]:
+                        cv2.putText(ann, "PERSON DOWN", (x1, max(18, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2, cv2.LINE_AA)
+                writer.append_data(cv2.cvtColor(ann, cv2.COLOR_BGR2RGB))
+                processed += 1
+            if tb is None:
+                tb = (time.time(), idx)  # start the budget clock after the first chunk (model warm-up is not counted)
+            elif total and (idx - tb[1]) / max(1, total - tb[1]) > 0.08:
+                # time budget: if the projected total exceeds it, analyse fewer frames so the user never waits long
+                proj = (time.time() - tb[0]) / ((idx - tb[1]) / max(1, total - tb[1]))
+                if proj > VIDEO_BUDGET_S:
+                    hurry = True
+                    sparse_every = min(12, sparse_every + 1)
+                elif proj < VIDEO_BUDGET_S * 0.6:
+                    hurry, sparse_every = False, max(SPARSE_EVERY, sparse_every - 1)
             if frame_cb and total:
                 frame_cb(min(1.0, idx / total))
     finally:

@@ -18,10 +18,10 @@
   <div class="brand"><span class="mark"></span><b>Disha AI</b><small>Feed panel</small></div>
   <nav class="tabs">
     <button class="key on" data-tab="cam">Live camera</button>
-    <button class="key" data-tab="vid">Video file</button>
-    <button class="key" data-tab="pho">Photo(s)</button>
+    <button class="key" data-tab="up">Upload photo or video</button>
   </nav>
   <span class="chip" id="status"><i></i><span>Connecting</span></span>
+  <a class="key" href="stage.html" style="text-decoration:none">Stage mode</a>
   <button class="key" id="alarmEnable">Enable alarm sound</button>
   <button class="key" id="alarmTest">Test alarm</button>
 </header>
@@ -44,17 +44,12 @@
       <p class="note" id="cmsg"></p>
       <div id="cres"></div>
     </div></section>
-    <section class="pane tilt" id="tab-vid"><div class="card">
-      <label>Video file<input type="file" id="vfile" accept="video/*"></label>
-      <div class="lbl">Quality<div class="seg" id="qseg"><button data-q="2k" class="on">2K (fast)</button><button data-q="4k">4K (detailed)</button></div></div>
-      <button class="btn3d primary" id="vgo">Analyze video</button>
+    <section class="pane tilt" id="tab-up"><div class="card">
+      <label class="btn3d primary" id="upbtn" style="display:block;text-align:center;cursor:pointer;padding:18px;font-size:18px">Upload photo or video<input type="file" id="ufile" accept="image/*,video/*" multiple style="position:absolute;opacity:0;width:0;height:0"></label>
+      <div class="lbl">Video quality<div class="seg" id="qseg"><button data-q="2k" class="on">2K (fast)</button><button data-q="4k">4K (detailed)</button></div></div>
       <div class="prog hidden" id="vprog"><div id="vbar"></div></div>
-      <p class="note" id="vmsg"></p><div id="vout"></div>
-    </div></section>
-    <section class="pane tilt" id="tab-pho"><div class="card">
-      <label>Photo(s)<input type="file" id="pfile" accept="image/*" multiple></label>
-      <button class="btn3d primary" id="pgo">Analyze photos</button>
-      <p class="note" id="pmsg"></p><div id="pout" class="thumbs"></div>
+      <p class="note" id="vmsg">Choose one or more photos or videos. Analysis starts as soon as you pick them.</p>
+      <div id="vout"></div><div id="pout" class="thumbs"></div>
     </div></section>
   </div>
   <aside class="card tilt">

@@ -229,13 +229,23 @@ def delay_fields(d, total):
             "delay_growth_pct_week": round(g * 100, 1)}
 
 
+_cost_cache: dict = {}
+
+
 def cost_rows(s, status: str = "active"):
-    q = s.query(Defect)
+    """Repair cost rows. Detections and inspections are loaded in two bulk queries (not one lazy query per defect)
+    and the result is cached for 90 seconds, so the cost, budget and insights pages answer instantly."""
+    hit = _cost_cache.get(status)
+    if hit and time.time() - hit[0] < 90:
+        return hit[1]
+    from sqlalchemy.orm import defer, joinedload, selectinload
+    q = s.query(Defect).options(defer(Defect.embedding), selectinload(Defect.detections).joinedload(Detection.inspection))
     if status and status != "all":
         q = q.filter(Defect.status == status)
     else:
         q = q.filter(Defect.status != "rejected")
     rows = [r for r in (estimate(d) for d in q.order_by(Defect.risk_score.desc()).all()) if r]
+    _cost_cache[status] = (time.time(), rows)
     return rows
 
 
