@@ -163,13 +163,19 @@ def run_check(data: bytes, filename: str, device_id=None, phone=None, user_id=No
             events.publish("screening.checked", out)
             return out
         mtype, dmg, rows, preview = _analyse(data, filename)
+        ai = {"ai": False, "score": None}
+        if mtype == "image":
+            from . import aigen
+            ai = aigen.check(data)
         name = f"scr_{uuid.uuid4().hex}.jpg"
         cv2.imwrite(str(config.ANNOTATED / name), preview, [cv2.IMWRITE_JPEG_QUALITY, 85])
         summary = {}
         for r in dmg:
             summary[r["class_name"]] = summary.get(r["class_name"], 0) + 1
-        ok = bool(dmg)
-        if ok:
+        ok = bool(dmg) and not ai["ai"]
+        if ai["ai"]:
+            reason = ai["reason"] + " Reports must use real photos taken at the road. AI generated images are not accepted."
+        elif ok:
             parts = [f"{v} {k.replace('_', ' ')}{'s' if v > 1 else ''}" for k, v in summary.items()]
             reason = "Road damage found: " + ", ".join(parts)
         elif rows:

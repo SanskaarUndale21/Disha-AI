@@ -252,6 +252,8 @@ def register_ws(app):
                     t = m.get("type")
                     if t == "config":
                         sess.cracks = bool(m.get("cracks", True))
+                        if "sensitivity" in m:
+                            sess.tk.set_sensitive(m["sensitivity"] in ("max", "high", True))
                         if "classes" in m:
                             sess.tk.allow = set(m["classes"]) or None
                         if "people" in m:

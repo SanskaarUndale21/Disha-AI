@@ -426,6 +426,8 @@ class Tracker:
 
     def __init__(self, imgsz=None, far=True, allow=None):
         from ultralytics.trackers.byte_tracker import BYTETracker
+        self.sensitive = False
+        self.min_hits = config.TRACK_MIN_HITS
         self.bt = BYTETracker(TRACK_ARGS)
         self.tracks = {}
         self.display = {}
@@ -434,6 +436,17 @@ class Tracker:
         self.far = far
         self.allow = set(allow) if allow else None
         self.w = self.h = 0
+
+    def set_sensitive(self, on: bool):
+        """Maximum-sensitivity mode for demos and live feeds: lower tracking thresholds, confirm after 2 sightings, and run
+        the magnified tile pass on every other frame. Finds more (and some doubtful) potholes."""
+        self.sensitive = bool(on)
+        self.min_hits = 2 if on else config.TRACK_MIN_HITS
+        a = SimpleNamespace(**vars(TRACK_ARGS))
+        if on:
+            a.track_high_thresh, a.track_low_thresh, a.new_track_thresh = 0.14, 0.05, 0.14
+        from ultralytics.trackers.byte_tracker import BYTETracker
+        self.bt = BYTETracker(a)
 
     def disp(self, tid):
         if tid not in self.display:
@@ -450,7 +463,7 @@ class Tracker:
             proc, _ = preprocess(frame)
             d = infer(proc, cracks=cracks, conf_floor=0.1, imgsz=self.imgsz)
             if FAR_PASS and self.far and self.frame_idx % 2 == 0:
-                self._far = infer_far(proc, self.imgsz)
+                self._far = infer_tiles([proc], self.imgsz, "photo" if self.sensitive else "far")[0]
             far = getattr(self, "_far", None)
             if FAR_PASS and self.far and far is not None and len(far):
                 d = merge_dets(d, far)
@@ -470,7 +483,7 @@ class Tracker:
             cls = tr["classes"].most_common(1)[0][0]
             x1, y1 = max(0.0, float(x1)), max(0.0, float(y1))
             x2, y2 = min(float(self.w), float(x2)), min(float(self.h), float(y2))
-            confirmed = tr["hits"] >= config.TRACK_MIN_HITS
+            confirmed = tr["hits"] >= self.min_hits
             cache = tr.get("ana")
             if not confirmed and cache is None:
                 # unconfirmed flicker: skip the OpenCV analysis, it is only drawn as a dashed box
@@ -499,7 +512,7 @@ class Tracker:
         return rows
 
     def unique(self):
-        return [t for t in self.tracks.values() if t["hits"] >= config.TRACK_MIN_HITS]
+        return [t for t in self.tracks.values() if t["hits"] >= self.min_hits]
 
     def by_class(self):
         return dict(Counter(t["classes"].most_common(1)[0][0] for t in self.unique()))
@@ -507,7 +520,7 @@ class Tracker:
     def final_rows(self):
         rows = []
         for tid, tr in self.tracks.items():
-            if tr["hits"] < config.TRACK_MIN_HITS or tr["best"] is None:
+            if tr["hits"] < self.min_hits or tr["best"] is None:
                 continue
             b = dict(tr["best"])
             b["class_name"] = tr["classes"].most_common(1)[0][0]

@@ -67,7 +67,7 @@
     return new Promise(function (ok, bad) {
       var s = new WebSocket(API.replace("http", "ws") + "/ws/live");
       s.binaryType = "arraybuffer";
-      s.onopen = function () { ws = s; wsSend({ type: "config", cracks: true, people: true, hazards: true }); ok(s); };
+      s.onopen = function () { ws = s; wsSend({ type: "config", cracks: true, people: true, hazards: true, sensitivity: "max" }); ok(s); };
       s.onerror = function () { bad(new Error("Cannot reach the detection server")); };
       s.onclose = function () { if (ws === s) { running = false; setLive(false, "OFFLINE"); } };
       s.onmessage = function (e) {
