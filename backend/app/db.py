@@ -149,9 +149,19 @@ class Complaint(Base):
     address = Column(String(255))
     status = Column(String(20), default="submitted")  # submitted | in_review | in_progress | resolved | rejected
     admin_note = Column(Text)
+    report_count = Column(Integer, default=1)  # 1 + citizens who reported the same spot (shown as +N in admin)
     created_at = Column(DateTime, default=now)
     updated_at = Column(DateTime, default=now)
     media = relationship("ComplaintMedia", back_populates="complaint", cascade="all, delete-orphan")
+
+
+class ComplaintVote(Base):
+    """One row per citizen (device, phone or account) that re-reported an existing complaint, so nobody counts twice."""
+    __tablename__ = "complaint_votes"
+    id = Column(Integer, primary_key=True)
+    complaint_id = Column(Integer, ForeignKey("complaints.id"), index=True)
+    voter = Column(String(100), index=True)
+    created_at = Column(DateTime, default=now)
 
 
 class ComplaintMedia(Base):
@@ -187,7 +197,7 @@ def init_db():
 def _add_missing_columns():
     """create_all never alters existing tables: add columns introduced later (additive only)."""
     from sqlalchemy import inspect, text
-    wanted = {"complaints": {"citizen_user_id": "VARCHAR(64)"}}
+    wanted = {"complaints": {"citizen_user_id": "VARCHAR(64)", "report_count": "INTEGER DEFAULT 1"}}
     insp = inspect(engine)
     with engine.begin() as conn:
         for table, cols in wanted.items():

@@ -841,6 +841,7 @@
       R.sending = false; R.done = c; lsSet("rw-last", c.ticket || "");
       if (Array.isArray(complaints)) complaints = [c].concat(complaints.filter(function (x) { return x.id !== c.id; })); else complaints = null;
       var snap = lsJson("rw-snap", {}) || {}; snap[c.id] = c.status || "submitted"; lsSetJson("rw-snap", snap);
+      if (c.duplicate && c.message) toast(c.message, { ms: 9000 });
       go("#/report/done");
     }, function (e) {
       if (e.status === 0 || e.status === -1) return queueIt(f, e);

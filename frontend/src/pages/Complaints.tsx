@@ -86,7 +86,7 @@ export default function Complaints() {
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} className={`click ${sel?.id === c.id ? 'selrow' : ''}`} onClick={() => open(c)}>
-                  <td><span className="uid">{c.ticket}</span></td>
+                  <td><span className="uid">{c.ticket}</span>{(c.report_count ?? 1) > 1 && <span className="pill" style={{ marginLeft: 6 }} title="Citizens who reported this same spot">+{c.report_count - 1}</span>}</td>
                   <td>{c.category}</td>
                   <td style={{ maxWidth: 260 }}>{(c.description ?? '').slice(0, 80)}</td>
                   <td>{c.citizen_name ?? c.citizen_phone ?? 'anonymous'}</td>
@@ -103,7 +103,7 @@ export default function Complaints() {
           {sel ? (
             <div className="card grid" style={{ gap: 10 }}>
               <div className="row">
-                <span className="uid" style={{ fontSize: 15 }}>{sel.ticket}</span>
+                <span className="uid" style={{ fontSize: 15 }}>{sel.ticket}</span>{(sel.report_count ?? 1) > 1 && <span className="pill" style={{ marginLeft: 6 }}>{sel.report_count} reports, +{sel.report_count - 1}</span>}
                 <StatusPill s={sel.status} />
                 <span className="spacer" />
                 <button className="btn sm" onClick={() => setSel(null)}>Close</button>

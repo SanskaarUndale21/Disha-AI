@@ -20,7 +20,7 @@ from . import auth, config, detector, events, live, pipeline, reports, scoring, 
 from . import severity as severity_mod
 from . import routing
 from . import screening
-from .db import (Complaint, ComplaintMedia, Defect, DefectHistory, Detection, Inspection, SessionLocal, get_session,
+from .db import (Complaint, ComplaintMedia, ComplaintVote, Defect, DefectHistory, Detection, Inspection, SessionLocal, get_session,
                  init_db, now)
 from .geo import GpxTrack, haversine_m, read_exif
 from . import ops
@@ -668,7 +668,21 @@ def ser_complaint(c: Complaint):
         "citizen_name": c.citizen_name, "citizen_phone": c.citizen_phone, "lat": c.lat, "lon": c.lon,
         "address": c.address, "status": c.status, "admin_note": c.admin_note, "created_at": c.created_at,
         "updated_at": c.updated_at, "media": media, "findings": findings,
+        "report_count": c.report_count or 1,
     }
+
+
+DUP_RADIUS_M = 30.0
+OPEN_COMPLAINT = ("submitted", "in_review", "in_progress")
+
+
+def _find_nearby_complaint(s, category, la, lo):
+    from .geo import haversine_m
+    d = DUP_RADIUS_M / 111000.0
+    rows = (s.query(Complaint).filter(Complaint.category == category, Complaint.status.in_(OPEN_COMPLAINT),
+                                      Complaint.lat.between(la - d, la + d), Complaint.lon.between(lo - 2 * d, lo + 2 * d)).all())
+    rows = [c for c in rows if haversine_m(la, lo, c.lat, c.lon) <= DUP_RADIUS_M]
+    return min(rows, key=lambda c: haversine_m(la, lo, c.lat, c.lon)) if rows else None
 
 
 @app.post("/api/complaints")
@@ -721,6 +735,35 @@ async def create_complaint(
     if user:
         citizen_name = citizen_name or user.get("full_name")
         citizen_phone = citizen_phone or user.get("phone")
+    # same spot already reported and still open: count this as +1 on the existing complaint instead of a new ticket
+    voter = (user or {}).get("id") or citizen_phone or device_id
+    dup = _find_nearby_complaint(s, category, la, lo) if la is not None and lo is not None else None
+    if dup is not None:
+        mine = voter and (voter == dup.citizen_user_id or voter == dup.citizen_phone or voter == dup.device_id)
+        seen = bool(voter) and s.query(ComplaintVote).filter_by(complaint_id=dup.id, voter=str(voter)[:100]).first() is not None
+        if not mine and not seen:
+            dup.report_count = (dup.report_count or 1) + 1
+            if voter:
+                s.add(ComplaintVote(complaint_id=dup.id, voter=str(voter)[:100]))
+            dup.updated_at = now()
+            s.commit()
+        who = "citizen: " + (citizen_name or citizen_phone or "anonymous")
+        for f in files:
+            data = await f.read()
+            try:
+                insp, res = _ingest(s, data, f.filename, la, lo, road_name=address, inspector=who, notes=f"Extra report for {dup.ticket}")
+            except HTTPException:
+                s.rollback()
+                continue
+            s.add(ComplaintMedia(complaint_id=dup.id, inspection_id=insp.id, job_id=res.get("job_id"), media_type=insp.media_type))
+            s.commit()
+        s.refresh(dup)
+        screening.link(check_ids, dup.id)
+        out = ser_complaint(dup)
+        out.update(duplicate=True, already_reported=True,
+                   message=f"This spot is already reported as {dup.ticket}. Your report was added to it ({dup.report_count} reports now).")
+        events.publish("complaint.updated", out, audience="officer")
+        return out
     c = Complaint(category=category, description=description.strip(), citizen_name=citizen_name,
                   citizen_phone=citizen_phone, device_id=device_id, lat=la, lon=lo, address=address,
                   citizen_user_id=user["id"] if user else None)
