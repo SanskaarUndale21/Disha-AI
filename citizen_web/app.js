@@ -977,7 +977,7 @@
   var mapLoaded = false, coachDismissed = false;
   function viewMap(p) {
     var frame = $("mapframe"), err = $("map-err");
-    var hash = p.q.lat && p.q.lon ? "#" + p.q.lat + "," + p.q.lon : "", ml = I18N.get() === "hi" ? "hi" : "en", mp = "/map?lang=" + ml;
+    var hash = p.q.lat && p.q.lon ? "#" + p.q.lat + "," + p.q.lon : "", ml = I18N.get() === "hi" ? "hi" : "en", mp = "/map?cz=1&lang=" + ml;
     $("map-coach").hidden = !(p.q.dir === "1" && !coachDismissed);
     function load() {
       err.hidden = true;

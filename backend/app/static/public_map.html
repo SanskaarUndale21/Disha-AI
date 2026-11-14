@@ -403,7 +403,7 @@ body.cz .delta{font-size:28px;margin-bottom:10px}body.cz .opts{display:none}body
 
   var EMBED = Q.get("embed") === "1"; if (EMBED) document.body.classList.add("embed");
   var APP = Q.get("app") === "1"; if (APP) document.body.classList.add("app");
-  var CZ = (APP || window.innerWidth < 700) && !EMBED; if (CZ) document.body.classList.add("cz");
+  var CZ = (APP || Q.get("cz") === "1" || window.innerWidth < 700) && !EMBED; if (CZ) document.body.classList.add("cz");
   function homeSnap() { return CZ ? "half" : "peek"; }
   var LANG = (Q.get("lang") || "en").toLowerCase().indexOf("hi") === 0 ? "hi" : "en";
   var SIM_KMH = parseFloat(Q.get("simkmh")) || 40;
@@ -873,7 +873,7 @@ body.cz .delta{font-size:28px;margin-bottom:10px}body.cz .opts{display:none}body
     }
     var d = REC.data;
     if (!d) return '<div class="card flat"><div class="sec" style="margin:0">Already recorded here</div><div class="msg">Counting recorded potholes...</div></div>';
-    var rd = (d.worst_roads || []).slice(0, 3).map(function (r) { return "<div class='kvr'><span>" + esc(r.road) + "</span><b>" + r.open + " open</b></div>"; }).join("");
+    var rd = (d.worst_roads || []).slice(0, 3).map(function (r) { return "<div style='display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid #e9e4cf;font-size:14px'><span>" + esc(r.road) + "</span><b style='white-space:nowrap'>" + r.open + " open</b></div>"; }).join("");
     return '<div class="card flat"><div class="sec" style="margin:0 0 6px">Already recorded within ' + d.radius_km + ' km</div>' +
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">' +
       '<div><div style="font:400 30px/1 Instrument Serif,serif">' + d.potholes_open + '</div><small>potholes open</small></div>' +
