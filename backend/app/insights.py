@@ -153,6 +153,39 @@ def accountability():
         s.close()
 
 
+def recorded_near(lat, lon, radius_km):
+    """Everything already on record around a point: open and repaired defects by type, how many were serious, how many
+    citizen reports back them, open complaints, plus the worst streets by name when the road register knows them."""
+    s = SessionLocal()
+    try:
+        dlat = radius_km / 110.54
+        dlon = radius_km / (111.32 * max(0.2, math.cos(math.radians(lat))))
+        rows = (s.query(Defect).filter(Defect.lat.between(lat - dlat, lat + dlat), Defect.lon.between(lon - dlon, lon + dlon),
+                                       Defect.status.in_(("active", "repaired"))).all())
+        rows = [d for d in rows if haversine_m(lat, lon, d.lat, d.lon) <= radius_km * 1000]
+        act = [d for d in rows if d.status == "active"]
+        by = {}
+        for d in act:
+            by[d.class_name] = by.get(d.class_name, 0) + 1
+        comps = (s.query(Complaint).filter(Complaint.lat.between(lat - dlat, lat + dlat), Complaint.lon.between(lon - dlon, lon + dlon),
+                                           Complaint.status.in_(("submitted", "in_review", "in_progress"))).count())
+        oldest = min((d.first_seen for d in act if d.first_seen), default=None)
+        assets = []
+        for a_ in s.query(RoadAsset).all():
+            if haversine_m(lat, lon, a_.center_lat, a_.center_lon) <= radius_km * 1000 + (a_.radius_m or 0):
+                n = sum(1 for d in act if haversine_m(a_.center_lat, a_.center_lon, d.lat, d.lon) <= (a_.radius_m or 600))
+                assets.append({"road": a_.name, "open": n})
+        assets.sort(key=lambda x: -x["open"])
+        return {"radius_km": radius_km, "recorded_total": len(rows), "open": len(act), "repaired": len(rows) - len(act),
+                "potholes_open": by.get("pothole", 0), "serious_open": sum(1 for d in act if (d.risk_score or 0) >= 70),
+                "reports_behind": int(sum((d.report_count or 1) for d in act)), "open_complaints": comps, "by_class": by,
+                "oldest_open_days": (now() - oldest).days if oldest else None, "worst_roads": [a_ for a_ in assets if a_["open"]][:5],
+                "source": "Disha AI records: citizen reports, AI detections and field uploads",
+                "external": {"osm_tagged_potholes": 0, "note": "OpenStreetMap holds no tagged potholes for this region, so recorded potholes come from Disha AI data"}}
+    finally:
+        s.close()
+
+
 class NearBody(BaseModel):
     lat: float
     lon: float
@@ -178,6 +211,12 @@ def register(app):
     @app.get("/api/insights/accountability")
     def api_accountability():
         return accountability()
+
+    @app.get("/api/recorded")
+    def api_recorded(lat: float, lon: float, radius_km: float = 5.0):
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise HTTPException(400, "Invalid location")
+        return recorded_near(lat, lon, max(0.3, min(radius_km, 50.0)))
 
     @app.post("/api/nearmiss")
     def post_nearmiss(b: NearBody):

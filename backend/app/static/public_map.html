@@ -841,6 +841,7 @@ body.cz .delta{font-size:28px;margin-bottom:10px}body.cz .opts{display:none}body
   function czHome() {
     rowIndex = {};
     var h = '<div class="tiles">' + tile("home", "home", "Home", saved.home ? saved.home.name : "Tap to set") + tile("work", "work", "Work", saved.work ? saved.work.name : "Tap to set") + tile("hospital", "hosp", "Hospital", "Nearby") + tile("fuel", "fuel", "Petrol", "Nearby") + "</div>";
+    h += recordedHtml();
     h += hotspotsHtml(3, "Worst roads near you");
     h += '<button class="report" data-act="report">' + ic("warn") + "Report a pothole here</button>";
     if (recents.length) { h += '<div class="sec">Recent</div>'; recents.slice(0, 2).forEach(function (p, i) { rowIndex["r" + i] = p; h += rowHtml("hist", "", p.name, p.address, 'data-pl="r' + i + '"'); }); }
@@ -849,7 +850,7 @@ body.cz .delta{font-size:28px;margin-bottom:10px}body.cz .opts{display:none}body
   function homeBody() {
     if (CZ) return czHome();
     var h = '<div class="qc"><button data-slot="home">' + ic("home", "s") + "Home" + (saved.home ? "" : " <small>Set</small>") + '</button><button data-slot="work">' + ic("work", "s") + "Work" + (saved.work ? "" : " <small>Set</small>") + '</button><button data-slot="star">' + ic("star", "s") + "Starred" + (saved.stars.length ? " <small>" + saved.stars.length + "</small>" : "") + "</button></div>";
-    rowIndex = {}; h += hotspotsHtml();
+    rowIndex = {}; h += recordedHtml(); h += hotspotsHtml();
     h += '<div class="row pad" style="margin-top:6px"><button class="btn p big" data-act="plan">' + ic("dir", "s") + "Plan a trip</button></div>";
     if (recents.length) { h += '<div class="sec">Recent</div>'; recents.slice(0, 4).forEach(function (p, i) { rowIndex["r" + i] = p; h += rowHtml("hist", "", p.name, p.address, 'data-pl="r' + i + '"'); }); }
     h += '<div class="tip">' + ic("pin", "s") + "<span>Press and hold anywhere on the map to drop a pin.</span></div>";
@@ -861,6 +862,25 @@ body.cz .delta{font-size:28px;margin-bottom:10px}body.cz .opts{display:none}body
     ZN[k] = { name: "", pending: true };
     reverse(c.lat, c.lon).then(function (r) { ZN[k] = { name: /^[\d.]+, ?[\d.]+$/.test(r.name) ? "Damage hotspot" : r.name }; renderBodyIfHome(); });
     return "";
+  }
+  var REC = { key: "", data: null, loading: false };
+  function recordedHtml() {
+    var ref = refPt(), key = ref.lat.toFixed(2) + "," + ref.lon.toFixed(2);
+    if (REC.key !== key && !REC.loading) {
+      REC.loading = true; REC.key = key;
+      fetch("/api/recorded?lat=" + ref.lat + "&lon=" + ref.lon + "&radius_km=5").then(function (r) { return r.json(); })
+        .then(function (j) { REC.data = j; REC.loading = false; renderBodyIfHome(); }).catch(function () { REC.loading = false; });
+    }
+    var d = REC.data;
+    if (!d) return '<div class="card flat"><div class="sec" style="margin:0">Already recorded here</div><div class="msg">Counting recorded potholes...</div></div>';
+    var rd = (d.worst_roads || []).slice(0, 3).map(function (r) { return "<div class='kvr'><span>" + esc(r.road) + "</span><b>" + r.open + " open</b></div>"; }).join("");
+    return '<div class="card flat"><div class="sec" style="margin:0 0 6px">Already recorded within ' + d.radius_km + ' km</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">' +
+      '<div><div style="font:400 30px/1 Instrument Serif,serif">' + d.potholes_open + '</div><small>potholes open</small></div>' +
+      '<div><div style="font:400 30px/1 Instrument Serif,serif;color:#E07A5F">' + d.serious_open + '</div><small>serious</small></div>' +
+      '<div><div style="font:400 30px/1 Instrument Serif,serif;color:#5E9C7E">' + d.repaired + '</div><small>repaired</small></div></div>' +
+      '<p class="hint" style="margin:10px 0 4px">' + d.reports_behind + " citizen reports behind them, " + d.open_complaints + " complaints open" + (d.oldest_open_days != null ? ", oldest " + d.oldest_open_days + " days" : "") + ".</p>" +
+      rd + '<p class="hint" style="margin:6px 0 0;font-size:11.5px">' + esc(d.external && d.external.note || "") + "</p></div>";
   }
   function hotspotsHtml(n, title) {
     var ref = refPt(), z = (D.zones || []).filter(function (c) { return c.level !== "green"; });
