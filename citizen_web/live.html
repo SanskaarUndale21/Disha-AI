@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Disha AI Live feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="live.css">
+</head>
+<body>
+<video id="vid" playsinline muted loop preload="auto"></video>
+<canvas id="cv"></canvas>
+<div class="vignette"></div><div class="scan"></div>
+<div class="brk tl"></div><div class="brk tr"></div><div class="brk bl"></div><div class="brk br"></div>
+
+<header class="bar glass">
+  <span class="brand"><i></i>Disha AI</span>
+  <span class="chip" id="chipLive"><b></b><span id="liveTxt">STANDBY</span></span>
+  <span class="mono stat">FPS <b id="fps">0</b></span>
+  <span class="mono stat">LATENCY <b id="lat">0</b> ms</span>
+  <span class="mono stat hide-sm">FRAME <b id="frm">0</b></span>
+  <span class="sp"></span>
+  <button class="mini" id="fsBtn" title="Full screen (Esc exits)">Full screen</button>
+  <a class="mini" href="index.html#/home">Exit</a>
+</header>
+
+<aside class="panel glass" id="panel">
+  <h3 class="mono">LIVE COUNTERS</h3>
+  <div class="grid">
+    <div><b id="cUniq">0</b><span>unique potholes</span></div>
+    <div><b id="cSev" class="hot">0</b><span>serious</span></div>
+    <div><b id="cCrack">0</b><span>cracks</span></div>
+    <div><b id="cRaw">0</b><span>raw detections</span></div>
+  </div>
+  <p class="mono dedupe" id="dedupe">raw 0 vs unique 0</p>
+  <h3 class="mono">ROAD RISK</h3>
+  <canvas id="spark" width="240" height="56"></canvas>
+</aside>
+
+<div id="banner" class="banner" role="alert" aria-live="assertive"><small class="mono" id="bTag">HAZARD</small><b id="bTxt"></b></div>
+<div id="alarm" class="alarm"><b>EMERGENCY</b><span id="alMsg"></span></div>
+
+<div id="start" class="start">
+  <div class="card glass">
+    <h1>Disha AI</h1>
+    <p>Live road feed. Point your camera at the road, or watch a demo drive: potholes are found, boxed, tracked and announced before you reach them.</p>
+    <button class="big" id="btnDemo">Start demo drive</button>
+    <button class="big alt" id="btnCam">Use my camera</button>
+    <p class="mono msg" id="msg"></p>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="live.js"></script>
+</body>
+</html>
