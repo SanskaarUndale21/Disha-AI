@@ -947,7 +947,10 @@ select { background-repeat: no-repeat; }
 .rail-group a.active:has(.nb)::after { display: none; }
 .rail-group .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .rail .nb { background: var(--terra); color: #1a0d08; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: inline-grid; place-items: center; padding: 0 6px; }
-.rail-foot { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rail-foot { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); min-width: 0; overflow: hidden; }
+.rail-foot > * { min-width: 0; }
+.rail .userbox { min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden; }
+.rail .userbox .icon-btn { flex: none; }
 .rail-link { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; border-radius: 14px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .rail-link:hover { background: var(--fill); color: var(--ink); }
 .rail-ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
