@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/media/:path*",
-      "destination": "https://canvas-dispatch-front-gen.trycloudflare.com/media/:path*"
+      "destination": "https://projectors-obligations-occurring-naturally.trycloudflare.com/media/:path*"
     },
     {
       "source": "/((?!assets/|media/|.*\\..*).*)",
